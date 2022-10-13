@@ -49,13 +49,13 @@ class ExactGPModel(gpytorch.models.ExactGP):
         if kernel_text == "RBF":
             self.covar_module = gpytorch.kernels.RBFKernel()
         elif kernel_text == "SIN":
-            self.covar_module = gpytorch.kernels.PeriodicKernel()
+            self.covar_module = gpytorch.kernels.CosineKernel()
         elif kernel_text == "SIN+RBF":
-            self.covar_module = gpytorch.kernels.PeriodicKernel() + gpytorch.kernels.RBFKernel()
+            self.covar_module = gpytorch.kernels.CosineKernel() + gpytorch.kernels.RBFKernel()
         elif kernel_text == "SIN*RBF":
-            self.covar_module = gpytorch.kernels.PeriodicKernel() * gpytorch.kernels.RBFKernel()
+            self.covar_module = gpytorch.kernels.CosineKernel() * gpytorch.kernels.RBFKernel()
         elif kernel_text == "SIN*LIN":
-            self.covar_module = gpytorch.kernels.PeriodicKernel() * gpytorch.kernels.LinearKernel()
+            self.covar_module = gpytorch.kernels.CosineKernel() * gpytorch.kernels.LinearKernel()
 
 
 
@@ -190,7 +190,7 @@ def run_experiment(config_file):
 
     """
 
-    EXPERIMENT_REPITITIONS = 20
+    EXPERIMENT_REPITITIONS = 1
 
     ### Initialization
     var_dict = load_config(config_file)
@@ -205,6 +205,9 @@ def run_experiment(config_file):
     train_START = -5.
     train_END = 5.
     train_COUNT = 10
+    eval_START = -10
+    eval_END = 10
+    eval_COUNT = 500
 
     ## Create train data
     # Create base model to generate data
@@ -215,7 +218,7 @@ def run_experiment(config_file):
     # initialize likelihood and model
     data_likelihood = gpytorch.likelihoods.GaussianLikelihood()
     data_model = ExactGPModel(prior_x, prior_y, data_likelihood, kernel_text="SIN")
-    observations_x = torch.linspace(train_START, train_END, train_COUNT)
+    observations_x = torch.linspace(eval_START, eval_END, eval_COUNT)
     # Get into evaluation (predictive posterior) mode
     data_model.eval()
     data_likelihood.eval()
@@ -231,13 +234,14 @@ def run_experiment(config_file):
     f_var = f_preds.variance
     f_covar = f_preds.covariance_matrix
     observations_y = f_preds.sample()           # samples from the model
-    #y_samples = observed_pred_prior.sample()    # samples drawn from likelihood(model)
 
-    X = observations_x
-    Y = observations_y
+
+    X = observations_x[int(0.25*eval_COUNT):int(0.75*eval_COUNT)]
+    Y = observations_y[int(0.25*eval_COUNT):int(0.75*eval_COUNT)]
 
     # Run CKS
-    list_of_kernels = [gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel()), gpytorch.kernels.ScaleKernel(gpytorch.kernels.PeriodicKernel()), gpytorch.kernels.ScaleKernel(gpytorch.kernels.LinearKernel())]
+    list_of_kernels = [gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel()), gpytorch.kernels.ScaleKernel(gpytorch.kernels.CosineKernel())]
+    likelihood = gpytorch.likelihoods.GaussianLikelihood()
     list_of_variances = [4.0 for i in range(28)]
     model, likelihood = CKS(X, Y, likelihood, list_of_kernels, list_of_variances, experiment, iterations=3, metric="Laplace")
 
@@ -249,15 +253,31 @@ def run_experiment(config_file):
     # Store the selected kernels over time in a parseable way
     # Store the parameters over time
     #
-    monte_carlo_simulate(model, likelihood, 100)
+    #monte_carlo_simulate(model, likelihood, 100)
 
     ### Calculating various metrics
     # Metrics
     # - RMSE?
     #
+    model.eval()
+    likelihood.eval()
+    with torch.no_grad(), gpytorch.settings.prior_mode(True):
+        observed_pred_prior = likelihood(model(observations_x))
+        f_preds = model(observations_x)
+        mean_posterior = observed_pred_prior.mean
+        lower_posterior, upper_posterior = observed_pred_prior.confidence_region()
 
+    mean_y = model(observations_x).mean
 
-    eval_rmse = RMSE(test_y.numpy(), mean.numpy())
+    #posterior_plot = experiment.plot_model("Posterior", 1, observations_x, X, Y, lower_posterior, upper_posterior, mean_posterior, ylim=[-3, 3], orig_data=None)
+    #posterior_plot.plot()
+    f, ax = plt.subplots()
+    f, ax = model.plot_model(return_figure=True, figure = f, ax=ax)
+    ax.plot(observations_x, observations_y, 'r*')
+    plt.show()
+
+    eval_rmse = RMSE(observations_y.numpy(), mean_y.detach().numpy())
+    print(eval_rmse)
     experiment.store_result("eval RMSE", eval_rmse)
 
     ### Plotting

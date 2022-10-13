@@ -5,14 +5,14 @@ as well as operations to fill an arbitrary dictionary of options with the missin
 
 default_options = {
     "training": {"print_training_output" : False,
-                 "print_optimizing_output": True,
-                 "max_iter": 50,
+                 "print_optimizing_output": False,
+                 "max_iter": 10,
                  "learning_rate": 0.1,
                  "restarts": 5,
                  "optimization method": "botorch"},
     "kernel search": {"print": False,
                       "probability graph": False,
-                      "multithreading": True},
+                      "multithreading": False},
     "plotting": {"border_ratio": 0.0,
                  "sample_points": 1000,
                  "legend": True},

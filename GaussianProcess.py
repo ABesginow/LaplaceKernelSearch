@@ -59,7 +59,7 @@ class ExactGPModel(gpt.models.ExactGP):
         mll = gpt.mlls.ExactMarginalLogLikelihood(self.likelihood, self)
         output = self.__call__(self.train_inputs[0])
         loss = -mll(output, self.train_targets)
-        return loss.item()
+        return loss
 
     def get_ll(self, X = None, Y = None):
         self.eval()
@@ -114,7 +114,7 @@ class ExactGPModel(gpt.models.ExactGP):
 
         interval_length = torch.max(self.train_inputs[0]) - torch.min(self.train_inputs[0])
         shift = interval_length * options["plotting"]["border_ratio"]
-        test_x = torch.linspace(torch.min(self.train_inputs[0]) - shift, torch.max(self.train_inputs[0]) + shift, options["plotting"]["sample_points"], dtype=torch.float64)
+        test_x = torch.linspace(torch.min(self.train_inputs[0]) - shift, torch.max(self.train_inputs[0]) + shift, options["plotting"]["sample_points"])
 
         with torch.no_grad(), gpt.settings.fast_pred_var():
             observed_pred = self.likelihood(self(test_x))

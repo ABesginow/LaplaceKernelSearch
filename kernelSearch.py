@@ -1,5 +1,6 @@
 import gpytorch as gpt
 import torch
+import numpy as np
 from GaussianProcess import ExactGPModel
 from helpFunctions import get_string_representation_of_kernel as gsr, clean_kernel_expression
 from helpFunctions import amount_of_base_kernels
@@ -81,7 +82,7 @@ def evaluate_performance_via_likelihood(model):
 
 
 def calculate_laplace(model, loss_of_model, variances_list=None):
-
+    num_of_observations = len(*model.train_inputs)
     # Save a list of model parameters and compute the Hessian of the MLL
     params_list = [p for p in model.parameters()]
     mll         = (num_of_observations * (-loss_of_model))
@@ -129,7 +130,7 @@ def calculate_laplace(model, loss_of_model, variances_list=None):
 # ----------------------------------------------------------------------------------------------------
 # ------------------------------------------- CKS ----------------------------------------------------
 # ----------------------------------------------------------------------------------------------------
-def CKS(X, Y, likelihood, base_kernels, iterations, **kwargs):
+def CKS(X, Y, likelihood, base_kernels, list_of_variances=None,  experiment=None, iterations=3, metric="MLL", **kwargs):
     operations = [gpt.kernels.AdditiveKernel, gpt.kernels.ProductKernel]
     candidates = base_kernels.copy()
     best_performance = dict()
@@ -147,7 +148,11 @@ def CKS(X, Y, likelihood, base_kernels, iterations, **kwargs):
         for t in threads:
             t.join()
         for k in candidates:
-            performance[gsr(k)] = calculate_laplace(models[gsr(k)], models[gsr(k)].get_current_loss())
+            if metric == "Laplace":
+                print(gsr(k))
+                performance[gsr(k)] = calculate_laplace(models[gsr(k)], models[gsr(k)].get_current_loss())
+            elif metric == "MLL":
+                performance[gsr(k)] = evaluate_performance_via_likelihood(models[gsr(k)])
             # Add variances list as parameter somehow
             if options["kernel search"]["print"]:
                 print(f"KERNEL SEARCH: iteration {i} checking {gsr(k)}, loss {-performance[gsr(k)]}")
