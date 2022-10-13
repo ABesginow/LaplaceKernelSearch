@@ -21,13 +21,13 @@ default_options = {
                         "per": {"p": 1, "a": 1, "p_offset": 0}}}
 
 
-hyperparameter_limits = {"RBFKernel": {"lengthscale": [0,1]},
-                         "LinearKernel": {"variance": [0,1]},
+hyperparameter_limits = {"RBFKernel": {"lengthscale": [1e-4,1]},
+                         "LinearKernel": {"variance": [1e-4,1]},
                          "PeriodicKernel": {"lengthscale": [1e-4,10],
                                             "period_length": [1e-4,10]},
-                         "ScaleKernel": {"outputscale": [0,100]},
-                         "WhiteNoiseKernel": {'lengthscale': [0,1]},
-                         "CosineKernel": {"period_length": [0,10]},
+                         "ScaleKernel": {"outputscale": [1e-4,100]},
+                         "WhiteNoiseKernel": {'lengthscale': [1e-4,1]},
+                         "CosineKernel": {"period_length": [1e-4,10]},
                          "Noise": [1e-4,2e-3],
                          "Mean": [0.0,1.0]}
 

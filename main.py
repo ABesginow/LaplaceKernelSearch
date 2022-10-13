@@ -11,7 +11,7 @@
 # 8. Ablation: Physical kernel ?
 # 9. Ablation: Robust against different parametrizations?
 # 10. Training runtimes (100, 200, 300 iterations)?
-# 11. Loss thresholds (-1, -2, -3)?
+# ~~11. Loss thresholds (-1, -2, -3)?~~
 # 12. Runtime evaluations
 # 13. Calculate Fourier series of a signal and cut after n to generate data
 # 14. Vary the values in the variance_list for the different parameters
@@ -19,6 +19,26 @@
 
 # Not goals of experiments
 # - Parameter training
+
+
+
+# Things to do in config
+# 14. Vary the values in the variance_list for the different parameters
+# 10. Training runtimes (100, 200, 300 iterations)?
+# 7. How high is the threshold to detect structures? (0.9*sin + 0.1*RBF)
+# 5. Test out noise levels and impacts
+
+# Things to do in code
+# 13. Calculate Fourier series of a signal/function and cut after n for data ?
+#     Purpose: Gives a linear combination of sine/cosine and "represent" real
+#     data
+# 12. Runtime evaluations (Logging)
+# 3. Reproducibility experiments (Logging/Repititions)
+
+# Things to do afterwards
+# 1. Check if Laplace Approx is better than MLL/MCMC
+# 12. Runtime evaluations
+
 
 import torch
 import gpytorch
