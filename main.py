@@ -229,6 +229,8 @@ def run_experiment(config_file):
     noise = var_dict["Noise"]
     data_scaling = var_dict["Data_scaling"]
 
+
+
     log_name = "..."
     experiment_keyword = var_dict["experiment name"]
     experiment_path = os.path.join("results", f"{experiment_keyword}")
@@ -268,8 +270,8 @@ def run_experiment(config_file):
     observations_y = f_preds.sample()           # samples from the model
 
 
-    X = observations_x[int(train_data_ratio*0.5*eval_COUNT):int(train_data_ratio*0.5*eval_COUNT)]
-    Y = observations_y[int(train_data_ratio*0.5*eval_COUNT):int(train_data_ratio*0.5*eval_COUNT)]
+    X = observations_x[int((1-train_data_ratio)*0.5*eval_COUNT):int((1+train_data_ratio)*0.5*eval_COUNT)]
+    Y = observations_y[int((1-train_data_ratio)*0.5*eval_COUNT):int((1+train_data_ratio)*0.5*eval_COUNT)]
 
     # Run CKS
     list_of_kernels = [gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel()), gpytorch.kernels.ScaleKernel(gpytorch.kernels.CosineKernel())]
@@ -301,12 +303,14 @@ def run_experiment(config_file):
 
     mean_y = model(observations_x).mean
 
-    #posterior_plot = experiment.plot_model("Posterior", 1, observations_x, X, Y, lower_posterior, upper_posterior, mean_posterior, ylim=[-3, 3], orig_data=None)
-    #posterior_plot.plot()
     f, ax = plt.subplots()
     f, ax = model.plot_model(return_figure=True, figure = f, ax=ax)
-    ax.plot(observations_x, observations_y, 'r*')
-    plt.show()
+    ax.plot(observations_x, observations_y, 'k*')
+    # Store the plots as .png
+
+    # Store the plots as .tex
+
+
 
     eval_rmse = RMSE(observations_y.numpy(), mean_y.detach().numpy())
     print(eval_rmse)
