@@ -214,6 +214,21 @@ def run_experiment(config_file):
 
     ### Initialization
     var_dict = load_config(config_file)
+
+    train_data_ratio = var_dict["train_data_ratio"]
+    eval_START = var_dict["eval_START"]
+    eval_END = var_dict["eval_END"]
+    eval_COUNT = var_dict["eval_COUNT"]
+    optimizer = var_dict["optimizer"]
+    metric = var_dict["Metric"]
+    kernel_search = var_dict["Kernel_search"]
+    data_kernel = var_dict["Data_kernel"]
+    variance_list_variance = var_dict["Variance_list"]
+    train_iterations = var_dict["train_iterations"]
+    LR = var_dict["LR"]
+    noise = var_dict["Noise"]
+    data_scaling = var_dict["Data_scaling"]
+
     log_name = "..."
     experiment_keyword = var_dict["experiment name"]
     experiment_path = os.path.join("results", f"{experiment_keyword}")
@@ -222,14 +237,11 @@ def run_experiment(config_file):
     log_experiment_path = os.path.join(experiment_path, f"{experiment_keyword}.log")
     experiment = Experiment(log_experiment_path, EXPERIMENT_REPITITIONS)
 
-    train_START = -5.
-    train_END = 5.
-    train_COUNT = 10
-    eval_START = -10
-    eval_END = 10
-    eval_COUNT = 500
+    for key in var_dict:
+        experiment.store_result(key, var_dict[key])
 
-    ## Create train data
+
+        ## Create train data
     # Create base model to generate data
 
     # training data for model initialization (e.g. 1 point with x=0, y=0) ; this makes initializing the model easier
@@ -237,7 +249,7 @@ def run_experiment(config_file):
     prior_y = prior_x
     # initialize likelihood and model
     data_likelihood = gpytorch.likelihoods.GaussianLikelihood()
-    data_model = ExactGPModel(prior_x, prior_y, data_likelihood, kernel_text="SIN")
+    data_model = ExactGPModel(prior_x, prior_y, data_likelihood, kernel_text=data_kernel)
     observations_x = torch.linspace(eval_START, eval_END, eval_COUNT)
     # Get into evaluation (predictive posterior) mode
     data_model.eval()
@@ -256,14 +268,14 @@ def run_experiment(config_file):
     observations_y = f_preds.sample()           # samples from the model
 
 
-    X = observations_x[int(0.25*eval_COUNT):int(0.75*eval_COUNT)]
-    Y = observations_y[int(0.25*eval_COUNT):int(0.75*eval_COUNT)]
+    X = observations_x[int(train_data_ratio*0.5*eval_COUNT):int(train_data_ratio*0.5*eval_COUNT)]
+    Y = observations_y[int(train_data_ratio*0.5*eval_COUNT):int(train_data_ratio*0.5*eval_COUNT)]
 
     # Run CKS
     list_of_kernels = [gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel()), gpytorch.kernels.ScaleKernel(gpytorch.kernels.CosineKernel())]
     likelihood = gpytorch.likelihoods.GaussianLikelihood()
-    list_of_variances = [4.0 for i in range(28)]
-    model, likelihood = CKS(X, Y, likelihood, list_of_kernels, list_of_variances, experiment, iterations=3, metric="Laplace")
+    list_of_variances = [float(variance_list_variance) for i in range(28)]
+    model, likelihood = CKS(X, Y, likelihood, list_of_kernels, list_of_variances, experiment, iterations=3, metric=metric)
 
 
 
