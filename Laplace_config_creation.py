@@ -13,12 +13,14 @@ import os
 
 
 # This block creates ALL the config files!
+# This block creates ALL the config files!
 
 general_json = {
-                'Metric': ["Laplace", "MCMC", "MLL", "AIC"],
-                'Kernel_search': ["CKS"],            
+                'Metric': ["Laplace", "MC", "MLL", "AIC"],
+                'Kernel_search': ["CKS"],
                 'train_data_ratio': [0.5],#50% of the eval data
                 'Data_kernel': ["SIN", "RBF", "SIN*RBF", "SIN+RBF"],
+                'weights': [[0.9, 0.1], [0.7, 0.3], [1., 1.], [0.3, 0.7], [0.1, 0.9]],
                 'Variance_list': [1, 4, 8, 16],
                 'eval_START':[-10.0],
                 'eval_END':[10.0],
@@ -29,7 +31,6 @@ general_json = {
                 'Noise': [0.0, 0.01, 0.05, 0.1],#1%, 5%, 10% of max
                 'Data_scaling': [False]
                }
-
 
 # In[10]:
 
@@ -150,13 +151,13 @@ l
 
 
 
-# LR, data_kernel, train_data_details, eval_data_details, Optimizer?, Metric, 
+# LR, data_kernel, train_data_details, eval_data_details, Optimizer?, Metric,
 var_dict = {
     "LR": 0.1,
     "TRAIN_start": -5,
-    "TRAIN_end": 5, 
-    "TRAIN_count": 50, 
-    "EVAL_start": -10, 
+    "TRAIN_end": 5,
+    "TRAIN_count": 50,
+    "EVAL_start": -10,
     "EVAL_end": 10,
     "EVAL_count": 500,
     "Optimizer": "Adam",

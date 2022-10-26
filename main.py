@@ -23,10 +23,7 @@
 
 
 # Things to do in config
-# 14. Vary the values in the variance_list for the different parameters
 # 10. Training runtimes (100, 200, 300 iterations)?
-# 7. How high is the threshold to detect structures? (0.9*sin + 0.1*RBF)
-# 5. Test out noise levels and impacts
 
 # Things to do in code
 # 13. Calculate Fourier series of a signal/function and cut after n for data ?
@@ -79,7 +76,7 @@ from kernelSearch import *
 
 
 class ExactGPModel(gpytorch.models.ExactGP):
-    def __init__(self, train_x, train_y, likelihood, kernel_text="RBF"):
+    def __init__(self, train_x, train_y, likelihood, kernel_text="RBF", weights=None):
         super(ExactGPModel, self).__init__(train_x, train_y, likelihood)
         self.mean_module = gpytorch.means.ConstantMean()
 
@@ -88,13 +85,14 @@ class ExactGPModel(gpytorch.models.ExactGP):
         elif kernel_text == "SIN":
             self.covar_module = gpytorch.kernels.PeriodicKernel()
         elif kernel_text == "SIN+RBF":
-            self.covar_module = gpytorch.kernels.PeriodicKernel() + gpytorch.kernels.RBFKernel()
+            if weights is None:
+                self.covar_module = gpytorch.kernels.PeriodicKernel() + gpytorch.kernels.RBFKernel()
+            else:
+                self.covar_module = weights[0]*gpytorch.kernels.PeriodicKernel() + weights[1]*gpytorch.kernels.RBFKernel()
         elif kernel_text == "SIN*RBF":
             self.covar_module = gpytorch.kernels.PeriodicKernel() * gpytorch.kernels.RBFKernel()
         elif kernel_text == "SIN*LIN":
             self.covar_module = gpytorch.kernels.PeriodicKernel() * gpytorch.kernels.LinearKernel()
-
-
 
     def forward(self, x):
         mean_x = self.mean_module(x)
@@ -160,6 +158,7 @@ def run_experiment(config_file):
     LR = var_dict["LR"]
     noise = var_dict["Noise"]
     data_scaling = var_dict["Data_scaling"]
+    weights = var_dict["weights"]
 
 
 
@@ -212,15 +211,6 @@ def run_experiment(config_file):
     model, likelihood = CKS(X, Y, likelihood, list_of_kernels, list_of_variances, experiment, iterations=3, metric=metric)
 
 
-
-
-    ### Model selection & Training (Jan)
-    # Store the loss/Laplace/... at each iteration of the model selection!
-    # Store the selected kernels over time in a parseable way
-    # Store the parameters over time
-    #
-    #monte_carlo_simulate(model, likelihood, 100)
-
     ### Calculating various metrics
     # Metrics
     # - RMSE?
@@ -261,7 +251,7 @@ if __name__ == "__main__":
     with open("FINISHED.log", "r") as f:
         finished_configs = [line.strip() for line in f.readlines()]
     curdir = os.getcwd()
-    KEYWORD = "MCMC"
+    KEYWORD = "MC"
     configs = os.listdir(os.path.join(curdir, "configs", KEYWORD))
     # Check if the config file is already finished and if it even exists
     configs = [os.path.join(KEYWORD, c) for c in configs if not os.path.join(KEYWORD, c) in finished_configs and os.path.isfile(os.path.join(curdir, "configs", KEYWORD, c))]
