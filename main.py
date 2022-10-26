@@ -205,9 +205,10 @@ def run_experiment(config_file):
     Y = observations_y[int((1-train_data_ratio)*0.5*eval_COUNT):int((1+train_data_ratio)*0.5*eval_COUNT)]
 
     # Run CKS
-    list_of_kernels = [gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel()), gpytorch.kernels.ScaleKernel(gpytorch.kernels.PeriodicKernel())]
+    list_of_kernels = [gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel()),
+                       gpytorch.kernels.ScaleKernel(gpytorch.kernels.PeriodicKernel())]
     likelihood = gpytorch.likelihoods.GaussianLikelihood()
-    list_of_variances = [float(variance_list_variance) for i in range(28)]
+    list_of_variances = [float(variance_list_variance) for i in range(28)] # ist das richtig so?? Kommt mir falsch vor...
     model, likelihood = CKS(X, Y, likelihood, list_of_kernels, list_of_variances, experiment, iterations=3, metric=metric)
 
 
@@ -229,7 +230,7 @@ def run_experiment(config_file):
     f, ax = model.plot_model(return_figure=True, figure = f, ax=ax)
     ax.plot(observations_x, observations_y, 'k*')
     # Store the plots as .png
-
+    f.savefig(os.path.join(experiment_path, f"{experiment_keyword}_{time.time()}.png"))
     # Store the plots as .tex
 
 
