@@ -73,6 +73,7 @@ from GaussianProcess import ExactGPModel
 from helpFunctions import get_string_representation_of_kernel as gsr, clean_kernel_expression
 from helpFunctions import amount_of_base_kernels
 from kernelSearch import *
+from globalParams import options
 
 
 class ExactGPModel(gpytorch.models.ExactGP):
@@ -160,6 +161,8 @@ def run_experiment(config_file):
     data_scaling = var_dict["Data_scaling"]
     weights = var_dict["weights"]
 
+    # set training iterations to the correct config
+    options["training"]["max_iter"] = int(train_iterations)
 
 
     log_name = "..."
