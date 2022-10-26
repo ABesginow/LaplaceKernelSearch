@@ -104,7 +104,7 @@ class ExactGPModel(gpytorch.models.ExactGP):
 def RMSE(goal, prediction):
     mse = np.mean((goal-prediction)**2)
     rmse = np.sqrt(mse)
-    return mse
+    return rmse
 
 
 def load_config(config_file):
