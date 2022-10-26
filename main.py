@@ -40,6 +40,24 @@
 # 12. Runtime evaluations
 
 
+
+# Things to log
+# - Parameters and their values (post training)
+# - The kernels that were tried (basically a progress tree)
+# - Loss at each kernel try
+# - The metrics with those kernels
+#   - Question: Do we calculate ALL metrics and highlight the current choice?
+# - Finale kernel
+# - Parameter starting points at random restarts?
+#   - Q: What would/could we hope to learn from this?
+
+
+
+# Known issues:
+# - The periodic kernel is prone to creating a non-PSD matrix
+# - The MC metric is prone to creating non-PSD matrices due to the random parametrizations
+
+
 import torch
 import gpytorch
 from matplotlib import pyplot as plt
@@ -60,7 +78,6 @@ from helpFunctions import amount_of_base_kernels
 from kernelSearch import *
 
 
-
 class ExactGPModel(gpytorch.models.ExactGP):
     def __init__(self, train_x, train_y, likelihood, kernel_text="RBF"):
         super(ExactGPModel, self).__init__(train_x, train_y, likelihood)
@@ -69,13 +86,13 @@ class ExactGPModel(gpytorch.models.ExactGP):
         if kernel_text == "RBF":
             self.covar_module = gpytorch.kernels.RBFKernel()
         elif kernel_text == "SIN":
-            self.covar_module = gpytorch.kernels.CosineKernel()
+            self.covar_module = gpytorch.kernels.PeriodicKernel()
         elif kernel_text == "SIN+RBF":
-            self.covar_module = gpytorch.kernels.CosineKernel() + gpytorch.kernels.RBFKernel()
+            self.covar_module = gpytorch.kernels.PeriodicKernel() + gpytorch.kernels.RBFKernel()
         elif kernel_text == "SIN*RBF":
-            self.covar_module = gpytorch.kernels.CosineKernel() * gpytorch.kernels.RBFKernel()
+            self.covar_module = gpytorch.kernels.PeriodicKernel() * gpytorch.kernels.RBFKernel()
         elif kernel_text == "SIN*LIN":
-            self.covar_module = gpytorch.kernels.CosineKernel() * gpytorch.kernels.LinearKernel()
+            self.covar_module = gpytorch.kernels.PeriodicKernel() * gpytorch.kernels.LinearKernel()
 
 
 
@@ -83,91 +100,6 @@ class ExactGPModel(gpytorch.models.ExactGP):
         mean_x = self.mean_module(x)
         covar_x = self.covar_module(x)
         return gpytorch.distributions.MultivariateNormal(mean_x, covar_x)
-
-
-
-
-def monte_carlo_simulate(model, likelihood, number_of_draws=1000, mean=0, std_deviation=2, print_steps=False, scale_data = False):
-
-    # We copy the model to keep the original model unchanged while we assign different parameter values to the copy
-    model_mc        = copy.deepcopy(model)
-    likelihood_mc   = copy.deepcopy(likelihood)
-
-    # How many parameters does the model have?
-    params_list     = [p for p in model_mc.parameters()]
-    num_of_params   = len(params_list)
-
-    # We create an array of tensors
-    # Each tensor has random values to use for one model parameter
-    # These values are normally distributed according to suitable means and standard deviations and not sorted
-    random_values   = [None] * num_of_params
-    for i in range(num_of_params):
-        if (i==0):        # raw noise
-            random_values[i] = torch.tensor(  np.random.normal(0.0, 4, number_of_draws)  )
-        elif (i==1):      # mean constant
-            random_values[i] = torch.tensor(  np.random.normal(0.0, 2, number_of_draws)  )
-        elif (i==2):      # raw lengthscale   (or possibly raw offset)
-            random_values[i] = torch.tensor(  np.random.normal(0.0, 2, number_of_draws)  )
-            #random_values[i] = torch.tensor(  np.random.normal(-2.5, 1.5, number_of_draws)  )
-        elif (i==3):      # raw variance      (or possibly raw lengthscale or raw alpha)
-            random_values[i] = torch.tensor(  np.random.normal(-2.5, 1.5, number_of_draws)  )
-            #random_values[i] = torch.tensor(  np.random.normal(0.0, 2, number_of_draws)  )
-        elif (i==4):      # raw period length (or possibly raw lengthscale)
-            random_values[i] = torch.tensor(  np.random.normal(2.5, 1.5, number_of_draws)  )
-        elif (i==5):      # raw alpha
-            random_values[i] = torch.tensor(  np.random.normal(0.0, 2, number_of_draws)  )
-        else:
-            random_values[i] = torch.tensor(  np.random.normal(mean, std_deviation, number_of_draws)  )
-
-    # An array to store the log-likelihoods in later
-    mll_array = []
-
-
-    for num_draw in range(number_of_draws):
-        num_param = 0
-        for param_name, param in model_mc.named_parameters():
-            param.data.fill_(random_values[num_param][num_draw])
-            num_param += 1
-
-        # We can print the parameter values of every round to validate that we are assigning them correctly:
-        if print_steps == True:
-            print('\nDraw number:  ', num_draw+1)
-            print('Randomly assigned parameters:')
-            for param_name, param in model_mc.named_parameters():
-                print(param.item())
-
-        # Switching to train mode (but we are not actually doing any training)
-        model_mc.train()
-        likelihood_mc.train()
-
-        mll_mc = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood_mc, model_mc)
-
-        output_mc = model_mc(observations_x)
-
-        if scale_data == True:
-            loss_mc   = -mll_mc(output_mc, observations_y_transformed)
-        else:
-            loss_mc   = -mll_mc(output_mc, observations_y)
-
-        # We can look at the loss of our MC model:
-        if print_steps == True:
-            print('loss of the test copy:       ', loss_mc.item())
-
-        # We save the log-likelihoods of our model into an array
-        mll_array.append(num_of_observations * (-loss_mc.item()))
-
-    # We restore the non-logarithmic likelihoods
-    # Then we take the mean of these
-    # And eventually, the natural logarithm of the mean
-    # ... Luckily, Numpy can handle likelihoods of even 10^50 without big issues or inaccuracies.
-    #return np.log(np.mean( np.exp(mll_array) ))
-
-    max_mll_array = max(mll_array)
-    max_mll_array = np.array(max_mll_array)
-    mll_shifted = mll_array-max_mll_array
-
-    return np.log(np.mean(np.exp(mll_shifted))) + max_mll_array
-
 
 
 
@@ -274,7 +206,7 @@ def run_experiment(config_file):
     Y = observations_y[int((1-train_data_ratio)*0.5*eval_COUNT):int((1+train_data_ratio)*0.5*eval_COUNT)]
 
     # Run CKS
-    list_of_kernels = [gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel()), gpytorch.kernels.ScaleKernel(gpytorch.kernels.CosineKernel())]
+    list_of_kernels = [gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel()), gpytorch.kernels.ScaleKernel(gpytorch.kernels.PeriodicKernel())]
     likelihood = gpytorch.likelihoods.GaussianLikelihood()
     list_of_variances = [float(variance_list_variance) for i in range(28)]
     model, likelihood = CKS(X, Y, likelihood, list_of_kernels, list_of_variances, experiment, iterations=3, metric=metric)
@@ -329,7 +261,7 @@ if __name__ == "__main__":
     with open("FINISHED.log", "r") as f:
         finished_configs = [line.strip() for line in f.readlines()]
     curdir = os.getcwd()
-    KEYWORD = "Laplace"
+    KEYWORD = "MCMC"
     configs = os.listdir(os.path.join(curdir, "configs", KEYWORD))
     # Check if the config file is already finished and if it even exists
     configs = [os.path.join(KEYWORD, c) for c in configs if not os.path.join(KEYWORD, c) in finished_configs and os.path.isfile(os.path.join(curdir, "configs", KEYWORD, c))]
