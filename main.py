@@ -30,7 +30,7 @@
 #     Purpose: Gives a linear combination of sine/cosine and "represent" real
 #     data
 # 12. Runtime evaluations (Logging)
-# 3. Reproducibility experiments (Logging/Repititions)
+# 3. Reproducibility experiments (Logging/Repetitions)
 
 # Things to do afterwards
 # 1. Check if Laplace Approx is better than MLL/MCMC
@@ -212,7 +212,7 @@ def run_experiment(config_file):
                        gpytorch.kernels.ScaleKernel(gpytorch.kernels.PeriodicKernel())]
     likelihood = gpytorch.likelihoods.GaussianLikelihood()
     list_of_variances = [float(variance_list_variance) for i in range(28)] # ist das richtig so?? Kommt mir falsch vor...
-    model, likelihood = CKS(X, Y, likelihood, list_of_kernels, list_of_variances, experiment, iterations=3, metric=metric)
+    model, likelihood, model_history, performance_history = CKS(X, Y, likelihood, list_of_kernels, list_of_variances, experiment, iterations=3, metric=metric)
 
 
     ### Calculating various metrics
@@ -261,5 +261,5 @@ if __name__ == "__main__":
     configs = [os.path.join(KEYWORD, c) for c in configs if not os.path.join(KEYWORD, c) in finished_configs and os.path.isfile(os.path.join(curdir, "configs", KEYWORD, c))]
     for config in configs:
         run_experiment(config)
-    #with Pool(processes=7) as pool:
+    #with Pool(processes=7) as pool: # multithreading will lead to problems with the training iterations
     #    pool.map(run_experiment, configs)
