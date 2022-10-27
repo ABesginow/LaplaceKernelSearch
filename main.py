@@ -23,7 +23,7 @@
 
 
 # Things to do in config
-# 10. Training runtimes (100, 200, 300 iterations)?
+# 10. Training runtimes (100, 200, 300 iterations)? Erledigt
 
 # Things to do in code
 # 13. Calculate Fourier series of a signal/function and cut after n for data ?
@@ -233,7 +233,13 @@ def run_experiment(config_file):
 
     eval_rmse = RMSE(observations_y.numpy(), mean_y.detach().numpy())
     print(eval_rmse)
+
     experiment.store_result("eval RMSE", eval_rmse)
+    experiment.store_result("model history", model_history)
+    experiment.store_result("performance history", performance_history)
+    experiment.store_result("loss history", loss_history)
+    experiment.store_result("final model", gsr(model))
+    experiment.store_result("parameters", dict(model.named_parameters())) # oder lieber als reinen string?
 
     ### Plotting
 
