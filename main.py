@@ -125,13 +125,6 @@ def load_config(config_file):
 
 
 
-def log(message, logfile="default.log"):
-    with open(os.path.join(path, filename), 'w') as temp_file:
-        temp_file.write(message)
-    return 0
-
-
-
 
 def run_experiment(config_file):
     """

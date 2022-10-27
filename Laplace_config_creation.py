@@ -26,7 +26,7 @@ general_json = {
                 'eval_END':[10.0],
                 'eval_COUNT':[200],
                 'optimizer':['Adam'],
-                'train_iterations':[300],
+                'train_iterations':[100, 200, 300],
                 'LR': [0.1],
                 'Noise': [0.0, 0.01, 0.05, 0.1],#1%, 5%, 10% of max
                 'Data_scaling': [False]
