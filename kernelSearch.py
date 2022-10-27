@@ -230,6 +230,7 @@ def CKS(X, Y, likelihood, base_kernels, list_of_variances=None,  experiment=None
     threads = list()
     model_steps = list()
     performance_steps = list()
+    loss_steps = list()
     for i in range(iterations):
         for k in candidates:
             models[gsr(k)] = ExactGPModel(X, Y, copy.deepcopy(likelihood), copy.deepcopy(k))
@@ -261,8 +262,9 @@ def CKS(X, Y, likelihood, base_kernels, list_of_variances=None,  experiment=None
         best_performance = {"model": best_model, "performance": max(performance.values())}
         model_steps.append(gsr(best_model))
         performance_steps.append(best_performance)
+        loss_steps.append(best_model.get_current_loss())
         candidates = create_candidates_CKS(best_model.covar_module, base_kernels, operations)
     if options["kernel search"]["print"]:
         print(f"KERNEL SEARCH: kernel search concluded, optimal expression: {gsr(best_model.covar_module)}")
-    return best_model, best_model.likelihood, model_steps, performance_steps
+    return best_model, best_model.likelihood, model_steps, performance_steps, loss_steps
 

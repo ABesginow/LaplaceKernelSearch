@@ -212,7 +212,7 @@ def run_experiment(config_file):
                        gpytorch.kernels.ScaleKernel(gpytorch.kernels.PeriodicKernel())]
     likelihood = gpytorch.likelihoods.GaussianLikelihood()
     list_of_variances = [float(variance_list_variance) for i in range(28)] # ist das richtig so?? Kommt mir falsch vor...
-    model, likelihood, model_history, performance_history = CKS(X, Y, likelihood, list_of_kernels, list_of_variances, experiment, iterations=3, metric=metric)
+    model, likelihood, model_history, performance_history, loss_history = CKS(X, Y, likelihood, list_of_kernels, list_of_variances, experiment, iterations=3, metric=metric)
 
 
     ### Calculating various metrics
