@@ -248,6 +248,10 @@ def CKS(X, Y, likelihood, base_kernels, list_of_variances=None,  experiment=None
             if metric == "MCMC":
                 print(gsr(k))
                 performance[gsr(k)] = calculate_mc(models[gsr(k)], models[gsr(k)].likelihood)
+            if metric == "AIC":
+                print(gsr(k))
+                log_loss = models[gsr(k)].get_current_loss() * models[gsr(k)].training_inputs
+                performance[gsr(k)] = 2*log_loss + 2*sum(p.numel() for p in models[gsr(k)].parameters() if p.requires_grad)
             elif metric == "MLL":
                 performance[gsr(k)] = evaluate_performance_via_likelihood(models[gsr(k)])
             # Add variances list as parameter somehow
