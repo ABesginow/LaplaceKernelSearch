@@ -101,7 +101,7 @@ config = list(itertools.product(general))
 # In[13]:
 
 
-len(config)
+print(len(config))
 
 
 # In[7]:
