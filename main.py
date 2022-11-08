@@ -256,6 +256,8 @@ if __name__ == "__main__":
     curdir = os.getcwd()
     KEYWORD = "MC"
     configs = os.listdir(os.path.join(curdir, "configs", KEYWORD))
+    if ".DS_Store" in configs:
+        configs.remove(".DS_Store")
     # Check if the config file is already finished and if it even exists
     configs = [os.path.join(KEYWORD, c) for c in configs if not os.path.join(KEYWORD, c) in finished_configs and os.path.isfile(os.path.join(curdir, "configs", KEYWORD, c))]
     for config in configs:
