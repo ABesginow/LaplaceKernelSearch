@@ -10,7 +10,7 @@ default_options = {
                  "learning_rate": 0.1,
                  "restarts": 5,
                  "optimization method": "botorch"},
-    "kernel search": {"print": False,
+    "kernel search": {"print": True,
                       "probability graph": False,
                       "multithreading": False},
     "plotting": {"border_ratio": 0.0,

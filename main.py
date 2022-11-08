@@ -23,9 +23,11 @@
 
 
 # Things to do in config
-# 10. Training runtimes (100, 200, 300 iterations)? Erledigt
 
 # Things to do in code
+# - Deal with multiple times the same parameter in the MCMC case
+#   (Probably look into the parameter names and store a dict of names+values)
+# - Deal with the issue of non PD matrices when parametrizations are bad
 # 13. Calculate Fourier series of a signal/function and cut after n for data ?
 #     Purpose: Gives a linear combination of sine/cosine and "represent" real
 #     data

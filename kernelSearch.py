@@ -168,7 +168,6 @@ def calculate_mc(model, likelihood, number_of_draws=1000, mean=0, std_deviation=
     # An array to store the log-likelihoods in later
     mll_array = []
 
-
     for num_draw in range(number_of_draws):
         num_param = 0
         for param_name, param in model_mc.named_parameters():
@@ -245,7 +244,7 @@ def CKS(X, Y, likelihood, base_kernels, list_of_variances=None,  experiment=None
             if metric == "Laplace":
                 print(gsr(k))
                 performance[gsr(k)] = calculate_laplace(models[gsr(k)], models[gsr(k)].get_current_loss())
-            if metric == "MCMC":
+            if metric == "MC":
                 print(gsr(k))
                 performance[gsr(k)] = calculate_mc(models[gsr(k)], models[gsr(k)].likelihood)
             if metric == "AIC":
