@@ -55,26 +55,24 @@
 # - The MC metric is prone to creating non-PSD matrices due to the random parametrizations
 
 
-import torch
-import gpytorch
-from matplotlib import pyplot as plt
-import pdb
-import random
-import configparser
-import os
-import time
-from multiprocessing import Pool
-import tikzplotlib
-from experiment_functions import Experiment
 import copy
-import json
-
+import configparser
+from experiment_functions import Experiment
 from GaussianProcess import ExactGPModel
+from globalParams import options
+import gpytorch
 from helpFunctions import get_string_representation_of_kernel as gsr, clean_kernel_expression
 from helpFunctions import amount_of_base_kernels
+import json
 from kernelSearch import *
-from globalParams import options
-
+from matplotlib import pyplot as plt
+from multiprocessing import Pool
+import os
+import pdb
+import random
+import tikzplotlib
+import time
+import torch
 
 class ExactGPModel(gpytorch.models.ExactGP):
     def __init__(self, train_x, train_y, likelihood, kernel_text="RBF", weights=None):
@@ -170,7 +168,7 @@ def run_experiment(config_file):
         experiment.store_result(key, var_dict[key])
 
 
-        ## Create train data
+    ## Create train data
     # Create base model to generate data
 
     # training data for model initialization (e.g. 1 point with x=0, y=0) ; this makes initializing the model easier
@@ -225,9 +223,11 @@ def run_experiment(config_file):
     f, ax = plt.subplots()
     f, ax = model.plot_model(return_figure=True, figure = f, ax=ax)
     ax.plot(observations_x, observations_y, 'k*')
+    image_time = time.time()
     # Store the plots as .png
-    f.savefig(os.path.join(experiment_path, f"{experiment_keyword}_{time.time()}.png"))
+    f.savefig(os.path.join(experiment_path, f"{experiment_keyword}_{image_time}.png"))
     # Store the plots as .tex
+    tikzplotlib.save(os.path.join(experiment_path, f"{experiment_keyword}_{image_time}.tex"))
 
 
 
