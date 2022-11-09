@@ -205,7 +205,13 @@ def run_experiment(config_file):
                        gpytorch.kernels.ScaleKernel(gpytorch.kernels.PeriodicKernel())]
     likelihood = gpytorch.likelihoods.GaussianLikelihood()
     list_of_variances = [float(variance_list_variance) for i in range(28)] # ist das richtig so?? Kommt mir falsch vor...
-    model, likelihood, model_history, performance_history, loss_history = CKS(X, Y, likelihood, list_of_kernels, list_of_variances, experiment, iterations=3, metric=metric)
+    try:
+        model, likelihood, model_history, performance_history, loss_history = CKS(X, Y, likelihood, list_of_kernels, list_of_variances, experiment, iterations=3, metric=metric)
+    except Exception as e:
+        experiment.store_result("catastrophic failure", catastrophic_failure)
+        experiment.store_result("Exception", e)
+        experiment.write_results()
+        return -1
 
 
     ### Calculating various metrics
@@ -238,12 +244,13 @@ def run_experiment(config_file):
 
     experiment.store_result("eval RMSE", eval_rmse)
     experiment.store_result("model history", model_history)
-    experiment.store_result("performance history", performance_history)
+    #experiment.store_result("performance history", performance_history)
     experiment.store_result("loss history", loss_history)
     experiment.store_result("final model", gsr(model))
     experiment.store_result("parameters", dict(model.named_parameters())) # oder lieber als reinen string?
 
     ### Plotting
+
 
     experiment.write_results()
     return 0

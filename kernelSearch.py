@@ -243,10 +243,16 @@ def CKS(X, Y, likelihood, base_kernels, list_of_variances=None,  experiment=None
         for k in candidates:
             if metric == "Laplace":
                 print(gsr(k))
-                performance[gsr(k)] = calculate_laplace(models[gsr(k)], models[gsr(k)].get_current_loss())
+                try:
+                    performance[gsr(k)] = calculate_laplace(models[gsr(k)], models[gsr(k)].get_current_loss())
+                except:
+                    performance[gsr(k)] = np.NINF
             if metric == "MC":
                 print(gsr(k))
-                performance[gsr(k)] = calculate_mc(models[gsr(k)], models[gsr(k)].likelihood)
+                try:
+                    performance[gsr(k)] = calculate_mc(models[gsr(k)], models[gsr(k)].likelihood)
+                except:
+                    performance[gsr(k)] = np.NINF
             if metric == "AIC":
                 print(gsr(k))
                 log_loss = models[gsr(k)].get_current_loss() * models[gsr(k)].training_inputs

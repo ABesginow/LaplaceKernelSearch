@@ -9,7 +9,7 @@ default_options = {
                  "max_iter": 10,
                  "learning_rate": 0.1,
                  "restarts": 5,
-                 "optimization method": "botorch"},
+                 "optimization method": "default"},
     "kernel search": {"print": True,
                       "probability graph": False,
                       "multithreading": False},
