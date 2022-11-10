@@ -258,7 +258,7 @@ def CKS(X, Y, likelihood, base_kernels, list_of_variances=None,  experiment=None
                     performance[gsr(k)] = np.NINF
             if metric == "AIC":
                 print(gsr(k))
-                log_loss = models[gsr(k)].get_current_loss() * models[gsr(k)].training_inputs
+                log_loss = models[gsr(k)].get_current_loss() * models[gsr(k)].train_inputs[0].numel()
                 performance[gsr(k)] = 2*log_loss + 2*sum(p.numel() for p in models[gsr(k)].parameters() if p.requires_grad)
             elif metric == "MLL":
                 performance[gsr(k)] = evaluate_performance_via_likelihood(models[gsr(k)]).detach().numpy()
