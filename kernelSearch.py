@@ -237,7 +237,10 @@ def CKS(X, Y, likelihood, base_kernels, list_of_variances=None,  experiment=None
                 threads.append(threading.Thread(target=models[gsr(k)].optimize_hyperparameters))
                 threads[-1].start()
             else:
-                models[gsr(k)].optimize_hyperparameters()
+                try:
+                    models[gsr(k)].optimize_hyperparameters()
+                except:
+                    continue
         for t in threads:
             t.join()
         for k in candidates:
@@ -258,7 +261,7 @@ def CKS(X, Y, likelihood, base_kernels, list_of_variances=None,  experiment=None
                 log_loss = models[gsr(k)].get_current_loss() * models[gsr(k)].training_inputs
                 performance[gsr(k)] = 2*log_loss + 2*sum(p.numel() for p in models[gsr(k)].parameters() if p.requires_grad)
             elif metric == "MLL":
-                performance[gsr(k)] = evaluate_performance_via_likelihood(models[gsr(k)])
+                performance[gsr(k)] = evaluate_performance_via_likelihood(models[gsr(k)]).detach().numpy()
             # Add variances list as parameter somehow
             if options["kernel search"]["print"]:
                 print(f"KERNEL SEARCH: iteration {i} checking {gsr(k)}, loss {-performance[gsr(k)]}")
@@ -267,8 +270,10 @@ def CKS(X, Y, likelihood, base_kernels, list_of_variances=None,  experiment=None
                 if options["kernel search"]["print"]:
                     print("KERNEL SEARCH: no gain through additional kernel length, stopping search")
                 break
+        import pdb
+        pdb.set_trace()
         best_model = models[max(performance, key=performance.__getitem__)]
-        best_performance = {"model": best_model, "performance": max(performance.values())}
+        best_performance = {"model": f"{print_formatted_}", "performance": max(performance.values())}
         model_steps.append(gsr(best_model))
         performance_steps.append(best_performance)
         loss_steps.append(best_model.get_current_loss())
