@@ -163,7 +163,7 @@ def run_experiment(config_file):
     experiment_path = os.path.join("results", f"{experiment_keyword}")
     if not os.path.exists(experiment_path):
         os.makedirs(experiment_path)
-    log_experiment_path = os.path.join(experiment_path, f"{experiment_keyword}.log")
+    log_experiment_path = os.path.join(experiment_path, f"{experiment_keyword}")
     experiment = Experiment(log_experiment_path, EXPERIMENT_REPITITIONS)
 
     for key in var_dict:
