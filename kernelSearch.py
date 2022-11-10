@@ -2,7 +2,7 @@ import gpytorch as gpt
 import torch
 import numpy as np
 from GaussianProcess import ExactGPModel
-from helpFunctions import get_string_representation_of_kernel as gsr, clean_kernel_expression
+from helpFunctions import get_string_representation_of_kernel as gsr, clean_kernel_expression, print_formatted_hyperparameters
 from helpFunctions import amount_of_base_kernels
 from gpytorch.kernels import ScaleKernel
 import threading
@@ -270,10 +270,10 @@ def CKS(X, Y, likelihood, base_kernels, list_of_variances=None,  experiment=None
                 if options["kernel search"]["print"]:
                     print("KERNEL SEARCH: no gain through additional kernel length, stopping search")
                 break
-        import pdb
-        pdb.set_trace()
+        #import pdb
+        #pdb.set_trace()
         best_model = models[max(performance, key=performance.__getitem__)]
-        best_performance = {"model": f"{print_formatted_}", "performance": max(performance.values())}
+        best_performance = {"model": (gsr(best_model.covar_module), best_model.state_dict()), "performance": max(performance.values())}
         model_steps.append(gsr(best_model))
         performance_steps.append(best_performance)
         loss_steps.append(best_model.get_current_loss())
