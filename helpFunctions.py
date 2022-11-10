@@ -18,6 +18,13 @@ def get_kernels_in_kernel_expression(kernel_expression):
     else:
         return [kernel_expression]
 
+def print_formatted_hyperparameters(kernel_expression):
+    for kernel in get_kernels_in_kernel_expression(kernel_expression):
+        print(kernel._get_name())
+        for name, param, constraint in kernel.named_parameters_and_constraints():
+            print(f"\t{name[name.rfind('.raw')+5:]:13}: {constraint.transform(param.data).item()}")
+
+
 
 def get_string_representation_of_kernel(kernel_expression):
     if kernel_expression._get_name() == "AdditiveKernel":
