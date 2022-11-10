@@ -36,7 +36,7 @@ class Experiment:
 
     def write_results(self, filename=None):
         if filename is None:
-            filename = f"{self.experiment_keyword}"
+            filename = f"{self.experiment_keyword}.pickle"
         with open(filename, 'wb') as fh:
             pickle.dump(self.results, fh)
 
