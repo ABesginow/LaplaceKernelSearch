@@ -266,8 +266,9 @@ if __name__ == "__main__":
     with open("FINISHED.log", "r") as f:
         finished_configs = [line.strip() for line in f.readlines()]
     curdir = os.getcwd()
-    KEYWORD = "Laplace"
-    configs = os.listdir(os.path.join(curdir, "configs", KEYWORD))
+    keywords = ["Laplace", "MC", "MLL", "AIC"]
+    for KEYWORD in keywords:
+        configs = os.listdir(os.path.join(curdir, "configs", KEYWORD))
     if ".DS_Store" in configs:
         configs.remove(".DS_Store")
     # Check if the config file is already finished and if it even exists
