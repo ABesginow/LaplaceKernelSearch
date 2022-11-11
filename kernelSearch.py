@@ -245,23 +245,26 @@ def CKS(X, Y, likelihood, base_kernels, list_of_variances=None,  experiment=None
             t.join()
         for k in candidates:
             if metric == "Laplace":
-                print(gsr(k))
                 try:
                     performance[gsr(k)] = calculate_laplace(models[gsr(k)], models[gsr(k)].get_current_loss())
                 except:
                     performance[gsr(k)] = np.NINF
             if metric == "MC":
-                print(gsr(k))
                 try:
                     performance[gsr(k)] = calculate_mc(models[gsr(k)], models[gsr(k)].likelihood)
                 except:
                     performance[gsr(k)] = np.NINF
             if metric == "AIC":
-                print(gsr(k))
-                log_loss = models[gsr(k)].get_current_loss() * models[gsr(k)].train_inputs[0].numel()
-                performance[gsr(k)] = 2*log_loss + 2*sum(p.numel() for p in models[gsr(k)].parameters() if p.requires_grad)
+                try:
+                    log_loss = -models[gsr(k)].get_current_loss() * models[gsr(k)].train_inputs[0].numel()
+                    performance[gsr(k)] = 2*log_loss + 2*sum(p.numel() for p in models[gsr(k)].parameters() if p.requires_grad)
+                except:
+                    performance[gsr(k)] = np.NINF
             elif metric == "MLL":
-                performance[gsr(k)] = evaluate_performance_via_likelihood(models[gsr(k)]).detach().numpy()
+                try:
+                    performance[gsr(k)] = evaluate_performance_via_likelihood(models[gsr(k)]).detach().numpy()
+                except:
+                    performance[gsr(k)] = np.NINF
             # Add variances list as parameter somehow
             if options["kernel search"]["print"]:
                 print(f"KERNEL SEARCH: iteration {i} checking {gsr(k)}, loss {-performance[gsr(k)]}")
@@ -270,8 +273,6 @@ def CKS(X, Y, likelihood, base_kernels, list_of_variances=None,  experiment=None
                 if options["kernel search"]["print"]:
                     print("KERNEL SEARCH: no gain through additional kernel length, stopping search")
                 break
-        #import pdb
-        #pdb.set_trace()
         best_model = models[max(performance, key=performance.__getitem__)]
         best_performance = {"model": (gsr(best_model.covar_module), best_model.state_dict()), "performance": max(performance.values())}
         model_steps.append(gsr(best_model))
