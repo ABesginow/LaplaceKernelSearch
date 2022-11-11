@@ -19,18 +19,35 @@ general_json = {
                 'Metric': ["Laplace", "MC", "MLL", "AIC"],
                 'Kernel_search': ["CKS"],
                 'train_data_ratio': [0.5],#50% of the eval data
-                'Data_kernel': ["SIN", "RBF", "SIN*RBF", "SIN+RBF"],
-                'weights': [[0.9, 0.1], [0.7, 0.3], [1., 1.], [0.3, 0.7], [0.1, 0.9]],
-                'Variance_list': [1, 4, 8, 16],
+                'Data_kernel': ["SIN"],
+                'weights': [[1., 1.]],
+                'Variance_list': [4],
                 'eval_START':[-10.0],
                 'eval_END':[10.0],
                 'eval_COUNT':[200],
                 'optimizer':['Adam'],
-                'train_iterations':[100, 200, 300],
+                'train_iterations':[100],
                 'LR': [0.1],
-                'Noise': [0.0, 0.01, 0.05, 0.1],#1%, 5%, 10% of max
+                'Noise': [0.0],#1%, 5%, 10% of max
                 'Data_scaling': [False]
                }
+
+#general_json = {
+#                'Metric': ["Laplace", "MC", "MLL", "AIC"],
+#                'Kernel_search': ["CKS"],
+#                'train_data_ratio': [0.5],#50% of the eval data
+#                'Data_kernel': ["SIN", "RBF", "SIN*RBF", "SIN+RBF"],
+#                'weights': [[0.9, 0.1], [0.7, 0.3], [1., 1.], [0.3, 0.7], [0.1, 0.9]],
+#                'Variance_list': [1, 4, 8, 16],
+#                'eval_START':[-10.0],
+#                'eval_END':[10.0],
+#                'eval_COUNT':[200],
+#                'optimizer':['Adam'],
+#                'train_iterations':[100, 200, 300],
+#                'LR': [0.1],
+#                'Noise': [0.0, 0.01, 0.05, 0.1],#1%, 5%, 10% of max
+#                'Data_scaling': [False]
+#               }
 
 # In[10]:
 
