@@ -200,6 +200,12 @@ def run_experiment(config_file):
     X = observations_x[int((1-train_data_ratio)*0.5*eval_COUNT):int((1+train_data_ratio)*0.5*eval_COUNT)]
     Y = observations_y[int((1-train_data_ratio)*0.5*eval_COUNT):int((1+train_data_ratio)*0.5*eval_COUNT)]
 
+    # TODO Check for a parameter whether data gets z-scored or not
+    # Hope is to make training more stable as many non-PSD GPs are trained atm
+
+
+
+
     # Run CKS
     list_of_kernels = [gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel()),
                        gpytorch.kernels.ScaleKernel(gpytorch.kernels.PeriodicKernel())]
@@ -256,6 +262,9 @@ def run_experiment(config_file):
 
 
     experiment.write_results()
+    # TODO write filename in FINISHED.log
+    with open("FINISHED.log", "a") as f:
+        f.writelines(config_file)
     return 0
 
 
@@ -267,12 +276,15 @@ if __name__ == "__main__":
         finished_configs = [line.strip() for line in f.readlines()]
     curdir = os.getcwd()
     keywords = ["Laplace", "MC", "MLL", "AIC"]
+    configs = []
     for KEYWORD in keywords:
-        configs = os.listdir(os.path.join(curdir, "configs", KEYWORD))
-    if ".DS_Store" in configs:
-        configs.remove(".DS_Store")
+        configs.extend([os.path.join(curdir, "configs", KEYWORD, item) for item in os.listdir(os.path.join(curdir, "configs", KEYWORD))])
+    if any([".DS_Store" in config for config in configs]):
+        DS_STORES = [config for config in configs if ".DS_Store" in config]
+        for conf in DS_STORES:
+            configs.remove(conf)
     # Check if the config file is already finished and if it even exists
-    configs = [os.path.join(KEYWORD, c) for c in configs if not os.path.join(KEYWORD, c) in finished_configs and os.path.isfile(os.path.join(curdir, "configs", KEYWORD, c))]
+    configs = [c for c in configs if not c.split("/")[-1] in finished_configs and os.path.isfile(c)]
     for config in configs:
         run_experiment(config)
     #with Pool(processes=7) as pool: # multithreading will lead to problems with the training iterations
