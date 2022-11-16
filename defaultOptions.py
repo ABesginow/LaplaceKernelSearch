@@ -15,10 +15,7 @@ default_options = {
                       "multithreading": False},
     "plotting": {"border_ratio": 0.0,
                  "sample_points": 1000,
-                 "legend": True},
-    "data generation": {"const": {},
-                        "lin": {"a": 1},
-                        "per": {"p": 1, "a": 1, "p_offset": 0}}}
+                 "legend": True}}
 
 
 hyperparameter_limits = {"RBFKernel": {"lengthscale": [1e-4,1]},
@@ -28,6 +25,6 @@ hyperparameter_limits = {"RBFKernel": {"lengthscale": [1e-4,1]},
                          "ScaleKernel": {"outputscale": [1e-4,100]},
                          "WhiteNoiseKernel": {'lengthscale': [1e-4,1]},
                          "CosineKernel": {"period_length": [1e-4,10]},
-                         "Noise": [1e-4,2e-3],
+                         "Noise": [1e-2,1e-1],
                          "Mean": [0.0,1.0]}
 
