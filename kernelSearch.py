@@ -245,10 +245,7 @@ def CKS(X, Y, likelihood, base_kernels, list_of_variances=None,  experiment=None
             t.join()
         for k in candidates:
             if metric == "Laplace":
-                try:
-                    performance[gsr(k)] = calculate_laplace(models[gsr(k)], models[gsr(k)].get_current_loss())
-                except:
-                    performance[gsr(k)] = np.NINF
+                performance[gsr(k)] = calculate_laplace(models[gsr(k)], models[gsr(k)].get_current_loss())
             if metric == "MC":
                 try:
                     performance[gsr(k)] = calculate_mc(models[gsr(k)], models[gsr(k)].likelihood)
