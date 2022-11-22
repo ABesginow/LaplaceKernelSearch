@@ -92,9 +92,25 @@ def calculate_laplace(model, loss_of_model, variances_list=None):
             hess_params.append(torch.autograd.grad(env_grads[i], params_list, retain_graph=True))
 
     # theta_mu is a vector of parameter priors
+    """
+    SE length    1.607
+    PER length   1.473
+    PER period   0.920
+    LIN variance 0.374
+    C scale      0.427
+    Noise noise  0.531
+    """
     theta_mu = torch.tensor([1 for p in range(len(params_list))]).reshape(-1,1)
 
     # sigma is a matrix of variance priors
+    """
+    SE length    1.650
+    PER length   1.582
+    PER period   0.690
+    LIN variance 0.309
+    C scale      0.754
+    Noise noise  0.384
+    """
     sigma = []
     if variances_list is None:
         variances_list = [4 for i in range(len(list(model.parameters())))]
