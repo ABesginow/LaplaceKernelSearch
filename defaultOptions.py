@@ -6,7 +6,7 @@ as well as operations to fill an arbitrary dictionary of options with the missin
 default_options = {
     "training": {"print_training_output" : False,
                  "print_optimizing_output": False,
-                 "max_iter": 10,
+                 "max_iter": 50,
                  "learning_rate": 0.1,
                  "restarts": 5,
                  "optimization method": "default"},
@@ -20,11 +20,8 @@ default_options = {
 
 hyperparameter_limits = {"RBFKernel": {"lengthscale": [1e-4,1]},
                          "LinearKernel": {"variance": [1e-4,1]},
-                         "PeriodicKernel": {"lengthscale": [1e-4,10],
-                                            "period_length": [1e-4,10]},
-                         "ScaleKernel": {"outputscale": [1e-4,100]},
-                         "WhiteNoiseKernel": {'lengthscale': [1e-4,1]},
-                         "CosineKernel": {"period_length": [1e-4,10]},
-                         "Noise": [1e-2,1e-1],
-                         "Mean": [0.0,1.0]}
+                         "PeriodicKernel": {"lengthscale": [1e-4,1],
+                                            "period_length": [1e-4,3]},
+                         "ScaleKernel": {"outputscale": [1e-4,10]},
+                         "Noise": [1e-2,1e-1]}
 
