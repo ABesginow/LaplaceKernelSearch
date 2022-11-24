@@ -208,7 +208,8 @@ def run_experiment(config_file):
 
     # Run CKS
     list_of_kernels = [gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel()),
-                       gpytorch.kernels.ScaleKernel(gpytorch.kernels.PeriodicKernel())]
+                       gpytorch.kernels.ScaleKernel(gpytorch.kernels.PeriodicKernel()),
+                       gpytorch.kernels.ScaleKernel(gpytorch.kernels.LinearKernel())]
     likelihood = gpytorch.likelihoods.GaussianLikelihood()
     list_of_variances = [float(variance_list_variance) for i in range(28)] # ist das richtig so?? Kommt mir falsch vor...
     #try:
@@ -257,9 +258,6 @@ def run_experiment(config_file):
     experiment.store_result("loss history", loss_history)
     experiment.store_result("final model", gsr(model))
     experiment.store_result("parameters", dict(model.named_parameters())) # oder lieber als reinen string?
-
-    ### Plotting
-
 
     experiment.write_results()
     # TODO write filename in FINISHED.log

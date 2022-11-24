@@ -3,7 +3,7 @@ import torch
 import numpy as np
 from GaussianProcess import ExactGPModel
 from helpFunctions import get_string_representation_of_kernel as gsr, clean_kernel_expression, print_formatted_hyperparameters
-from helpFunctions import amount_of_base_kernels
+from helpFunctions import amount_of_base_kernels, get_kernels_in_kernel_expression
 from gpytorch.kernels import ScaleKernel
 import threading
 import copy
@@ -91,26 +91,42 @@ def calculate_laplace(model, loss_of_model, variances_list=None):
     for i in range(len(env_grads)):
             hess_params.append(torch.autograd.grad(env_grads[i], params_list, retain_graph=True))
 
+    #prior_dict_softplussed = {"SE": {"lengthscale" : {"mean": 1.607, "std":1.650}},
+    #                          "PER":{"lengthscale": {"mean": 1.473, "std":1.582}, "period_length":{"mean": 0.920, "std":0.690}},
+    #                          "LIN":{"variance" : {"mean":0.374, "std":0.309}},
+    #                          "C":{"outputscale": {"mean":0.427, "std":0.754}},
+    #                          "noise": {"noise": {"mean":0.531, "std":0.384}}}
+
+    prior_dict = {"SE": {"raw_lengthscale" : {"mean": 0.891, "std":2.195}},
+                  "PER":{"raw_lengthscale": {"mean": 0.338, "std":2.636}, "raw_period_length":{"mean": 0.284, "std":0.902}},
+                  "LIN":{"raw_variance" : {"mean":-1.463, "std":1.633}},
+                  "c":{"raw_outputscale": {"mean":-2.163, "std":2.448}},
+                  "noise": {"raw_noise": {"mean":-1.792, "std":3.266}}}
+
+    theta_mu = []
+
+    covar_string = gsr(model.covar_module)
+    import pdb
+    pdb.set_trace()
+    covar_string = covar_string.strip("(")
+    covar_string = covar_string.strip(")")
+    covar_string = covar_string.replace(" ", "")
+    covar_string_list = [s.split("*") for s in covar_string.split("+")]
+    named_param_iter = iter(model.named_parameters())
+    for param_name, param in named_param_iter:
+        # First param is (always?) noise and is always with the likelihood
+        if "likelihood" in param_name:
+            theta_mu.append(prior_dict["noise"]["raw_noise"]["mean"])
+        if
+        # Get the params name
+        theta_mu.append()
+
+
     # theta_mu is a vector of parameter priors
-    """
-    SE length    1.607
-    PER length   1.473
-    PER period   0.920
-    LIN variance 0.374
-    C scale      0.427
-    Noise noise  0.531
-    """
     theta_mu = torch.tensor([1 for p in range(len(params_list))]).reshape(-1,1)
 
     # sigma is a matrix of variance priors
-    """
-    SE length    1.650
-    PER length   1.582
-    PER period   0.690
-    LIN variance 0.309
-    C scale      0.754
-    Noise noise  0.384
-    """
+
     sigma = []
     if variances_list is None:
         variances_list = [4 for i in range(len(list(model.parameters())))]
