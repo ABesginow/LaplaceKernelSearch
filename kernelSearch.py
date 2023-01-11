@@ -2,9 +2,10 @@ import gpytorch as gpt
 import torch
 import numpy as np
 from GaussianProcess import ExactGPModel
+from gpytorch.kernels import ScaleKernel
 from helpFunctions import get_string_representation_of_kernel as gsr, clean_kernel_expression, print_formatted_hyperparameters
 from helpFunctions import amount_of_base_kernels, get_kernels_in_kernel_expression
-from gpytorch.kernels import ScaleKernel
+from itertools import chain
 import threading
 import copy
 
@@ -106,20 +107,33 @@ def calculate_laplace(model, loss_of_model, variances_list=None):
     theta_mu = []
 
     covar_string = gsr(model.covar_module)
-    import pdb
-    pdb.set_trace()
-    covar_string = covar_string.strip("(")
-    covar_string = covar_string.strip(")")
+    covar_string = covar_string.replace("(", "")
+    covar_string = covar_string.replace(")", "")
     covar_string = covar_string.replace(" ", "")
+    covar_string = covar_string.replace("PER", "PER+PER")
     covar_string_list = [s.split("*") for s in covar_string.split("+")]
-    named_param_iter = iter(model.named_parameters())
-    for param_name, param in named_param_iter:
+    covar_string_list.insert(0, ["LIKELIHOOD"])
+    covar_string_list = list(chain.from_iterable(covar_string_list))
+    both_PER_params = False
+    for (param_name, param), cov_str in zip(model.named_parameters(), covar_string_list):
         # First param is (always?) noise and is always with the likelihood
         if "likelihood" in param_name:
             theta_mu.append(prior_dict["noise"]["raw_noise"]["mean"])
-        if
-        # Get the params name
-        theta_mu.append()
+            continue
+        else:
+            if cov_str == "PER" and not both_PER_params:
+                theta_mu.append(prior_dict[cov_str][param_name.split(".")[-1]]["mean"])
+                both_PER_params = True
+            elif cov_str == "PER" and both_PER_params:
+                theta_mu.append(prior_dict[cov_str][param_name.split(".")[-1]]["mean"])
+                both_PER_params = False
+            else:
+                try:
+                    theta_mu.append(prior_dict[cov_str][param_name.split(".")[-1]]["mean"])
+                except:
+                    import pdb
+                    pdb.set_trace()
+        prev_cov = cov_str
 
 
     # theta_mu is a vector of parameter priors
