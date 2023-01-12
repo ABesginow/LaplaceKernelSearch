@@ -82,7 +82,11 @@ def evaluate_performance_via_likelihood(model):
     return - model.get_current_loss()
 
 
-def calculate_laplace(model, loss_of_model, variances_list=None):
+def calculate_laplace(model, loss_of_model, variances_list=None, with_prior=True):
+    """
+        mode - Decides whether the version of the Laplace approx WITH the prior
+               is used or the one where the prior is not part of the approx.
+    """
     num_of_observations = len(*model.train_inputs)
     # Save a list of model parameters and compute the Hessian of the MLL
     params_list = [p for p in model.parameters()]
@@ -168,7 +172,13 @@ def calculate_laplace(model, loss_of_model, variances_list=None):
 
     # Conveniently we can also just express the fraction as a sum:
     laplace = mll - (1/2)*torch.log(sigma.det()) - (1/2)*torch.log( (sigma.inverse()-hessian).det() )  + (-1/2) * matmuls
-
+    laplace2 = mll - (1/2)*torch.log(sigma.det()) - (1/2)*(params-theta_mu).t()@sigma.inverse()@(params-theta_mu) - (1/2)*torch.log((-hessian).det())
+    if laplace.isnan() ^ laplace2.isnan():
+        print(f"Epic failure. W.P.:{laplace}, Wo.P.:{laplace2}")
+    if with_prior:
+        laplace = mll - (1/2)*torch.log(sigma.det()) - (1/2)*torch.log( (sigma.inverse()-hessian).det() )  + (-1/2) * matmuls
+    else:
+        laplace = mll - (1/2)*torch.log(sigma.det()) - (1/2)*(params-theta_mu).t()@sigma.inverse()@(params-theta_mu) - (1/2)*torch.log((-hessian).det())
     return laplace
 
 
@@ -292,7 +302,7 @@ def CKS(X, Y, likelihood, base_kernels, list_of_variances=None,  experiment=None
         for k in candidates:
             if metric == "Laplace":
                 try:
-                    performance[gsr(k)] = calculate_laplace(models[gsr(k)], models[gsr(k)].get_current_loss())
+                    performance[gsr(k)] = calculate_laplace(models[gsr(k)], models[gsr(k)].get_current_loss(), with_prior=False)
                 except:
                     performance[gsr(k)] = np.NINF
             if metric == "MC":

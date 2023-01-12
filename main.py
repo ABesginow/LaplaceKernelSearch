@@ -157,6 +157,7 @@ def run_experiment(config_file):
     # set training iterations to the correct config
     options["training"]["max_iter"] = int(train_iterations)
 
+    print(metric)
 
     log_name = "..."
     experiment_keyword = var_dict["experiment name"]
