@@ -90,7 +90,10 @@ def calculate_laplace(model, loss_of_model, variances_list=None, with_prior=True
     num_of_observations = len(*model.train_inputs)
     # Save a list of model parameters and compute the Hessian of the MLL
     params_list = [p for p in model.parameters()]
-    mll         = (num_of_observations * (-loss_of_model))
+    # This is now the positive MLL
+    #mll         = (num_of_observations * (-loss_of_model))
+    # This is NEGATIVE MLL
+    mll         = (num_of_observations * (loss_of_model))
     env_grads   = torch.autograd.grad(mll, params_list, retain_graph=True, create_graph=True)
     hess_params = []
     for i in range(len(env_grads)):
@@ -157,6 +160,8 @@ def calculate_laplace(model, loss_of_model, variances_list=None, with_prior=True
 
     params = torch.tensor(params_list).clone().reshape(-1,1)
     hessian = torch.tensor(hess_params).clone()
+    #TODO This is an important step and should be highlighted and explained in the paper
+    hessian = -hessian
 
 
     # Here comes what's wrapped in the exp-function:
@@ -170,15 +175,21 @@ def calculate_laplace(model, loss_of_model, variances_list=None, with_prior=True
     #fraction = 1 / (sigma.inverse()-hessian).det().sqrt() / sigma.det().sqrt()
     #laplace = mll + torch.log(fraction) + (-1/2) * matmuls
 
-    # Conveniently we can also just express the fraction as a sum:
+    #This is the original
     laplace = mll - (1/2)*torch.log(sigma.det()) - (1/2)*torch.log( (sigma.inverse()-hessian).det() )  + (-1/2) * matmuls
+    #This is the original
     laplace2 = mll - (1/2)*torch.log(sigma.det()) - (1/2)*(params-theta_mu).t()@sigma.inverse()@(params-theta_mu) - (1/2)*torch.log((-hessian).det())
     if laplace.isnan() ^ laplace2.isnan():
-        print(f"Epic failure. W.P.:{laplace}, Wo.P.:{laplace2}")
+        print(f"Epic failure. Wo.P.:{laplace}, W.P.:{laplace2}")
+        #import pdb
+        #pdb.set_trace()
     if with_prior:
-        laplace = mll - (1/2)*torch.log(sigma.det()) - (1/2)*torch.log( (sigma.inverse()-hessian).det() )  + (-1/2) * matmuls
+        #This is the original
+        laplace2 = mll - (1/2)*torch.log(sigma.det()) - (1/2)*(params-theta_mu).t()@sigma.inverse()@(params-theta_mu) - (1/2)*torch.log((-hessian).det())
     else:
-        laplace = mll - (1/2)*torch.log(sigma.det()) - (1/2)*(params-theta_mu).t()@sigma.inverse()@(params-theta_mu) - (1/2)*torch.log((-hessian).det())
+        #This is the original
+        laplace = mll - (1/2)*torch.log(sigma.det()) - (1/2)*torch.log( (sigma.inverse()-hessian).det() )  + (-1/2) * matmuls
+        print(torch.linalg.eig(hessian))
     return laplace
 
 
@@ -276,7 +287,7 @@ def calculate_mc(model, likelihood, number_of_draws=1000, mean=0, std_deviation=
 # ----------------------------------------------------------------------------------------------------
 # ------------------------------------------- CKS ----------------------------------------------------
 # ----------------------------------------------------------------------------------------------------
-def CKS(X, Y, likelihood, base_kernels, list_of_variances=None,  experiment=None, iterations=3, metric="MLL", **kwargs):
+def CKS(X, Y, likelihood, base_kernels, list_of_variances=None,  experiment=None, iterations=3, metric="MLL", BFGS=True, **kwargs):
     operations = [gpt.kernels.AdditiveKernel, gpt.kernels.ProductKernel]
     candidates = base_kernels.copy()
     best_performance = dict()
@@ -294,7 +305,10 @@ def CKS(X, Y, likelihood, base_kernels, list_of_variances=None,  experiment=None
                 threads[-1].start()
             else:
                 try:
-                    models[gsr(k)].optimize_hyperparameters()
+                    if BFGS:
+                        models[gsr(k)].optimize_hyperparameters(with_BFGS=True)
+                    else:
+                        models[gsr(k)].optimize_hyperparameters()
                 except:
                     continue
         for t in threads:
@@ -324,6 +338,7 @@ def CKS(X, Y, likelihood, base_kernels, list_of_variances=None,  experiment=None
             # Add variances list as parameter somehow
             if options["kernel search"]["print"]:
                 print(f"KERNEL SEARCH: iteration {i} checking {gsr(k)}, loss {-performance[gsr(k)]}")
+                print("--------\n")
         if len(best_performance) > 0:
             if best_performance["performance"] >= max(performance.values()):
                 if options["kernel search"]["print"]:

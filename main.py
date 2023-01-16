@@ -153,6 +153,7 @@ def run_experiment(config_file):
     noise = var_dict["Noise"]
     data_scaling = var_dict["Data_scaling"]
     weights = var_dict["weights"]
+    use_BFGS = True# var_dict["BFGS"]
 
     # set training iterations to the correct config
     options["training"]["max_iter"] = int(train_iterations)
@@ -214,7 +215,7 @@ def run_experiment(config_file):
     likelihood = gpytorch.likelihoods.GaussianLikelihood()
     list_of_variances = [float(variance_list_variance) for i in range(28)] # ist das richtig so?? Kommt mir falsch vor...
     #try:
-    model, likelihood, model_history, performance_history, loss_history = CKS(X, Y, likelihood, list_of_kernels, list_of_variances, experiment, iterations=3, metric=metric)
+    model, likelihood, model_history, performance_history, loss_history = CKS(X, Y, likelihood, list_of_kernels, list_of_variances, experiment, iterations=3, metric=metric, BFGS=use_BFGS)
     # With the exception check in CKS hyperparameter training this shouldn't
     # happen
     #except Exception as e:

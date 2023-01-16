@@ -33,7 +33,7 @@ class ExactGPModel(gpt.models.ExactGP):
             observed_pred = self.likelihood(self(x))
         return observed_pred.mean
 
-    def train_model(self):
+    def train_model(self, with_BFGS=False):
         self.train()
         self.likelihood.train()
         optimizer = torch.optim.Adam([{"params": self.parameters()}], lr=options["training"]["learning_rate"])
@@ -53,6 +53,26 @@ class ExactGPModel(gpt.models.ExactGP):
                 f"HYPERPARAMETER TRAINING: Iteration {i} - Loss: {loss.item()}  \n{parameter_string}")
             optimizer.step()
 
+        if with_BFGS:
+            # Additional BFGS optimization to better ensure optimal parameters
+            LBFGS_optimizer = torch.optim.LBFGS(self.parameters(), line_search_fn='strong_wolfe')
+            # define closure
+            def closure():
+                LBFGS_optimizer.zero_grad()
+                output = self.__call__(self.train_inputs[0])
+                loss = -mll(output, self.train_targets)
+                return loss
+
+            loss = closure()
+            loss.backward()
+
+            training_iter = 10
+            for i in range(training_iter):
+                # perform step and update curvature
+                #LBFGS_opts = {'closure': closure, 'current_loss': loss, 'max_ls': 10}
+                loss, _, lr, _, F_eval, G_eval, _, _ = LBFGS_optimizer.step(closure)
+
+
     def get_current_loss(self):
         self.train()
         self.likelihood.train()
@@ -68,7 +88,7 @@ class ExactGPModel(gpt.models.ExactGP):
         output = self.__call__(X)
         return torch.exp(mll(output, Y)).item()
 
-    def optimize_hyperparameters(self):
+    def optimize_hyperparameters(self, with_BFGS=False):
         """
         find optimal hyperparameters either by BO or by starting from random initial values multiple times, using an optimizer every time
         and then returning the best result
@@ -80,7 +100,7 @@ class ExactGPModel(gpt.models.ExactGP):
         # start runs
         for iteration in range(options["training"]["restarts"]+1):
             # optimize and determine loss
-            self.train_model()
+            self.train_model(with_BFGS=with_BFGS)
             current_loss = self.get_current_loss()
             # check if the current run is better than previous runs
             if current_loss < best_loss:
