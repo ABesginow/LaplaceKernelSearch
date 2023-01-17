@@ -91,9 +91,9 @@ def calculate_laplace(model, loss_of_model, variances_list=None, with_prior=True
     # Save a list of model parameters and compute the Hessian of the MLL
     params_list = [p for p in model.parameters()]
     # This is now the positive MLL
-    #mll         = (num_of_observations * (-loss_of_model))
+    mll         = (num_of_observations * (-loss_of_model))
     # This is NEGATIVE MLL
-    mll         = (num_of_observations * (loss_of_model))
+    #mll         = (num_of_observations * (loss_of_model))
     env_grads   = torch.autograd.grad(mll, params_list, retain_graph=True, create_graph=True)
     hess_params = []
     for i in range(len(env_grads)):
@@ -161,14 +161,15 @@ def calculate_laplace(model, loss_of_model, variances_list=None, with_prior=True
     params = torch.tensor(params_list).clone().reshape(-1,1)
     hessian = torch.tensor(hess_params).clone()
     #TODO This is an important step and should be highlighted and explained in the paper
-    hessian = -hessian
+    #hessian = -hessian
 
 
     # Here comes what's wrapped in the exp-function:
     thetas_added = params+theta_mu
     thetas_added_transposed = (params+theta_mu).reshape(1,-1)
     middle_term = (sigma.inverse()-hessian).inverse()
-    matmuls    = torch.matmul( torch.matmul( torch.matmul( torch.matmul(thetas_added_transposed, sigma.inverse()), middle_term ), hessian ), thetas_added )
+    matmuls = thetas_added_transposed @ sigma.inverse() @ middle_term @ hessian @ thetas_added
+    #matmuls    = torch.matmul( torch.matmul( torch.matmul( torch.matmul(thetas_added_transposed, sigma.inverse()), middle_term ), hessian ), thetas_added )
 
 
     # We can calculate by taking the log of the fraction:
@@ -176,7 +177,7 @@ def calculate_laplace(model, loss_of_model, variances_list=None, with_prior=True
     #laplace = mll + torch.log(fraction) + (-1/2) * matmuls
 
     #This is the original
-    laplace = mll - (1/2)*torch.log(sigma.det()) - (1/2)*torch.log( (sigma.inverse()-hessian).det() )  + (-1/2) * matmuls
+    laplace = mll - (1/2)*torch.log(sigma.det()) - (1/2)*torch.log( (sigma.inverse()-hessian).det() ) - (1/2) * matmuls
     #This is the original
     laplace2 = mll - (1/2)*torch.log(sigma.det()) - (1/2)*(params-theta_mu).t()@sigma.inverse()@(params-theta_mu) - (1/2)*torch.log((-hessian).det())
     if laplace.isnan() ^ laplace2.isnan():
@@ -188,7 +189,7 @@ def calculate_laplace(model, loss_of_model, variances_list=None, with_prior=True
         laplace2 = mll - (1/2)*torch.log(sigma.det()) - (1/2)*(params-theta_mu).t()@sigma.inverse()@(params-theta_mu) - (1/2)*torch.log((-hessian).det())
     else:
         #This is the original
-        laplace = mll - (1/2)*torch.log(sigma.det()) - (1/2)*torch.log( (sigma.inverse()-hessian).det() )  + (-1/2) * matmuls
+        laplace = mll - (1/2)*torch.log(sigma.det()) - (1/2)*torch.log( (sigma.inverse()-hessian).det() )  - (1/2) * matmuls
         print(torch.linalg.eig(hessian))
     return laplace
 
@@ -337,7 +338,7 @@ def CKS(X, Y, likelihood, base_kernels, list_of_variances=None,  experiment=None
                     performance[gsr(k)] = np.NINF
             # Add variances list as parameter somehow
             if options["kernel search"]["print"]:
-                print(f"KERNEL SEARCH: iteration {i} checking {gsr(k)}, loss {-performance[gsr(k)]}")
+                print(f"KERNEL SEARCH: iteration {i} checking {gsr(k)}, loss {performance[gsr(k)]}")
                 print("--------\n")
         if len(best_performance) > 0:
             if best_performance["performance"] >= max(performance.values()):
