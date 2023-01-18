@@ -189,8 +189,17 @@ def calculate_laplace(model, loss_of_model, variances_list=None, with_prior=True
         laplace2 = mll - (1/2)*torch.log(sigma.det()) - (1/2)*(params-theta_mu).t()@sigma.inverse()@(params-theta_mu) - (1/2)*torch.log((-hessian).det())
     else:
         #This is the original
+        prior_complexity = - (1/2)*torch.log(sigma.det())
+        combined_complexity = - (1/2)*torch.log( (sigma.inverse()-hessian).det() )
+        mahab_dist = - (1/2) * matmuls
         laplace = mll - (1/2)*torch.log(sigma.det()) - (1/2)*torch.log( (sigma.inverse()-hessian).det() )  - (1/2) * matmuls
+        import pdb
+        pdb.set_trace()
         print(torch.linalg.eig(hessian))
+        #with open("hessians.store", "a+") as f:
+        #    f.writelines(str(hessian.tolist())+"\n")
+        #print("Hessian")
+        #print(hessian)
     return laplace
 
 
