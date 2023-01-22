@@ -1,4 +1,5 @@
 import gpytorch as gpt
+from scipy.special import lambertw
 import torch
 import numpy as np
 from GaussianProcess import ExactGPModel
@@ -80,6 +81,48 @@ def create_candidates_AKS(base, kernels, operations, max_complexity=5):
 # ----------------------------------------------------------------------------------------------------
 def evaluate_performance_via_likelihood(model):
     return - model.get_current_loss()
+
+
+
+def calcLaplace(mll, hessian, sigma, theta_mu, params, with_prior=False, shift=None):
+    import pdb
+    #pdb.set_trace()
+    if shift is not None:
+        oldHessian = hessian.clone()
+        print(f"Old Hessian: {hessian}")
+        vals, vecs = np.linalg.eig(hessian)
+        c = (params - theta_mu).t()@sigma.inverse()@(params - theta_mu)
+        constructed_eigvals = np.diag(torch.Tensor([val if val < -c/(np.real(lambertw(c*torch.exp(c-2)))*sigma[i][i])-(1/sigma[i][i]) else -c/(np.real(lambertw(c*torch.exp(c-2)))*sigma[i][i])-(1/sigma[i][i]) for i, val in enumerate(vals)]))
+        print(f"Constructed Eigvals:{constructed_eigvals}")
+        hessian = vecs@constructed_eigvals@vecs.transpose()
+        #pdb.set_trace()
+        #temp = np.linalg.matrix_rank(hessian - np.diag([-c/(np.real(lambertw(c*torch.exp(c-2)))*sigma[0][0])-(1/sigma[0][0]) for i in range(len(hessian))]))
+        print(f"NEW VALUE:{-c/(np.real(lambertw(c*torch.exp(c-2)))*sigma[0][0])-(1/sigma[0][0])}")
+        if any([val > shift for val in vals]):
+            print("old eigs")
+            print(np.linalg.eig(oldHessian))
+            #print(vals)
+            print("new eigs")
+            print(np.linalg.eig(hessian))
+            print("matrix similarity")
+            print(np.linalg.norm(vecs - np.linalg.eig(hessian)[1]))
+        print(f"New Hessian: {hessian}")
+
+    thetas_added = params+theta_mu
+    thetas_added_transposed = (params+theta_mu).reshape(1,-1)
+    middle_term = (sigma.inverse()-hessian).inverse()
+    matmuls = thetas_added_transposed @ sigma.inverse() @ middle_term @ hessian @ thetas_added
+
+    if with_prior:
+        laplace2 = mll - (1/2)*torch.log(sigma.det()) - (1/2)*(params-theta_mu).t()@sigma.inverse()@(params-theta_mu) - (1/2)*torch.log((-hessian).det())
+    else:
+        laplace = mll - (1/2)*torch.log(sigma.det()) - (1/2)*torch.log( (sigma.inverse()-hessian).det() )  + (1/2) * matmuls
+        oldLaplace = mll - (1/2)*torch.log(sigma.det()) - (1/2)*torch.log( (sigma.inverse()-oldHessian).det() )  + (1/2) * thetas_added_transposed @ sigma.inverse() @ (sigma.inverse()-oldHessian).inverse() @ oldHessian @ thetas_added
+
+    #print(f"{}")
+    print(f"With shift:{laplace}")
+    print(f"Without shift:{oldLaplace}")
+    return laplace
 
 
 def calculate_laplace(model, loss_of_model, variances_list=None, with_prior=True):
@@ -191,10 +234,12 @@ def calculate_laplace(model, loss_of_model, variances_list=None, with_prior=True
         #This is the original
         prior_complexity = - (1/2)*torch.log(sigma.det())
         combined_complexity = - (1/2)*torch.log( (sigma.inverse()-hessian).det() )
-        mahab_dist = - (1/2) * matmuls
-        laplace = mll - (1/2)*torch.log(sigma.det()) - (1/2)*torch.log( (sigma.inverse()-hessian).det() )  - (1/2) * matmuls
+        mahab_dist = + (1/2) * matmuls
+        # This is the first version (BA thesis)
+        laplace = calcLaplace(mll, hessian, sigma, theta_mu, params, shift=-4)
+        #laplace = mll - (1/2)*torch.log(sigma.det()) - (1/2)*torch.log( (sigma.inverse()-hessian).det() )  + (1/2) * matmuls
         import pdb
-        pdb.set_trace()
+        #pdb.set_trace()
         print(torch.linalg.eig(hessian))
         #with open("hessians.store", "a+") as f:
         #    f.writelines(str(hessian.tolist())+"\n")

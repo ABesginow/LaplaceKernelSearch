@@ -275,7 +275,7 @@ if __name__ == "__main__":
     with open("FINISHED.log", "r") as f:
         finished_configs = [line.strip() for line in f.readlines()]
     curdir = os.getcwd()
-    keywords = ["Laplace", "MC", "MLL", "AIC"]
+    keywords = ["Laplace"]#, "MC", "MLL", "AIC"]
     configs = []
     for KEYWORD in keywords:
         configs.extend([os.path.join(curdir, "configs", KEYWORD, item) for item in os.listdir(os.path.join(curdir, "configs", KEYWORD))])
