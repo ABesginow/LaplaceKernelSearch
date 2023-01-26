@@ -83,55 +83,12 @@ def evaluate_performance_via_likelihood(model):
     return - model.get_current_loss()
 
 
-def calcLaplace(mll, hessian, sigma, theta_mu, params, with_prior=False, shift=True):
-    import pdb
-    #pdb.set_trace()
-    if shift:
-        oldHessian = hessian.clone()
-        #print(f"Old Hessian: {hessian}")
-        vals, vecs = np.linalg.eig(hessian)
-        c = lambda i : -((params[i] - theta_mu[i])**2/(np.real(lambertw((params[i] - theta_mu[i])**2*1/sigma[i][i] * torch.exp((params[i] - theta_mu[i])**2*1/sigma[i][i]-2)))*sigma[i][i]**2)+(1/sigma[i][i]))
-        constructed_eigvals = np.diag(torch.Tensor([val if val < c(i) else c(i) for i, val in enumerate(vals)]))
-        print(params)
-        print(f"Constructed Eigvals:{np.diag(constructed_eigvals)}")
-        hessian = vecs@constructed_eigvals@vecs.transpose()
-        #pdb.set_trace()
-        #temp = np.linalg.matrix_rank(hessian - np.diag([-c/(np.real(lambertw(c*torch.exp(c-2)))*sigma[0][0])-(1/sigma[0][0]) for i in range(len(hessian))]))
-        #print(f"NEW VALUE:{-c/(np.real(lambertw(c*torch.exp(c-2)))*sigma[0][0])-(1/sigma[0][0])}")
-        print("old eigs")
-        print(np.linalg.eig(oldHessian))
-        print("new eigs")
-        #print(np.diag(constructed_eigvals))
-        print(np.linalg.eig(hessian))
-        print("Difference in eigvals")
-        print(vals - np.diag(constructed_eigvals))
-        print("matrix similarity (1) eigvectors (2) hessian")
-        print(np.linalg.norm(vecs - np.linalg.eig(hessian)[1]))
-        print(np.linalg.norm(oldHessian - hessian))
-        #print(f"New Hessian: {hessian}")
-
-    thetas_added = params+theta_mu
-    thetas_added_transposed = (params+theta_mu).reshape(1,-1)
-    middle_term = (sigma.inverse()-hessian).inverse()
-    matmuls = thetas_added_transposed @ sigma.inverse() @ middle_term @ hessian @ thetas_added
-
-    if with_prior:
-        laplace2 = mll - (1/2)*torch.log(sigma.det()) - (1/2)*(params-theta_mu).t()@sigma.inverse()@(params-theta_mu) - (1/2)*torch.log((-hessian).det())
-    else:
-        laplace = mll - (1/2)*torch.log(sigma.det()) - (1/2)*torch.log( (sigma.inverse()-hessian).det() )  + (1/2) * matmuls
-        oldLaplace = mll - (1/2)*torch.log(sigma.det()) - (1/2)*torch.log( (sigma.inverse()-oldHessian).det() )  + (1/2) * thetas_added_transposed @ sigma.inverse() @ (sigma.inverse()-oldHessian).inverse() @ oldHessian @ thetas_added
-
-    #print(f"{}")
-    #print(f"With shift:{laplace}")
-    #print(f"Without shift:{oldLaplace}")
-    return laplace
-
-
 def calculate_laplace(model, loss_of_model, variances_list=None, with_prior=True):
     """
         mode - Decides whether the version of the Laplace approx WITH the prior
                is used or the one where the prior is not part of the approx.
     """
+    logables = {}
     num_of_observations = len(*model.train_inputs)
     # Save a list of model parameters and compute the Hessian of the MLL
     params_list = [p for p in model.parameters()]
@@ -231,23 +188,19 @@ def calculate_laplace(model, loss_of_model, variances_list=None, with_prior=True
         #pdb.set_trace()
     if with_prior:
         #This is the original
-        laplace2 = mll - (1/2)*torch.log(sigma.det()) - (1/2)*(params-theta_mu).t()@sigma.inverse()@(params-theta_mu) - (1/2)*torch.log((-hessian).det())
+        laplace = mll - (1/2)*torch.log(sigma.det()) - (1/2)*(params-theta_mu).t()@sigma.inverse()@(params-theta_mu) - (1/2)*torch.log((-hessian).det())
     else:
-        #This is the original
-        prior_complexity = - (1/2)*torch.log(sigma.det())
-        combined_complexity = - (1/2)*torch.log( (sigma.inverse()-hessian).det() )
-        mahab_dist = + (1/2) * matmuls
-        # This is the first version (BA thesis)
-        laplace = calcLaplace(mll, hessian, sigma, theta_mu, params)
+        oldHessian = hessian.clone()
+        vals, vecs = np.linalg.eig(hessian)
+        c = lambda i : -((params[i] - theta_mu[i])**2/(np.real(lambertw((params[i] - theta_mu[i])**2*1/sigma[i][i] * torch.exp((params[i] - theta_mu[i])**2*1/sigma[i][i]-2)))*sigma[i][i]**2)+(1/sigma[i][i]))
+        constructed_eigvals = np.diag(torch.Tensor([val if val < c(i) else c(i) for i, val in enumerate(vals)]))
+        hessian = vecs@constructed_eigvals@vecs.transpose()
+
+        laplace = mll - (1/2)*torch.log(sigma.det()) - (1/2)*torch.log( (sigma.inverse()-hessian).det() )  + (1/2) * matmuls
+        oldLaplace = mll - (1/2)*torch.log(sigma.det()) - (1/2)*torch.log( (sigma.inverse()-oldHessian).det() )  + (1/2) * thetas_added_transposed @ sigma.inverse() @ (sigma.inverse()-oldHessian).inverse() @ oldHessian @ thetas_added
+
         #laplace = mll - (1/2)*torch.log(sigma.det()) - (1/2)*torch.log( (sigma.inverse()-hessian).det() )  + (1/2) * matmuls
-        import pdb
-        #pdb.set_trace()
-        print(torch.linalg.eig(hessian))
-        #with open("hessians.store", "a+") as f:
-        #    f.writelines(str(hessian.tolist())+"\n")
-        #print("Hessian")
-        #print(hessian)
-    return laplace
+    return laplace, logables
 
 
 def calculate_mc(model, likelihood, number_of_draws=1000, mean=0, std_deviation=2, print_steps=False, scale_data = False):
@@ -373,7 +326,7 @@ def CKS(X, Y, likelihood, base_kernels, list_of_variances=None,  experiment=None
         for k in candidates:
             if metric == "Laplace":
                 try:
-                    performance[gsr(k)] = calculate_laplace(models[gsr(k)], models[gsr(k)].get_current_loss(), with_prior=False)
+                    performance[gsr(k)], logables = calculate_laplace(models[gsr(k)], models[gsr(k)].get_current_loss(), with_prior=False)
                 except:
                     performance[gsr(k)] = np.NINF
             if metric == "MC":
