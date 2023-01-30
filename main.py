@@ -139,21 +139,21 @@ def run_experiment(config_file):
     ### Initialization
     var_dict = load_config(config_file)
 
+    metric = var_dict["Metric"]
+    kernel_search = var_dict["Kernel_search"]
     train_data_ratio = var_dict["train_data_ratio"]
+    data_kernel = var_dict["Data_kernel"]
+    weights = var_dict["weights"]
+    variance_list_variance = var_dict["Variance_list"]
     eval_START = var_dict["eval_START"]
     eval_END = var_dict["eval_END"]
     eval_COUNT = var_dict["eval_COUNT"]
     optimizer = var_dict["optimizer"]
-    metric = var_dict["Metric"]
-    kernel_search = var_dict["Kernel_search"]
-    data_kernel = var_dict["Data_kernel"]
-    variance_list_variance = var_dict["Variance_list"]
     train_iterations = var_dict["train_iterations"]
     LR = var_dict["LR"]
     noise = var_dict["Noise"]
     data_scaling = var_dict["Data_scaling"]
-    weights = var_dict["weights"]
-    use_BFGS = True# var_dict["BFGS"]
+    use_BFGS = var_dict["BFGS"]
 
     # set training iterations to the correct config
     options["training"]["max_iter"] = int(train_iterations)
@@ -215,7 +215,7 @@ def run_experiment(config_file):
     likelihood = gpytorch.likelihoods.GaussianLikelihood()
     list_of_variances = [float(variance_list_variance) for i in range(28)] # ist das richtig so?? Kommt mir falsch vor...
     #try:
-    model, likelihood, model_history, performance_history, loss_history = CKS(X, Y, likelihood, list_of_kernels, list_of_variances, experiment, iterations=3, metric=metric, BFGS=use_BFGS)
+    model, likelihood, model_history, performance_history, loss_history, logables = CKS(X, Y, likelihood, list_of_kernels, list_of_variances, experiment, iterations=3, metric=metric, BFGS=use_BFGS)
     # With the exception check in CKS hyperparameter training this shouldn't
     # happen
     #except Exception as e:
@@ -251,10 +251,10 @@ def run_experiment(config_file):
 
 
 
-    eval_rmse = RMSE(observations_y.numpy(), mean_y.detach().numpy())
-    print(eval_rmse)
+    #eval_rmse = RMSE(observations_y.numpy(), mean_y.detach().numpy())
+    #print(eval_rmse)
 
-    experiment.store_result("eval RMSE", eval_rmse)
+    #experiment.store_result("eval RMSE", eval_rmse)
     experiment.store_result("model history", model_history)
     experiment.store_result("performance history", performance_history)
     experiment.store_result("loss history", loss_history)
@@ -264,7 +264,7 @@ def run_experiment(config_file):
     experiment.write_results()
     # TODO write filename in FINISHED.log
     with open("FINISHED.log", "a") as f:
-        f.writelines(config_file)
+        f.writelines(config_file + "\n")
     return 0
 
 
