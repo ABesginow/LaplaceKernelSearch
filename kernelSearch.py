@@ -85,8 +85,9 @@ def evaluate_performance_via_likelihood(model):
 
 def calculate_laplace(model, loss_of_model, variances_list=None, with_prior=True):
     """
-        mode - Decides whether the version of the Laplace approx WITH the prior
-               is used or the one where the prior is not part of the approx.
+        with_prior - Decides whether the version of the Laplace approx WITH the
+                     prior is used or the one where the prior is not part of
+                     the approx.
     """
     logables = {}
     num_of_observations = len(*model.train_inputs)
@@ -114,92 +115,137 @@ def calculate_laplace(model, loss_of_model, variances_list=None, with_prior=True
                   "noise": {"raw_noise": {"mean":-1.792, "std":3.266}}}
 
     theta_mu = []
-
-    covar_string = gsr(model.covar_module)
-    covar_string = covar_string.replace("(", "")
-    covar_string = covar_string.replace(")", "")
-    covar_string = covar_string.replace(" ", "")
-    covar_string = covar_string.replace("PER", "PER+PER")
-    covar_string_list = [s.split("*") for s in covar_string.split("+")]
-    covar_string_list.insert(0, ["LIKELIHOOD"])
-    covar_string_list = list(chain.from_iterable(covar_string_list))
-    both_PER_params = False
-    for (param_name, param), cov_str in zip(model.named_parameters(), covar_string_list):
-        # First param is (always?) noise and is always with the likelihood
-        if "likelihood" in param_name:
-            theta_mu.append(prior_dict["noise"]["raw_noise"]["mean"])
-            continue
-        else:
-            if cov_str == "PER" and not both_PER_params:
-                theta_mu.append(prior_dict[cov_str][param_name.split(".")[-1]]["mean"])
-                both_PER_params = True
-            elif cov_str == "PER" and both_PER_params:
-                theta_mu.append(prior_dict[cov_str][param_name.split(".")[-1]]["mean"])
-                both_PER_params = False
+    if variances_list is None:
+        variances_list = []
+    debug_param_name_list = []
+    if variances_list == [] and theta_mu == []:
+        covar_string = gsr(model.covar_module)
+        covar_string = covar_string.replace("(", "")
+        covar_string = covar_string.replace(")", "")
+        covar_string = covar_string.replace(" ", "")
+        covar_string = covar_string.replace("PER", "PER+PER")
+        covar_string_list = [s.split("*") for s in covar_string.split("+")]
+        covar_string_list.insert(0, ["LIKELIHOOD"])
+        covar_string_list = list(chain.from_iterable(covar_string_list))
+        both_PER_params = False
+        for (param_name, param), cov_str in zip(model.named_parameters(), covar_string_list):
+            debug_param_name_list.append(param_name)
+            # First param is (always?) noise and is always with the likelihood
+            if "likelihood" in param_name:
+                theta_mu.append(prior_dict["noise"]["raw_noise"]["mean"])
+                variances_list.append(prior_dict["noise"]["raw_noise"]["std"])
+                continue
             else:
-                try:
+                if cov_str == "PER" and not both_PER_params:
                     theta_mu.append(prior_dict[cov_str][param_name.split(".")[-1]]["mean"])
-                except:
-                    import pdb
-                    pdb.set_trace()
-        prev_cov = cov_str
-
+                    variances_list.append(prior_dict[cov_str][param_name.split(".")[-1]]["std"])
+                    both_PER_params = True
+                elif cov_str == "PER" and both_PER_params:
+                    theta_mu.append(prior_dict[cov_str][param_name.split(".")[-1]]["mean"])
+                    variances_list.append(prior_dict[cov_str][param_name.split(".")[-1]]["std"])
+                    both_PER_params = False
+                else:
+                    try:
+                        theta_mu.append(prior_dict[cov_str][param_name.split(".")[-1]]["mean"])
+                        variances_list.append(prior_dict[cov_str][param_name.split(".")[-1]]["std"])
+                    except:
+                        import pdb
+                        pdb.set_trace()
+            prev_cov = cov_str
+        theta_mu = torch.tensor(theta_mu)
+        theta_mu = theta_mu.unsqueeze(0).t()
 
     # theta_mu is a vector of parameter priors
-    theta_mu = torch.tensor([1 for p in range(len(params_list))]).reshape(-1,1)
+    #theta_mu = torch.tensor([1 for p in range(len(params_list))]).reshape(-1,1)
 
     # sigma is a matrix of variance priors
 
-    sigma = []
-    if variances_list is None:
-        variances_list = [4 for i in range(len(list(model.parameters())))]
-    for i in range(len(params_list)):
-        line = (np.zeros(len(params_list))).tolist()
-        line[i] = variances_list[i]
-        sigma.append(line)
-    sigma = torch.tensor(sigma)
+    #if variances_list is None:
+    #    variances_list = [4 for i in range(len(list(model.parameters())))]
+    # Check if sigma and variances_list are the same pls
+    sigma = torch.diag(torch.Tensor(variances_list))
 
 
     params = torch.tensor(params_list).clone().reshape(-1,1)
     hessian = torch.tensor(hess_params).clone()
+    hessian = (hessian + hessian.t()) / 2
     #TODO This is an important step and should be highlighted and explained in the paper
     #hessian = -hessian
 
-
-    # Here comes what's wrapped in the exp-function:
-    thetas_added = params+theta_mu
-    thetas_added_transposed = (params+theta_mu).reshape(1,-1)
-    middle_term = (sigma.inverse()-hessian).inverse()
-    matmuls = thetas_added_transposed @ sigma.inverse() @ middle_term @ hessian @ thetas_added
     #matmuls    = torch.matmul( torch.matmul( torch.matmul( torch.matmul(thetas_added_transposed, sigma.inverse()), middle_term ), hessian ), thetas_added )
 
-
+    #print(f"(sigma.inverse()-hessian).det()): {(sigma.inverse()-hessian).det())}")
     # We can calculate by taking the log of the fraction:
     #fraction = 1 / (sigma.inverse()-hessian).det().sqrt() / sigma.det().sqrt()
     #laplace = mll + torch.log(fraction) + (-1/2) * matmuls
 
     #This is the original
-    laplace = mll - (1/2)*torch.log(sigma.det()) - (1/2)*torch.log( (sigma.inverse()-hessian).det() ) - (1/2) * matmuls
+    #laplace = mll - (1/2)*torch.log(sigma.det()) - (1/2)*torch.log( (sigma.inverse()-hessian).det() ) - (1/2) * matmuls
     #This is the original
-    laplace2 = mll - (1/2)*torch.log(sigma.det()) - (1/2)*(params-theta_mu).t()@sigma.inverse()@(params-theta_mu) - (1/2)*torch.log((-hessian).det())
-    if laplace.isnan() ^ laplace2.isnan():
-        print(f"Epic failure. Wo.P.:{laplace}, W.P.:{laplace2}")
-        #import pdb
-        #pdb.set_trace()
+    #laplace2 = mll - (1/2)*torch.log(sigma.det()) - (1/2)*(params-theta_mu).t()@sigma.inverse()@(params-theta_mu) - (1/2)*torch.log((-hessian).det())
+    #if laplace.isnan() ^ laplace2.isnan():
+    #    print(f"Epic failure. Wo.P.:{laplace}, W.P.:{laplace2}")
+    #    #import pdb
+    #    #pdb.set_trace()
     if with_prior:
         #This is the original
         laplace = mll - (1/2)*torch.log(sigma.det()) - (1/2)*(params-theta_mu).t()@sigma.inverse()@(params-theta_mu) - (1/2)*torch.log((-hessian).det())
     else:
+        # Hessian correcting part (for Eigenvalues < 0 < c(i)  )
         oldHessian = hessian.clone()
-        vals, vecs = np.linalg.eig(hessian)
+        vals, vecs = torch.linalg.eig(hessian)
         c = lambda i : -((params[i] - theta_mu[i])**2/(np.real(lambertw((params[i] - theta_mu[i])**2*1/sigma[i][i] * torch.exp((params[i] - theta_mu[i])**2*1/sigma[i][i]-2)))*sigma[i][i]**2)+(1/sigma[i][i]))
-        constructed_eigvals = np.diag(torch.Tensor([val if val < c(i) else c(i) for i, val in enumerate(vals)]))
-        hessian = vecs@constructed_eigvals@vecs.transpose()
+        constructed_eigvals = torch.diag(torch.Tensor([min(val.real, c(i)) for i, val in enumerate(vals)]))
+        hessian = vecs.real@constructed_eigvals@vecs.t().real
 
+        # Here comes what's wrapped in the exp-function:
+        thetas_added = params+theta_mu
+        thetas_added_transposed = (params+theta_mu).reshape(1,-1)
+        middle_term = (sigma.inverse()-hessian).inverse()
+        matmuls = thetas_added_transposed @ sigma.inverse() @ middle_term @ hessian @ thetas_added
+
+        print(f"theta_s: {thetas_added_transposed}")
+        print(f"Sigma inv: {sigma.inverse()}")
+        print(f"(sigma.inverse()-hessian): {(sigma.inverse()-hessian)}")
+        print(f"(sigma.inverse()-hessian).inverse(): {(sigma.inverse()-hessian).inverse()}")
+        print(f"Hessian: {hessian}")
+        print(f"Frob. norm(H):{np.linalg.norm(hessian)}")
+        print(f"matmuls: {matmuls}")
+        print(f"----")
+        print(f"param_list:{debug_param_name_list}")
+        print(f"Corrected eig(H):{torch.linalg.eig(hessian)}")
+        print(f"Old  eig(H):{torch.linalg.eig(oldHessian)}")
+        print(f"Symmetry error: {hessian - hessian.t()}")
+        if any(torch.diag(constructed_eigvals) > 0):
+            print("Something went horribly wrong with the c(i)s")
+            import pdb
+            pdb.set_trace()
+            print(constructed_eigvals)
+        elif matmuls > 0:
+            print("matmuls positive!!")
+            import pdb
+            pdb.set_trace()
+            print(matmuls)
         laplace = mll - (1/2)*torch.log(sigma.det()) - (1/2)*torch.log( (sigma.inverse()-hessian).det() )  + (1/2) * matmuls
         oldLaplace = mll - (1/2)*torch.log(sigma.det()) - (1/2)*torch.log( (sigma.inverse()-oldHessian).det() )  + (1/2) * thetas_added_transposed @ sigma.inverse() @ (sigma.inverse()-oldHessian).inverse() @ oldHessian @ thetas_added
 
+        print(f"mll - 1/2 log sigma - 1/2 log sigma H + matmuls\n{mll} - {(1/2)*torch.log(sigma.det())} - {(1/2)*torch.log((sigma.inverse()-hessian).det())} + {(1/2) * matmuls}")
         #laplace = mll - (1/2)*torch.log(sigma.det()) - (1/2)*torch.log( (sigma.inverse()-hessian).det() )  + (1/2) * matmuls
+
+
+
+    # Everything worth logging
+    logables["MLL"] = mll
+    logables["parameter list"] = debug_param_name_list
+    logables["parameter values"] = params
+    logables["corrected Hessian"] = hessian
+    logables["constructed eigvals"] = constructed_eigvals
+    logables["original symmetrized Hessian"] = oldHessian
+    logables["theta mu"] = theta_mu
+    logables["diag(sigma)"] = torch.diag(sigma)
+    logables["approximation"] = laplace
+
+
     return laplace, logables
 
 
@@ -362,5 +408,5 @@ def CKS(X, Y, likelihood, base_kernels, list_of_variances=None,  experiment=None
         candidates = create_candidates_CKS(best_model.covar_module, base_kernels, operations)
     if options["kernel search"]["print"]:
         print(f"KERNEL SEARCH: kernel search concluded, optimal expression: {gsr(best_model.covar_module)}")
-    return best_model, best_model.likelihood, model_steps, performance_steps, loss_steps
+    return best_model, best_model.likelihood, model_steps, performance_steps, loss_steps, logables
 
