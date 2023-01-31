@@ -249,6 +249,33 @@ def calculate_laplace(model, loss_of_model, variances_list=None, with_prior=True
     return laplace, logables
 
 
+
+def generate_STAN_kernel(str: kernel_representation, list: parameter_list):
+    replacement_dictionary = {
+        "c" : "scale",
+        "SE": "gp_exp_quad_cov(x, sigma, lengthscale)",
+        "PER": "gp_periodic_cov(x, sigma, lengthscale, period)",
+        "LIN": "variance*(operator'(x)*x)"
+    }
+
+
+
+    # Basically do text replacement
+    # Take care of theta order!
+
+    "k(x1, x2) = "
+
+
+    return ""
+
+
+
+def generate_STAN_code():
+    return ""
+
+
+
+
 def calculate_mc(model, likelihood, number_of_draws=1000, mean=0, std_deviation=2, print_steps=False, scale_data = False):
 
     observations_x = model.train_inputs
