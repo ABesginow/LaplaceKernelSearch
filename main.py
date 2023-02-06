@@ -154,6 +154,7 @@ def run_experiment(config_file):
     noise = var_dict["Noise"]
     data_scaling = var_dict["Data_scaling"]
     use_BFGS = var_dict["BFGS"]
+    num_draws = var_dict["num_draws"] if metric == "MC" else None
 
     # set training iterations to the correct config
     options["training"]["max_iter"] = int(train_iterations)
@@ -162,14 +163,12 @@ def run_experiment(config_file):
 
     log_name = "..."
     experiment_keyword = var_dict["experiment name"]
-    experiment_path = os.path.join("results", f"{experiment_keyword}")
+    experiment_path = os.path.join("results", metric, f"{experiment_keyword}")
     if not os.path.exists(experiment_path):
         os.makedirs(experiment_path)
     log_experiment_path = os.path.join(experiment_path, f"{experiment_keyword}")
-    experiment = Experiment(log_experiment_path, EXPERIMENT_REPITITIONS)
+    experiment = Experiment(log_experiment_path, EXPERIMENT_REPITITIONS, attributes=var_dict)
 
-    for key in var_dict:
-        experiment.store_result(key, var_dict[key])
 
 
     ## Create train data
@@ -215,7 +214,9 @@ def run_experiment(config_file):
     likelihood = gpytorch.likelihoods.GaussianLikelihood()
     list_of_variances = [float(variance_list_variance) for i in range(28)] # ist das richtig so?? Kommt mir falsch vor...
     #try:
-    model, likelihood, model_history, performance_history, loss_history, logables = CKS(X, Y, likelihood, list_of_kernels, list_of_variances, experiment, iterations=3, metric=metric, BFGS=use_BFGS)
+    model, likelihood, model_history, performance_history, loss_history, logables = CKS(X, Y, likelihood, list_of_kernels, list_of_variances, experiment, iterations=3, metric=metric, BFGS=use_BFGS, num_draws=num_draws)
+
+    experiment.store_result("details", logables)
     # With the exception check in CKS hyperparameter training this shouldn't
     # happen
     #except Exception as e:
@@ -261,7 +262,7 @@ def run_experiment(config_file):
     experiment.store_result("final model", gsr(model))
     experiment.store_result("parameters", dict(model.named_parameters())) # oder lieber als reinen string?
 
-    experiment.write_results()
+    experiment.write_results(os.path.join(experiment_path, "results.pickle"))
     # TODO write filename in FINISHED.log
     with open("FINISHED.log", "a") as f:
         f.writelines(config_file + "\n")
@@ -275,7 +276,7 @@ if __name__ == "__main__":
     with open("FINISHED.log", "r") as f:
         finished_configs = [line.strip() for line in f.readlines()]
     curdir = os.getcwd()
-    keywords = ["Laplace"]#, "MC", "MLL", "AIC"]
+    keywords = ["MC"]#, "MLL", "AIC", "Laplace"]
     configs = []
     for KEYWORD in keywords:
         configs.extend([os.path.join(curdir, "configs", KEYWORD, item) for item in os.listdir(os.path.join(curdir, "configs", KEYWORD))])

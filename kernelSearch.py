@@ -1,16 +1,18 @@
-import gpytorch as gpt
-from scipy.special import lambertw
-import torch
-import numpy as np
+import copy
 from GaussianProcess import ExactGPModel
+from globalParams import options
+import gpytorch as gpt
 from gpytorch.kernels import ScaleKernel
 from helpFunctions import get_string_representation_of_kernel as gsr, clean_kernel_expression, print_formatted_hyperparameters
 from helpFunctions import amount_of_base_kernels, get_kernels_in_kernel_expression
 from itertools import chain
+import numpy as np
+import re
+from scipy.special import lambertw
+import stan
+import torch
 import threading
-import copy
 
-from globalParams import options
 
 # ----------------------------------------------------------------------------------------------------
 # ----------------------------------------HELP FUNCTIONS----------------------------------------------
@@ -239,39 +241,183 @@ def calculate_laplace(model, loss_of_model, variances_list=None, with_prior=True
     logables["parameter list"] = debug_param_name_list
     logables["parameter values"] = params
     logables["corrected Hessian"] = hessian
-    logables["constructed eigvals"] = constructed_eigvals
+    logables["diag(constructed eigvals)"] = torch.diag(constructed_eigvals)
     logables["original symmetrized Hessian"] = oldHessian
-    logables["theta mu"] = theta_mu
-    logables["diag(sigma)"] = torch.diag(sigma)
-    logables["approximation"] = laplace
+    logables["prior mean"] = theta_mu
+    logables["diag(prior var)"] = torch.diag(sigma)
+    logables["likelihood approximation"] = laplace
 
 
     return laplace, logables
 
 
 
-def generate_STAN_kernel(str: kernel_representation, list: parameter_list):
+
+def generate_STAN_kernel(kernel_representation : str, parameter_list : list, covar_string_list : list):
+    """
+    parameter_list : We assume it just contains strings of parameter names
+    """
     replacement_dictionary = {
-        "c" : "scale",
-        "SE": "gp_exp_quad_cov(x, sigma, lengthscale)",
-        "PER": "gp_periodic_cov(x, sigma, lengthscale, period)",
-        "LIN": "variance*(operator'(x)*x)"
+        "c" : "softplus(theta[i])",
+        "SE": "gp_exp_quad_cov(x, 1.0, softplus(theta[i]))",
+        "PER": "gp_periodic_cov(x, 1.0, softplus(theta[i]), softplus(theta[i]))",
+        "LIN": "softplus(theta[i]) * (x' * x)"
     }
-
-
-
     # Basically do text replacement
     # Take care of theta order!
+    STAN_str_kernel = f"{kernel_representation}"
+    search_str = "[i]"
+    # str.replace(old, new, count) replaces the leftmost entry
+    # Thus by iterating over all occurences of search_str I can hack this
+    for key in replacement_dictionary:
+        STAN_str_kernel = STAN_str_kernel.replace(key, replacement_dictionary[key])
+    for i in range(len(re.findall(re.escape(search_str), STAN_str_kernel))):
+        STAN_str_kernel = STAN_str_kernel.replace(search_str, f"[{i+1}]", 1)
+    #STAN_str_kernel += "+ identity_matrix(dims(x)[0])*noise"
+    return STAN_str_kernel
 
-    "k(x1, x2) = "
 
 
-    return ""
+def generate_STAN_code(kernel_representation : str,  parameter_list : list, covar_string_list : list ):
+    # Alternative: use 1:dims(v)[0] in the loop
+    functions = """
+    functions {
+        array[] real softplus(array[] real v){
+            array[num_elements(v)] real r;
+            for (d in 1:num_elements(v)){
+                r[d] = log(1.0 + exp(v[d]));
+            }
+            return r;
+        }
+        real softplus(real v){
+            return log(1.0 + exp(v));
+        }
+    }
+    """
 
 
+    data = """
+    data {
+        int N;
+        int D;
+        array[N] real x;
+        vector[N] y;
+        vector[D] t_mu;
+        matrix[D, D] t_sigma;
+    }
+    """
 
-def generate_STAN_code():
-    return ""
+    parameters = """
+    parameters {
+        vector[D] theta;
+    }
+    """
+
+    model = f"""
+    model {{
+        matrix[N, N] K;
+        vector[N] mu;
+        theta ~ multi_normal(t_mu, t_sigma);
+        K = {generate_STAN_kernel(kernel_representation, parameter_list, covar_string_list)};
+        mu = zeros_vector(N);
+        y ~ multi_normal(mu, K);
+    }}
+    """
+
+    code = functions + data + parameters + model
+    return code
+
+
+def calculate_mc_STAN(model, likelihood, num_draws):
+    # Yes, this is code duplication from above.
+    # No, I am not happy with this
+    prior_dict = {"SE": {"raw_lengthscale" : {"mean": 0.891, "std":2.195}},
+                  "PER":{"raw_lengthscale": {"mean": 0.338, "std":2.636}, "raw_period_length":{"mean": 0.284, "std":0.902}},
+                  "LIN":{"raw_variance" : {"mean":-1.463, "std":1.633}},
+                  "c":{"raw_outputscale": {"mean":-2.163, "std":2.448}},
+                  "noise": {"raw_noise": {"mean":-1.792, "std":3.266}}}
+    theta_mu = list()
+    variances_list = list()
+    covar_string = gsr(model.covar_module)
+    covar_string_clone = copy.deepcopy(covar_string)
+    covar_string_clone = covar_string_clone.replace("(", "")
+    covar_string_clone = covar_string_clone.replace(")", "")
+    covar_string_clone = covar_string_clone.replace(" ", "")
+    covar_string_clone = covar_string_clone.replace("PER", "PER+PER")
+    covar_string_list = [s.split("*") for s in covar_string_clone.split("+")]
+    covar_string_list.insert(0, ["LIKELIHOOD"])
+    covar_string_list = list(chain.from_iterable(covar_string_list))
+    both_PER_params = False
+    debug_param_name_list = list()
+    for (param_name, param), cov_str in zip(model.named_parameters(), covar_string_list):
+        debug_param_name_list.append(param_name)
+        # First param is (always?) noise and is always with the likelihood
+        if "likelihood" in param_name:
+            theta_mu.append(prior_dict["noise"]["raw_noise"]["mean"])
+            variances_list.append(prior_dict["noise"]["raw_noise"]["std"])
+            continue
+        else:
+            if cov_str == "PER" and not both_PER_params:
+                theta_mu.append(prior_dict[cov_str][param_name.split(".")[-1]]["mean"])
+                variances_list.append(prior_dict[cov_str][param_name.split(".")[-1]]["std"])
+                both_PER_params = True
+            elif cov_str == "PER" and both_PER_params:
+                theta_mu.append(prior_dict[cov_str][param_name.split(".")[-1]]["mean"])
+                variances_list.append(prior_dict[cov_str][param_name.split(".")[-1]]["std"])
+                both_PER_params = False
+            else:
+                try:
+                    theta_mu.append(prior_dict[cov_str][param_name.split(".")[-1]]["mean"])
+                    variances_list.append(prior_dict[cov_str][param_name.split(".")[-1]]["std"])
+                except:
+                    import pdb
+                    pdb.set_trace()
+        prev_cov = cov_str
+    theta_mu = torch.tensor(theta_mu)
+    theta_mu = theta_mu.unsqueeze(0).t()
+
+    # theta_mu is a vector of parameter priors
+    #theta_mu = torch.tensor([1 for p in range(len(params_list))]).reshape(-1,1)
+
+    # sigma is a matrix of variance priors
+    sigma = torch.diag(torch.Tensor(variances_list))
+
+
+    STAN_code = generate_STAN_code(covar_string, debug_param_name_list, covar_string_list)
+    # Required data for the STAN model:
+    """
+    int N;
+    int D;
+    array[N] real x;
+    vector[N] y;
+    vector[D] t_mu;
+    matrix[D, D] t_sigma;
+    """
+    if type(model.train_inputs) == tuple:
+        x = model.train_inputs[0].tolist()
+        # Assuming I have [[x1], [x2], [x3], ...]
+        if not np.ndim(x) == 1:
+            x = [t[0] for t in x]
+    else:
+        x = model.train_inputs.tolist()
+    STAN_data = {"N" : len(x),
+                 "D" : len(theta_mu),
+                 "x" : x,
+                 "y" : model.train_targets.tolist(),
+                 "t_mu" : [t[0] for t in theta_mu.tolist()],
+                 "t_sigma" : sigma.tolist()
+    }
+    print(STAN_code)
+    posterior = stan.build(STAN_code, data=STAN_data, random_seed=1)
+    if num_draws is None:
+       raise("Number of draws not specified")
+    # This should give me the likelihood distribution p(y|x), right?
+    fit = posterior.sample(num_chains=8, num_samples=num_draws)
+
+    import pdb
+    pdb.set_trace()
+    # Now I have to average over the chain likelihood, which is my result
+    return None
 
 
 
@@ -370,7 +516,7 @@ def calculate_mc(model, likelihood, number_of_draws=1000, mean=0, std_deviation=
 # ----------------------------------------------------------------------------------------------------
 # ------------------------------------------- CKS ----------------------------------------------------
 # ----------------------------------------------------------------------------------------------------
-def CKS(X, Y, likelihood, base_kernels, list_of_variances=None,  experiment=None, iterations=3, metric="MLL", BFGS=True, **kwargs):
+def CKS(X, Y, likelihood, base_kernels, list_of_variances=None,  experiment=None, iterations=3, metric="MLL", BFGS=True, num_draws=None, **kwargs):
     operations = [gpt.kernels.AdditiveKernel, gpt.kernels.ProductKernel]
     candidates = base_kernels.copy()
     best_performance = dict()
@@ -403,10 +549,12 @@ def CKS(X, Y, likelihood, base_kernels, list_of_variances=None,  experiment=None
                 except:
                     performance[gsr(k)] = np.NINF
             if metric == "MC":
-                try:
-                    performance[gsr(k)] = calculate_mc(models[gsr(k)], models[gsr(k)].likelihood)
-                except:
-                    performance[gsr(k)] = np.NINF
+                #try:
+                performance[gsr(k)] = calculate_mc_STAN(models[gsr(k)], models[gsr(k)].likelihood, num_draws=num_draws)
+                #except:
+                #    import pdb
+                #    pdb.post_mortem()
+                #    performance[gsr(k)] = np.NINF
             if metric == "AIC":
                 try:
                     log_loss = -models[gsr(k)].get_current_loss() * models[gsr(k)].train_inputs[0].numel()

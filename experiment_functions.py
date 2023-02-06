@@ -9,10 +9,12 @@ import matplotlib.pyplot as plt
 
 class Experiment:
 
-    def __init__(self, experiment_keyword, repititions : int):
+    def __init__(self, experiment_keyword, repititions : int, attributes :dict = None):
         self.experiment_keyword = experiment_keyword
         self.DEBUG = (self.experiment_keyword == "")
         self.results = {i:{} for i in range(repititions)}
+        if not attributes is None:
+            self.results["attributes"] = attributes
         self.current_result = 0
         self.loss = None
         return
