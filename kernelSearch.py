@@ -260,8 +260,8 @@ def generate_STAN_kernel(kernel_representation : str, parameter_list : list, cov
     replacement_dictionary = {
         "c" : "softplus(theta[i])",
         "SE": "gp_exp_quad_cov(x, 1.0, softplus(theta[i]))",
-        "PER": "gp_periodic_cov(x, 1.0, softplus(theta[i]), softplus(theta[i]))",
-        "LIN": "softplus(theta[i]) * (x' * x)"
+        "PER": "gp_periodic_cov(x, 1.0, sqrt(softplus(theta[i])), softplus(theta[i]))",
+        "LIN": "softplus(theta[i]) * gp_dot_prod_cov(x, 0.0)"
     }
     # Basically do text replacement
     # Take care of theta order!
@@ -431,6 +431,7 @@ def calculate_mc_STAN(model, likelihood, num_draws):
 
 
 
+    manual_lp_list = list()
     # Iterate over chain
     for sample in post_frame[list(fit.constrained_param_names)].iterrows():
         # Iterate over kernel parameters
@@ -452,11 +453,13 @@ def calculate_mc_STAN(model, likelihood, num_draws):
 
         # Compare this to the likelihood of y given mean and covar (+ noise)
         like_mean = torch.zeros(len(model.train_inputs))
-        like_cov_matr = model.covar_module(model.train_inputs)
+        # Is softplus(noise) equal to likelihood.noise?
+        like_cov_matr = torch.eye(model.train_inputs) * likelihood.noise + model.covar_module(model.train_inputs)
+        like_dist = torch.distributions.multivariate_normal.MultivariateNormal(like_mean, covariance_matrix=like_cov_matr)
+        manual_lp_list.append(like_dist.log_prob(model.train_targets))
 
-
-
-    return None
+    # TODO verify this and do sanity checks
+    return torch.mean(manual_lp_list)
 
 
 
