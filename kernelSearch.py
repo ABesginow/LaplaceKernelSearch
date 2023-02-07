@@ -265,7 +265,7 @@ def generate_STAN_kernel(kernel_representation : str, parameter_list : list, cov
     }
     # Basically do text replacement
     # Take care of theta order!
-    STAN_str_kernel = f"{kernel_representation}"
+    STAN_str_kernel = f"identity_matrix(dims(x)[1])*softplus(theta[i]) + {kernel_representation}"
     search_str = "[i]"
     # str.replace(old, new, count) replaces the leftmost entry
     # Thus by iterating over all occurences of search_str I can hack this
@@ -273,7 +273,6 @@ def generate_STAN_kernel(kernel_representation : str, parameter_list : list, cov
         STAN_str_kernel = STAN_str_kernel.replace(key, replacement_dictionary[key])
     for i in range(len(re.findall(re.escape(search_str), STAN_str_kernel))):
         STAN_str_kernel = STAN_str_kernel.replace(search_str, f"[{i+1}]", 1)
-    #STAN_str_kernel += "+ identity_matrix(dims(x)[0])*noise"
     return STAN_str_kernel
 
 
@@ -324,7 +323,17 @@ def generate_STAN_code(kernel_representation : str,  parameter_list : list, cova
     }}
     """
 
-    code = functions + data + parameters + model
+    generated_quantities = f"""
+    generated quantities {{
+        real lpd;
+        matrix[N, N] K;
+        vector[N] mu;
+        K = {generate_STAN_kernel(kernel_representation, parameter_list, covar_string_list)};
+        mu = zeros_vector(N);
+        lpd = multi_normal_lpdf(y | mu, K);
+    }}
+    """
+    code = functions + data + parameters + model #+ generated_quantities
     return code
 
 
@@ -411,12 +420,42 @@ def calculate_mc_STAN(model, likelihood, num_draws):
     posterior = stan.build(STAN_code, data=STAN_data, random_seed=1)
     if num_draws is None:
        raise("Number of draws not specified")
-    # This should give me the likelihood distribution p(y|x), right?
+    # This gives me the chain with 'lp__' approximately the posterior likeli.
     fit = posterior.sample(num_chains=8, num_samples=num_draws)
 
-    import pdb
-    pdb.set_trace()
-    # Now I have to average over the chain likelihood, which is my result
+    # Use the sampled parameters to reconstruct the mean and cov. matr.
+    # Average(?) to get the actual posterior likelihood
+    post_frame = fit.to_frame()
+    # Each theta corresponds to exactly one model parameter
+    # TODO move from named_parameter to parameters once verified
+
+
+
+    # Iterate over chain
+    for sample in post_frame[list(fit.constrained_param_names)].iterrows():
+        # Iterate over kernel parameters
+        # Main assumption: Kernel parameters are stored in order of kernel
+        # appearance from left to right, just like in STAN
+        for model_param, sampled_param in zip(model.parameters(), sample[1]):
+            import pdb
+            pdb.set_trace()
+            param.data = torch.tensor([sampled_param])
+
+        # Can I just use the model mll and multiply by datapoints
+        # to correct for GPyTorchs term?
+        model.eval()
+        likelihood.eval()
+        mll = gpytorch.mlls.ExactMarginalLogLikelihood(model.likelihood, model)
+        output = model(model.train_inputs)
+        l1 = mll(output, model.train_targets)
+
+
+        # Compare this to the likelihood of y given mean and covar (+ noise)
+        like_mean = torch.zeros(len(model.train_inputs))
+        like_cov_matr = model.covar_module(model.train_inputs)
+
+
+
     return None
 
 
