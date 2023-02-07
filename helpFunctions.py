@@ -92,3 +92,58 @@ def clean_kernel_expression(kernel):
     elif hasattr(kernel, "kernels"):
         for sub_expression in kernel.kernels:
             clean_kernel_expression(sub_expression)
+
+def generate_kernel_from_polish_string(s : str):
+    """
+    generate a gpytorch kernel expression equivalent to the string s
+    Args:
+        s: a string representing the kernel in polish notation. Place spaces between elements
+        Supported kernels are SE, PER, LIN, c (use as "c PER" or "c SE" for example)
+        Supported operators are + and *
+        Scaling operators (e.g. c + PER SE) is currently not supported
+
+    Returns: gpytorch kernel
+    """
+    from gpytorch.kernels import ScaleKernel, AdditiveKernel, ProductKernel, RBFKernel, PeriodicKernel, LinearKernel
+    def get_corresponding_kernel(name):
+        match name:
+            case "*":
+                return ProductKernel()
+            case "+":
+                return AdditiveKernel()
+            case "c":
+                return ScaleKernel
+            case "SE":
+                return RBFKernel()
+            case "RBF":
+                return RBFKernel()
+            case "PER":
+                return PeriodicKernel()
+            case "LIN":
+                return LinearKernel()
+    s2 = s.split(' ')
+    first = s2.pop(0)
+    if first == "c":
+        return ScaleKernel(get_corresponding_kernel(s2.pop(0))) # special case
+    kernel_expression = get_corresponding_kernel(first)
+    kernel_buffer = []
+    if hasattr(kernel_expression, "kernels"):
+        kernel_buffer.append(kernel_expression)
+    while True:
+        if len(kernel_buffer) == 0: # if buffer is empty, the expression is finished
+            break
+        if len(kernel_buffer[-1].kernels) == 2: # if the latest operator has 2 children, it is full and gets removed
+            kernel_buffer = kernel_buffer[:-1]
+        else:
+            try:
+                current_symbol = s2.pop(0)
+            except: # s2 is empty -> done
+                break
+            if current_symbol == "c":
+                current_kernel = ScaleKernel(get_corresponding_kernel(s2.pop(0)))
+            else:
+                current_kernel = get_corresponding_kernel(current_symbol)
+            kernel_buffer[-1].kernels.append(current_kernel)
+            if hasattr(current_kernel, 'kernels'):
+                kernel_buffer.append(current_kernel)
+    return kernel_expression
