@@ -432,34 +432,43 @@ def calculate_mc_STAN(model, likelihood, num_draws):
 
 
     manual_lp_list = list()
+    bad_entries = 0
     # Iterate over chain
     for sample in post_frame[list(fit.constrained_param_names)].iterrows():
         # Iterate over kernel parameters
         # Main assumption: Kernel parameters are stored in order of kernel
         # appearance from left to right, just like in STAN
         for model_param, sampled_param in zip(model.parameters(), sample[1]):
-            import pdb
-            pdb.set_trace()
-            param.data = torch.tensor([sampled_param])
-
-        # Can I just use the model mll and multiply by datapoints
-        # to correct for GPyTorchs term?
-        model.eval()
-        likelihood.eval()
-        mll = gpytorch.mlls.ExactMarginalLogLikelihood(model.likelihood, model)
-        output = model(model.train_inputs)
-        l1 = mll(output, model.train_targets)
+            model_param.data = torch.full_like(model_param.data, sampled_param)
 
 
-        # Compare this to the likelihood of y given mean and covar (+ noise)
-        like_mean = torch.zeros(len(model.train_inputs))
-        # Is softplus(noise) equal to likelihood.noise?
-        like_cov_matr = torch.eye(model.train_inputs) * likelihood.noise + model.covar_module(model.train_inputs)
-        like_dist = torch.distributions.multivariate_normal.MultivariateNormal(like_mean, covariance_matrix=like_cov_matr)
-        manual_lp_list.append(like_dist.log_prob(model.train_targets))
+        try:
+            # Can I just use the model mll and multiply by datapoints
+            # to correct for GPyTorchs term?
+            model.eval()
+            likelihood.eval()
+            mll = gpt.mlls.ExactMarginalLogLikelihood(model.likelihood, model)
+            output = model(model.train_inputs[0])
+            l1 = mll(output, model.train_targets)
 
+            # Compare this to the likelihood of y given mean and covar (+ noise)
+            like_mean = torch.zeros(len(model.train_inputs[0]))
+            # Is softplus(noise) equal to likelihood.noise?
+            like_cov_matr = torch.eye(len(model.train_inputs[0].tolist())) * likelihood.noise + model.covar_module(model.train_inputs[0])
+            like_cov_matr += torch.eye(len(model.train_inputs[0].tolist())) * 1e-6 # Jitter
+            like_dist = torch.distributions.multivariate_normal.MultivariateNormal(like_mean, covariance_matrix=like_cov_matr.evaluate())
+            manual_lp_list.append(like_dist.log_prob(model.train_targets))
+
+            print(list(model.named_parameters()))
+            print(f"GPyTorch:{len(model.train_inputs[0])*l1}\t Manual:{like_dist.log_prob(model.train_targets)}")
+        except:
+            bad_entries += 1
+
+    print(f"Num bad entries: {bad_entries}")
     # TODO verify this and do sanity checks
-    return torch.mean(manual_lp_list)
+    import pdb
+    pdb.set_trace()
+    return torch.mean(torch.Tensor(manual_lp_list))
 
 
 
