@@ -201,8 +201,8 @@ def calculate_laplace(model, loss_of_model, variances_list=None, with_prior=True
         hessian = vecs.real@constructed_eigvals@vecs.t().real
 
         # Here comes what's wrapped in the exp-function:
-        thetas_added = params+theta_mu
-        thetas_added_transposed = (params+theta_mu).reshape(1,-1)
+        thetas_added = params-theta_mu
+        thetas_added_transposed = (params-theta_mu).reshape(1,-1)
         middle_term = (sigma.inverse()-hessian).inverse()
         matmuls = thetas_added_transposed @ sigma.inverse() @ middle_term @ hessian @ thetas_added
 
@@ -467,8 +467,8 @@ def calculate_mc_STAN(model, likelihood, num_draws):
             like_dist = torch.distributions.multivariate_normal.MultivariateNormal(like_mean, covariance_matrix=like_cov_matr.evaluate())
             manual_lp_list.append(like_dist.log_prob(model.train_targets))
 
-            print(list(model.named_parameters()))
-            print(f"GPyTorch:{len(model.train_inputs[0])*l1}\t Manual:{like_dist.log_prob(model.train_targets)}")
+            #print(list(model.named_parameters()))
+            #print(f"GPyTorch:{len(model.train_inputs[0])*l1}\t Manual:{like_dist.log_prob(model.train_targets)}")
         except:
             bad_entries += 1
 
