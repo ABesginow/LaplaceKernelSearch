@@ -259,15 +259,17 @@ def generate_STAN_kernel(kernel_representation : str, parameter_list : list, cov
     """
     replacement_dictionary = {
         "c" : "softplus(theta[i])",
-        "SE": "gp_exp_quad_cov(left, right, 1.0, softplus(theta[i]))",
-        "PER": "gp_periodic_cov(left, right, 1.0, sqrt(softplus(theta[i])), softplus(theta[i]))",
-        "LIN": "softplus(theta[i]) * gp_dot_prod_cov(left, right, 0.0)"
+        "SE": "gp_exp_quad_cov(x, 1.0, softplus(theta[i]))",
+        "PER": "gp_periodic_cov(x, 1.0, sqrt(softplus(theta[i])), softplus(theta[i]))",
+        "LIN": "softplus(theta[i]) * gp_dot_prod_cov(x, 0.0)"
     }
     # Basically do text replacement
     # Take care of theta order!
-    STAN_str_kernel = f"softplus(theta[i]) + {kernel_representation}"
+    STAN_str_kernel = STAN_str_kernel.replace("*", ".*")
+    STAN_str_kernel = f"identity_matrix(dims(x)[1])*softplus(theta[i]) + {kernel_representation}"
     search_str = "[i]"
     # str.replace(old, new, count) replaces the leftmost entry
+    # Replace the matrix muliplications by elementwise operation to prevent issues
     # Thus by iterating over all occurences of search_str I can hack this
     for key in replacement_dictionary:
         STAN_str_kernel = STAN_str_kernel.replace(key, replacement_dictionary[key])
@@ -317,15 +319,7 @@ def generate_STAN_code(kernel_representation : str,  parameter_list : list, cova
         matrix[N, N] K;
         vector[N] mu;
         theta ~ multi_normal(t_mu, t_sigma);
-        array[1] real left;
-        array[1] real right;
-        for (i in 1:N){{
-            for (j in 1:N){{
-                left[1] = x[j];
-                right[1] = x[i];
-                K[j, i] = {generate_STAN_kernel(kernel_representation, parameter_list, covar_string_list)}[1][1];
-            }}
-        }}
+        K = {generate_STAN_kernel(kernel_representation, parameter_list, covar_string_list)};
         mu = zeros_vector(N);
         y ~ multi_normal(mu, K);
     }}
