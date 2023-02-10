@@ -511,11 +511,11 @@ def CKS(X, Y, likelihood, base_kernels, list_of_variances=None,  experiment=None
     for i in range(iterations):
         for k in candidates:
             models[gsr(k)] = ExactGPModel(X, Y, copy.deepcopy(likelihood), copy.deepcopy(k))
-            if options["kernel search"]["multithreading"]:
-                threads.append(threading.Thread(target=models[gsr(k)].optimize_hyperparameters))
-                threads[-1].start()
-            else:
-                if not metric == "MC":
+            if not metric == "MC":
+                if options["kernel search"]["multithreading"]:
+                    threads.append(threading.Thread(target=models[gsr(k)].optimize_hyperparameters))
+                    threads[-1].start()
+                else:
                     try:
                         if BFGS:
                             models[gsr(k)].optimize_hyperparameters(with_BFGS=True)
