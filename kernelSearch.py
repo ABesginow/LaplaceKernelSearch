@@ -10,6 +10,7 @@ import numpy as np
 import re
 from scipy.special import lambertw
 import stan
+import time
 import torch
 import threading
 
@@ -265,11 +266,11 @@ def generate_STAN_kernel(kernel_representation : str, parameter_list : list, cov
     }
     # Basically do text replacement
     # Take care of theta order!
-    STAN_str_kernel = STAN_str_kernel.replace("*", ".*")
+    # Replace the matrix muliplications by elementwise operation to prevent issues
+    kernel_representation = kernel_representation.replace("*", ".*")
     STAN_str_kernel = f"identity_matrix(dims(x)[1])*softplus(theta[i]) + {kernel_representation}"
     search_str = "[i]"
     # str.replace(old, new, count) replaces the leftmost entry
-    # Replace the matrix muliplications by elementwise operation to prevent issues
     # Thus by iterating over all occurences of search_str I can hack this
     for key in replacement_dictionary:
         STAN_str_kernel = STAN_str_kernel.replace(key, replacement_dictionary[key])
@@ -278,8 +279,7 @@ def generate_STAN_kernel(kernel_representation : str, parameter_list : list, cov
     return STAN_str_kernel
 
 
-
-def generate_STAN_code(kernel_representation : str,  parameter_list : list, covar_string_list : list ):
+def generate_STAN_code(kernel_representation : str,  parameter_list : list, covar_string_list : list):
     # Alternative: use 1:dims(v)[0] in the loop
     functions = """
     functions {
@@ -308,9 +308,10 @@ def generate_STAN_code(kernel_representation : str,  parameter_list : list, cova
     }
     """
 
+    # Give it lower bound -3.0 for each parameter to ensure Softplus doesn't reach 0
     parameters = """
     parameters {
-        vector[D] theta;
+        vector<lower=-3.0>[D] theta;
     }
     """
 
@@ -347,6 +348,8 @@ def calculate_mc_STAN(model, likelihood, num_draws):
                   "LIN":{"raw_variance" : {"mean":-1.463, "std":1.633}},
                   "c":{"raw_outputscale": {"mean":-2.163, "std":2.448}},
                   "noise": {"raw_noise": {"mean":-1.792, "std":3.266}}}
+    logables = {}
+
     theta_mu = list()
     variances_list = list()
     covar_string = gsr(model.covar_module)
@@ -402,7 +405,7 @@ def calculate_mc_STAN(model, likelihood, num_draws):
     array[N] real x;
     vector[N] y;
     vector[D] t_mu;
-    matrix[D, D] t_sigma;
+    cov_matrix[D, D] t_sigma;
     """
     if type(model.train_inputs) == tuple:
         x = model.train_inputs[0].tolist()
@@ -418,28 +421,36 @@ def calculate_mc_STAN(model, likelihood, num_draws):
                  "t_mu" : [t[0] for t in theta_mu.tolist()],
                  "t_sigma" : sigma.tolist()
     }
-    print(STAN_code)
+    #print("========================")
+    #print("data")
+    #print(STAN_data)
+    #print("Code")
+    #print(STAN_code)
+    #print("========================")
+    start = time.time()
     posterior = stan.build(STAN_code, data=STAN_data, random_seed=1)
+    end = time.time()
+    STAN_model_generation_time = end - start
     if num_draws is None:
        raise("Number of draws not specified")
-    # This gives me the chain with 'lp__' approximately the posterior likeli.
-    fit = posterior.sample(num_chains=8, num_samples=num_draws)
+    start = time.time()
+    fit = posterior.sample(num_chains=10, num_samples=num_draws)
+    end = time.time()
+    STAN_MCMC_sampling_time = end - start
 
     # Use the sampled parameters to reconstruct the mean and cov. matr.
     # Average(?) to get the actual posterior likelihood
     post_frame = fit.to_frame()
-    # Each theta corresponds to exactly one model parameter
-    # TODO move from named_parameter to parameters once verified
-
-
-
     manual_lp_list = list()
     bad_entries = 0
+
+    start = time.time()
     # Iterate over chain
     for sample in post_frame[list(fit.constrained_param_names)].iterrows():
         # Iterate over kernel parameters
         # Main assumption: Kernel parameters are stored in order of kernel
         # appearance from left to right, just like in STAN
+        # Each theta corresponds to exactly one model parameter
         for model_param, sampled_param in zip(model.parameters(), sample[1]):
             model_param.data = torch.full_like(model_param.data, sampled_param)
 
@@ -447,30 +458,39 @@ def calculate_mc_STAN(model, likelihood, num_draws):
         try:
             # Can I just use the model mll and multiply by datapoints
             # to correct for GPyTorchs term?
-            model.eval()
-            likelihood.eval()
-            mll = gpt.mlls.ExactMarginalLogLikelihood(model.likelihood, model)
-            output = model(model.train_inputs[0])
-            l1 = mll(output, model.train_targets)
+            #model.eval()
+            #likelihood.eval()
+            #mll = gpt.mlls.ExactMarginalLogLikelihood(model.likelihood, model)
+            #output = model(model.train_inputs[0])
+            #l1 = torch.mean(likelihood.log_marginal(model.train_targets, output))
 
             # Compare this to the likelihood of y given mean and covar (+ noise)
             like_mean = torch.zeros(len(model.train_inputs[0]))
-            # Is softplus(noise) equal to likelihood.noise?
+            ## Is softplus(noise) equal to likelihood.noise?
             like_cov_matr = torch.eye(len(model.train_inputs[0].tolist())) * likelihood.noise + model.covar_module(model.train_inputs[0])
             like_cov_matr += torch.eye(len(model.train_inputs[0].tolist())) * 1e-6 # Jitter
-            like_dist = torch.distributions.multivariate_normal.MultivariateNormal(like_mean, covariance_matrix=like_cov_matr.evaluate())
+            like_cov_chol = torch.linalg.cholesky(like_cov_matr.evaluate())
+            like_dist = torch.distributions.multivariate_normal.MultivariateNormal(like_mean, scale_tril=like_cov_chol)
             manual_lp_list.append(like_dist.log_prob(model.train_targets))
 
-            #print(list(model.named_parameters()))
-            #print(f"GPyTorch:{len(model.train_inputs[0])*l1}\t Manual:{like_dist.log_prob(model.train_targets)}")
-        except:
-            bad_entries += 1
+            # Completely manual calculation of log likelihood
+            #fully_manual_lp = -0.5*len(like_mean)*torch.log(torch.tensor(2*3.1415)) -0.5* torch.log(torch.det(like_cov_matr.evaluate())) - 0.5*(model.train_targets-like_mean).t()@like_cov_matr.evaluate().inverse()@(model.train_targets-like_mean)
 
+            #print(f"GPyTorch:{len(model.train_inputs[0])*l1}\t Manual:{like_dist.log_prob(model.train_targets)}")
+        except Exception as e:
+            bad_entries += 1
+            print(e)
+            print(list(model.named_parameters()))
+            #print(torch.linalg.eig(like_cov_matr.evaluate()))
+
+    end = time.time()
+    likelihood_approximation_time = end - start
+    logables["Likelihood time"] = likelihood_approximation_time
+    logables["Model compile time"] = STAN_model_generation_time
+    logables["Sampling time"] = STAN_MCMC_sampling_time
     print(f"Num bad entries: {bad_entries}")
     # TODO verify this and do sanity checks
-    import pdb
-    pdb.set_trace()
-    return torch.mean(torch.Tensor(manual_lp_list))
+    return torch.mean(torch.Tensor(manual_lp_list)), logables
 
 
 
@@ -586,13 +606,14 @@ def CKS(X, Y, likelihood, base_kernels, list_of_variances=None,  experiment=None
                 threads.append(threading.Thread(target=models[gsr(k)].optimize_hyperparameters))
                 threads[-1].start()
             else:
-                try:
-                    if BFGS:
-                        models[gsr(k)].optimize_hyperparameters(with_BFGS=True)
-                    else:
-                        models[gsr(k)].optimize_hyperparameters()
-                except:
-                    continue
+                if not metric == "MC":
+                    try:
+                        if BFGS:
+                            models[gsr(k)].optimize_hyperparameters(with_BFGS=True)
+                        else:
+                            models[gsr(k)].optimize_hyperparameters()
+                    except:
+                        continue
         for t in threads:
             t.join()
         for k in candidates:
@@ -603,7 +624,7 @@ def CKS(X, Y, likelihood, base_kernels, list_of_variances=None,  experiment=None
                     performance[gsr(k)] = np.NINF
             if metric == "MC":
                 #try:
-                performance[gsr(k)] = calculate_mc_STAN(models[gsr(k)], models[gsr(k)].likelihood, num_draws=num_draws)
+                performance[gsr(k)], logables = calculate_mc_STAN(models[gsr(k)], models[gsr(k)].likelihood, num_draws=num_draws)
                 #except:
                 #    import pdb
                 #    pdb.post_mortem()
