@@ -12,7 +12,7 @@ class Experiment:
     def __init__(self, experiment_keyword, repititions : int, attributes :dict = None):
         self.experiment_keyword = experiment_keyword
         self.DEBUG = (self.experiment_keyword == "")
-        self.results = {i:{} for i in range(repititions)}
+        self.results = {"results":{}}
         if not attributes is None:
             self.results["attributes"] = attributes
         self.current_result = 0
@@ -33,7 +33,7 @@ class Experiment:
         return
 
     def store_result(self, key, result):
-        self.results[self.current_result][key] = result
+        self.results["results"][key] = result
         return
 
     def write_results(self, filename=None):

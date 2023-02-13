@@ -15,6 +15,7 @@ import torch
 import threading
 
 
+
 # ----------------------------------------------------------------------------------------------------
 # ----------------------------------------HELP FUNCTIONS----------------------------------------------
 # ----------------------------------------------------------------------------------------------------
@@ -86,13 +87,14 @@ def evaluate_performance_via_likelihood(model):
     return - model.get_current_loss()
 
 
-def calculate_laplace(model, loss_of_model, variances_list=None, with_prior=True):
+def calculate_laplace(model, loss_of_model, variances_list=None, with_prior=True, param_punish_term = 2.0):
     """
         with_prior - Decides whether the version of the Laplace approx WITH the
                      prior is used or the one where the prior is not part of
                      the approx.
     """
     logables = {}
+    total_start = time.time()
     num_of_observations = len(*model.train_inputs)
     # Save a list of model parameters and compute the Hessian of the MLL
     params_list = [p for p in model.parameters()]
@@ -100,11 +102,13 @@ def calculate_laplace(model, loss_of_model, variances_list=None, with_prior=True
     mll         = (num_of_observations * (-loss_of_model))
     # This is NEGATIVE MLL
     #mll         = (num_of_observations * (loss_of_model))
+    start = time.time()
     env_grads   = torch.autograd.grad(mll, params_list, retain_graph=True, create_graph=True)
     hess_params = []
     for i in range(len(env_grads)):
             hess_params.append(torch.autograd.grad(env_grads[i], params_list, retain_graph=True))
-
+    end = time.time()
+    derivative_calc_time = end - start
     #prior_dict_softplussed = {"SE": {"lengthscale" : {"mean": 1.607, "std":1.650}},
     #                          "PER":{"lengthscale": {"mean": 1.473, "std":1.582}, "period_length":{"mean": 0.920, "std":0.690}},
     #                          "LIN":{"variance" : {"mean":0.374, "std":0.309}},
@@ -117,6 +121,7 @@ def calculate_laplace(model, loss_of_model, variances_list=None, with_prior=True
                   "c":{"raw_outputscale": {"mean":-2.163, "std":2.448}},
                   "noise": {"raw_noise": {"mean":-1.792, "std":3.266}}}
 
+    start = time.time()
     theta_mu = []
     if variances_list is None:
         variances_list = []
@@ -158,55 +163,47 @@ def calculate_laplace(model, loss_of_model, variances_list=None, with_prior=True
         theta_mu = torch.tensor(theta_mu)
         theta_mu = theta_mu.unsqueeze(0).t()
 
-    # theta_mu is a vector of parameter priors
-    #theta_mu = torch.tensor([1 for p in range(len(params_list))]).reshape(-1,1)
-
     # sigma is a matrix of variance priors
-
-    #if variances_list is None:
-    #    variances_list = [4 for i in range(len(list(model.parameters())))]
-    # Check if sigma and variances_list are the same pls
     sigma = torch.diag(torch.Tensor(variances_list))
-
-
     params = torch.tensor(params_list).clone().reshape(-1,1)
-    hessian = torch.tensor(hess_params).clone()
-    hessian = (hessian + hessian.t()) / 2
-    #TODO This is an important step and should be highlighted and explained in the paper
-    #hessian = -hessian
 
-    #matmuls    = torch.matmul( torch.matmul( torch.matmul( torch.matmul(thetas_added_transposed, sigma.inverse()), middle_term ), hessian ), thetas_added )
+    end = time.time()
+    prior_generation_time = end - start
 
-    #print(f"(sigma.inverse()-hessian).det()): {(sigma.inverse()-hessian).det())}")
-    # We can calculate by taking the log of the fraction:
-    #fraction = 1 / (sigma.inverse()-hessian).det().sqrt() / sigma.det().sqrt()
-    #laplace = mll + torch.log(fraction) + (-1/2) * matmuls
-
-    #This is the original
-    #laplace = mll - (1/2)*torch.log(sigma.det()) - (1/2)*torch.log( (sigma.inverse()-hessian).det() ) - (1/2) * matmuls
-    #This is the original
-    #laplace2 = mll - (1/2)*torch.log(sigma.det()) - (1/2)*(params-theta_mu).t()@sigma.inverse()@(params-theta_mu) - (1/2)*torch.log((-hessian).det())
-    #if laplace.isnan() ^ laplace2.isnan():
-    #    print(f"Epic failure. Wo.P.:{laplace}, W.P.:{laplace2}")
-    #    #import pdb
-    #    #pdb.set_trace()
     if with_prior:
         #This is the original
         laplace = mll - (1/2)*torch.log(sigma.det()) - (1/2)*(params-theta_mu).t()@sigma.inverse()@(params-theta_mu) - (1/2)*torch.log((-hessian).det())
     else:
-        # Hessian correcting part (for Eigenvalues < 0 < c(i)  )
-        oldHessian = hessian.clone()
-        vals, vecs = torch.linalg.eig(hessian)
-        c = lambda i : -((params[i] - theta_mu[i])**2/(np.real(lambertw((params[i] - theta_mu[i])**2*1/sigma[i][i] * torch.exp((params[i] - theta_mu[i])**2*1/sigma[i][i]-2)))*sigma[i][i]**2)+(1/sigma[i][i]))
-        constructed_eigvals = torch.diag(torch.Tensor([min(val.real, c(i)) for i, val in enumerate(vals)]))
-        hessian = vecs.real@constructed_eigvals@vecs.t().real
 
+        hessian = torch.tensor(hess_params).clone()
+        hessian = (hessian + hessian.t()) / 2
+
+        oldHessian = hessian.clone()
+
+        # Hessian correcting part (for Eigenvalues < 0 < c(i)  )
+        start = time.time()
+        vals, vecs = torch.linalg.eig(hessian)
+        c = lambda i : -((theta_mu[i] - params[i])**2/(np.real(lambertw((theta_mu[i] - params[i])**2*1/sigma[i][i] * torch.exp((theta_mu[i] - params[i])**2*1/sigma[i][i]-param_punish_term)))*sigma[i][i]**2)+(1/sigma[i][i]))
+        constructed_diagonal = torch.Tensor([min(hessian[i][i].real, c(i)) for i, val in enumerate(vals)])
+        for i in range(len(torch.diag(hessian))):
+            hessian[i][i] = constructed_diagonal[i]
+        end = time.time()
+        hessian_correction_time = end - start
+
+        start = time.time()
         # Here comes what's wrapped in the exp-function:
         thetas_added = params-theta_mu
         thetas_added_transposed = (params-theta_mu).reshape(1,-1)
         middle_term = (sigma.inverse()-hessian).inverse()
         matmuls = thetas_added_transposed @ sigma.inverse() @ middle_term @ hessian @ thetas_added
 
+        laplace = mll - (1/2)*torch.log(sigma.det()) - (1/2)*torch.log( (sigma.inverse()-hessian).det() )  + (1/2) * matmuls
+        end = time.time()
+        approximation_time = end - start
+
+        total_time = end - total_start
+
+        #oldLaplace = mll - (1/2)*torch.log(sigma.det()) - (1/2)*torch.log( (sigma.inverse()-oldHessian).det() )  + (1/2) * thetas_added_transposed @ sigma.inverse() @ (sigma.inverse()-oldHessian).inverse() @ oldHessian @ thetas_added
         print(f"theta_s: {thetas_added_transposed}")
         print(f"Sigma inv: {sigma.inverse()}")
         print(f"(sigma.inverse()-hessian): {(sigma.inverse()-hessian)}")
@@ -219,18 +216,16 @@ def calculate_laplace(model, loss_of_model, variances_list=None, with_prior=True
         print(f"Corrected eig(H):{torch.linalg.eig(hessian)}")
         print(f"Old  eig(H):{torch.linalg.eig(oldHessian)}")
         print(f"Symmetry error: {hessian - hessian.t()}")
-        if any(torch.diag(constructed_eigvals) > 0):
+        if any(torch.diag(constructed_diagonal) > 0):
             print("Something went horribly wrong with the c(i)s")
-            import pdb
-            pdb.set_trace()
+            #import pdb
+            #pdb.set_trace()
             print(constructed_eigvals)
         elif matmuls > 0:
             print("matmuls positive!!")
-            import pdb
-            pdb.set_trace()
+            #import pdb
+            #pdb.set_trace()
             print(matmuls)
-        laplace = mll - (1/2)*torch.log(sigma.det()) - (1/2)*torch.log( (sigma.inverse()-hessian).det() )  + (1/2) * matmuls
-        oldLaplace = mll - (1/2)*torch.log(sigma.det()) - (1/2)*torch.log( (sigma.inverse()-oldHessian).det() )  + (1/2) * thetas_added_transposed @ sigma.inverse() @ (sigma.inverse()-oldHessian).inverse() @ oldHessian @ thetas_added
 
         print(f"mll - 1/2 log sigma - 1/2 log sigma H + matmuls\n{mll} - {(1/2)*torch.log(sigma.det())} - {(1/2)*torch.log((sigma.inverse()-hessian).det())} + {(1/2) * matmuls}")
         #laplace = mll - (1/2)*torch.log(sigma.det()) - (1/2)*torch.log( (sigma.inverse()-hessian).det() )  + (1/2) * matmuls
@@ -242,11 +237,18 @@ def calculate_laplace(model, loss_of_model, variances_list=None, with_prior=True
     logables["parameter list"] = debug_param_name_list
     logables["parameter values"] = params
     logables["corrected Hessian"] = hessian
-    logables["diag(constructed eigvals)"] = torch.diag(constructed_eigvals)
+    logables["diag(constructed eigvals)"] = constructed_diagonal
     logables["original symmetrized Hessian"] = oldHessian
     logables["prior mean"] = theta_mu
     logables["diag(prior var)"] = torch.diag(sigma)
     logables["likelihood approximation"] = laplace
+
+    # Everything time related
+    logables["Derivative time"]         = derivative_calc_time
+    logables["Approximation time"]      = approximation_time
+    logables["Correction time"]         = hessian_correction_time
+    logables["Prior generation time"]   = prior_generation_time
+    logables["Total time"]              = total_time
 
 
     return laplace, logables
@@ -350,6 +352,7 @@ def calculate_mc_STAN(model, likelihood, num_draws):
                   "noise": {"raw_noise": {"mean":-1.792, "std":3.266}}}
     logables = {}
 
+    total_start = time.time()
     theta_mu = list()
     variances_list = list()
     covar_string = gsr(model.covar_module)
@@ -434,7 +437,8 @@ def calculate_mc_STAN(model, likelihood, num_draws):
     if num_draws is None:
        raise("Number of draws not specified")
     start = time.time()
-    fit = posterior.sample(num_chains=10, num_samples=num_draws)
+
+    fit = posterior.sample(num_chains=1, num_samples=num_draws)
     end = time.time()
     STAN_MCMC_sampling_time = end - start
 
@@ -456,27 +460,14 @@ def calculate_mc_STAN(model, likelihood, num_draws):
 
 
         try:
-            # Can I just use the model mll and multiply by datapoints
-            # to correct for GPyTorchs term?
-            #model.eval()
-            #likelihood.eval()
-            #mll = gpt.mlls.ExactMarginalLogLikelihood(model.likelihood, model)
-            #output = model(model.train_inputs[0])
-            #l1 = torch.mean(likelihood.log_marginal(model.train_targets, output))
-
             # Compare this to the likelihood of y given mean and covar (+ noise)
             like_mean = torch.zeros(len(model.train_inputs[0]))
-            ## Is softplus(noise) equal to likelihood.noise?
+
             like_cov_matr = torch.eye(len(model.train_inputs[0].tolist())) * likelihood.noise + model.covar_module(model.train_inputs[0])
-            like_cov_matr += torch.eye(len(model.train_inputs[0].tolist())) * 1e-6 # Jitter
+            like_cov_matr += torch.eye(len(model.train_inputs[0].tolist())) * 1e-4 # Jitter
             like_cov_chol = torch.linalg.cholesky(like_cov_matr.evaluate())
             like_dist = torch.distributions.multivariate_normal.MultivariateNormal(like_mean, scale_tril=like_cov_chol)
             manual_lp_list.append(like_dist.log_prob(model.train_targets))
-
-            # Completely manual calculation of log likelihood
-            #fully_manual_lp = -0.5*len(like_mean)*torch.log(torch.tensor(2*3.1415)) -0.5* torch.log(torch.det(like_cov_matr.evaluate())) - 0.5*(model.train_targets-like_mean).t()@like_cov_matr.evaluate().inverse()@(model.train_targets-like_mean)
-
-            #print(f"GPyTorch:{len(model.train_inputs[0])*l1}\t Manual:{like_dist.log_prob(model.train_targets)}")
         except Exception as e:
             bad_entries += 1
             print(e)
@@ -485,11 +476,16 @@ def calculate_mc_STAN(model, likelihood, num_draws):
 
     end = time.time()
     likelihood_approximation_time = end - start
+    total_time = end - total_start
+
+    logables["Kernel code"] = generate_STAN_kernel(covar_string, debug_param_name_list, covar_string_list)
     logables["Likelihood time"] = likelihood_approximation_time
     logables["Model compile time"] = STAN_model_generation_time
     logables["Sampling time"] = STAN_MCMC_sampling_time
+    logables["Total time"] = total_time
+    logables["Bad entries"] = bad_entries
+    logables["likelihood approximation"] = torch.mean(torch.Tensor(manual_lp_list))
     print(f"Num bad entries: {bad_entries}")
-    # TODO verify this and do sanity checks
     return torch.mean(torch.Tensor(manual_lp_list)), logables
 
 
@@ -498,7 +494,7 @@ def calculate_mc_STAN(model, likelihood, num_draws):
 # ----------------------------------------------------------------------------------------------------
 # ------------------------------------------- CKS ----------------------------------------------------
 # ----------------------------------------------------------------------------------------------------
-def CKS(X, Y, likelihood, base_kernels, list_of_variances=None,  experiment=None, iterations=3, metric="MLL", BFGS=True, num_draws=None, **kwargs):
+def CKS(X, Y, likelihood, base_kernels, list_of_variances=None,  experiment=None, iterations=3, metric="MLL", BFGS=True, num_draws=None, param_punish_term = None, **kwargs):
     operations = [gpt.kernels.AdditiveKernel, gpt.kernels.ProductKernel]
     candidates = base_kernels.copy()
     best_performance = dict()
@@ -508,6 +504,7 @@ def CKS(X, Y, likelihood, base_kernels, list_of_variances=None,  experiment=None
     model_steps = list()
     performance_steps = list()
     loss_steps = list()
+    logables = list()
     for i in range(iterations):
         for k in candidates:
             models[gsr(k)] = ExactGPModel(X, Y, copy.deepcopy(likelihood), copy.deepcopy(k))
@@ -517,10 +514,12 @@ def CKS(X, Y, likelihood, base_kernels, list_of_variances=None,  experiment=None
                     threads[-1].start()
                 else:
                     try:
+                        train_start = time.time()
                         if BFGS:
                             models[gsr(k)].optimize_hyperparameters(with_BFGS=True)
                         else:
                             models[gsr(k)].optimize_hyperparameters()
+                        train_end = time.time()
                     except:
                         continue
         for t in threads:
@@ -528,12 +527,17 @@ def CKS(X, Y, likelihood, base_kernels, list_of_variances=None,  experiment=None
         for k in candidates:
             if metric == "Laplace":
                 try:
-                    performance[gsr(k)], logables = calculate_laplace(models[gsr(k)], models[gsr(k)].get_current_loss(), with_prior=False)
+                    performance[gsr(k)], logs = calculate_laplace(models[gsr(k)], models[gsr(k)].get_current_loss(), with_prior=False, param_punish_term = param_punish_term)
+                    logs["iteration"] = i
+                    logs["Train time"] = train_end - train_start
+                    logables.append(logs)
                 except:
                     performance[gsr(k)] = np.NINF
             if metric == "MC":
                 #try:
-                performance[gsr(k)], logables = calculate_mc_STAN(models[gsr(k)], models[gsr(k)].likelihood, num_draws=num_draws)
+                performance[gsr(k)], logs =  calculate_mc_STAN(models[gsr(k)], models[gsr(k)].likelihood, num_draws=num_draws)
+                logables.append(logs)
+
                 #except:
                 #    import pdb
                 #    pdb.post_mortem()
@@ -560,7 +564,7 @@ def CKS(X, Y, likelihood, base_kernels, list_of_variances=None,  experiment=None
                 break
         best_model = models[max(performance, key=performance.__getitem__)]
         best_performance = {"model": (gsr(best_model.covar_module), best_model.state_dict()), "performance": max(performance.values())}
-        model_steps.append(gsr(best_model))
+        model_steps.append(performance)
         performance_steps.append(best_performance)
         loss_steps.append(best_model.get_current_loss())
         candidates = create_candidates_CKS(best_model.covar_module, base_kernels, operations)

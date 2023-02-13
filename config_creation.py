@@ -25,11 +25,11 @@ general_json = {
     'eval_END':[10.0],
     'eval_COUNT':[200],
     'optimizer':['Adam'],
-    'train_iterations':[50, 100, 200],
+    'train_iterations':[200],
     'LR': [0.1],
     'Noise': [0.0],#1%, 5%, 10% of max
     'Data_scaling': [False],
-    'BFGS' : [True, False]
+    'BFGS' : [True]
 }
 
 MC_json = {
@@ -38,7 +38,8 @@ MC_json = {
 }
 
 Laplace_json = {
-    "Metric": ["Laplace"]
+    "Metric": ["Laplace"],
+    "parameter_punishment": [2.0, 10.0]
 }
 
 MLL_json = {
