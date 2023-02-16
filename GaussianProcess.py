@@ -61,16 +61,18 @@ class ExactGPModel(gpt.models.ExactGP):
                 LBFGS_optimizer.zero_grad()
                 output = self.__call__(self.train_inputs[0])
                 loss = -mll(output, self.train_targets)
+                LBFGS_optimizer.zero_grad()
+                loss.backward()
                 return loss
 
-            loss = closure()
-            loss.backward()
+            #loss = closure()
+            #loss.backward()
 
-            training_iter = 10
-            for i in range(training_iter):
+            #for i in range(training_iter):
                 # perform step and update curvature
                 #LBFGS_opts = {'closure': closure, 'current_loss': loss, 'max_ls': 10}
-                loss, _, lr, _, F_eval, G_eval, _, _ = LBFGS_optimizer.step(closure)
+            LBFGS_optimizer.step(closure)
+
 
 
     def get_current_loss(self):

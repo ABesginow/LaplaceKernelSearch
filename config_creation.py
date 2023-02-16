@@ -7,6 +7,7 @@
 import json
 import pprint
 import os
+import pdb
 
 
 # In[9]:
@@ -15,7 +16,6 @@ import os
 # This block creates ALL the config files!
 
 general_json = {
-    'Metric': ["Laplace", "MC", "MLL", "AIC"],
     'Kernel_search': ["CKS"],
     'train_data_ratio': [0.5],#50% of the eval data
     'Data_kernel': ["SIN"],
@@ -25,13 +25,32 @@ general_json = {
     'eval_END':[10.0],
     'eval_COUNT':[200],
     'optimizer':['Adam'],
-    'train_iterations':[50, 100, 200],
+    'train_iterations':[200],
     'LR': [0.1],
     'Noise': [0.0],#1%, 5%, 10% of max
     'Data_scaling': [False],
-    'BFGS' : [True, False]
+    'BFGS' : [True]
 }
 
+MC_json = {
+    "Metric": ["MC"],
+    "num_draws": [10, 100, 1000, 10000]
+}
+
+Laplace_json = {
+    "Metric": ["Laplace"],
+    "parameter_punishment": [2.0, 10.0]
+}
+
+MLL_json = {
+    "Metric": ["MLL"]
+}
+
+AIC_json = {
+    "Metric" : ["AIC"]
+}
+
+specific_jsons = [MC_json, Laplace_json, MLL_json, AIC_json]
 #general_json = {
 #                'Metric': ["Laplace", "MC", "MLL", "AIC"],
 #                'Kernel_search': ["CKS"],
@@ -48,8 +67,6 @@ general_json = {
 #                'Noise': [0.0, 0.01, 0.05, 0.1],#1%, 5%, 10% of max
 #                'Data_scaling': [False]
 #               }
-
-# In[10]:
 
 
 # Expects dict of mixture of lists and other data
@@ -77,14 +94,6 @@ def json_iter_combinations(json_iterable):
     return total_combinations
 
 
-# In[ ]:
-
-
-
-
-
-# In[11]:
-
 
 import json
 # Assumption: list is ordered to be correct with the keys
@@ -96,32 +105,30 @@ def generate_config(keys, configurations):
     # configurations is a list of tuples, where the first tuple element is part of the entry 0 configuration
     # and the second tuple element is part of entry 2 configuration
 
+    try:
     # create a config file for each configuration and store it at 'configs/'
-    for i, config in enumerate(configurations):
-        config_dict = {}
-        config_dict = {key:value for key, value in zip(keys, config[0])}
-        #config_dict[keys[2]] = {key:value for key, value in zip(keys[3], config[1])}
-        config_file_name = f"{config_dict['Metric']}_{i}"
-        conf_dir = config_dict['Metric']
-        with open(os.path.join("configs", f"{conf_dir}", f"{config_file_name}.json"), 'w') as configfile:
-            configfile.write(json.dumps(config_dict, indent=4))
-
-
-# In[12]:
+        for i, config in enumerate(configurations):
+            config_dict = {}
+            config_dict = {key:value for key, value in zip(keys, config)}
+            #config_dict[keys[2]] = {key:value for key, value in zip(keys[3], config[1])}
+            config_file_name = f"{config_dict['Metric']}_{i}"
+            conf_dir = config_dict['Metric']
+            with open(os.path.join("configs", f"{conf_dir}", f"{config_file_name}.json"), 'w') as configfile:
+                configfile.write(json.dumps(config_dict, indent=4))
+    except Exception as e:
+        pdb.post_mortem()
 
 
 general = json_iter_combinations(general_json)
 keys = list(general_json.keys())
-config = list(itertools.product(general))
 
+num_confs = 0
+for task_specific_json in specific_jsons:
+    task_spec = json_iter_combinations(task_specific_json)
+    keys = list(general_json.keys())
+    keys.extend(list(task_specific_json.keys()))
+    config = [[*a, *b] for a, b in itertools.product(general, task_spec)]
+    num_confs += len(config)
+    generate_config(keys, config)
 
-# In[13]:
-
-
-print(len(config))
-
-
-# In[7]:
-
-
-generate_config(keys, config)
+print(num_confs)
