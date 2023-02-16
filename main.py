@@ -217,10 +217,12 @@ def run_experiment(config_file):
         #try:
 
         KS_start = time.time()
-        model, likelihood, model_history, performance_history, loss_history, logables = CKS(X, Y, likelihood, list_of_kernels, list_of_variances, experiment, iterations=3, metric=metric, BFGS=use_BFGS, num_draws=num_draws, param_punish_term = parameter_punishment)
+        model, likelihood, model_history, performance_history, loss_history, logables, explosion_counter, total_counter = CKS(X, Y, likelihood, list_of_kernels, list_of_variances, experiment, iterations=3, metric=metric, BFGS=use_BFGS, num_draws=num_draws, param_punish_term = parameter_punishment)
         KS_end = time.time()
         experiment.store_result("Kernel search time", KS_end - KS_start)
         experiment.store_result("details", logables)
+        experiment.store_result("total count", total_counter)
+        experiment.store_result("explosion count", explosion_counter)
         # With the exception check in CKS hyperparameter training this shouldn't
         # happen
         #except Exception as e:
@@ -280,7 +282,7 @@ if __name__ == "__main__":
     with open("FINISHED.log", "r") as f:
         finished_configs = [line.strip().split("/")[-1] for line in f.readlines()]
     curdir = os.getcwd()
-    keywords = ["Laplace"]#, "MLL", "AIC", "Laplace"]
+    keywords = ["MC"]#, "MLL", "AIC", "Laplace"]
     configs = []
     for KEYWORD in keywords:
         configs.extend([os.path.join(curdir, "configs", KEYWORD, item) for item in os.listdir(os.path.join(curdir, "configs", KEYWORD))])

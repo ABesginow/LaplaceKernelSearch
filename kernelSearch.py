@@ -8,6 +8,7 @@ from helpFunctions import amount_of_base_kernels, get_kernels_in_kernel_expressi
 from itertools import chain
 import numpy as np
 import re
+import random
 from scipy.special import lambertw
 import stan
 import time
@@ -87,7 +88,7 @@ def evaluate_performance_via_likelihood(model):
     return - model.get_current_loss()
 
 
-def calculate_laplace(model, loss_of_model, variances_list=None, with_prior=True, param_punish_term = 2.0):
+def calculate_laplace(model, loss_of_model, variances_list=None, with_prior=False, param_punish_term = 2.0):
     """
         with_prior - Decides whether the version of the Laplace approx WITH the
                      prior is used or the one where the prior is not part of
@@ -216,7 +217,7 @@ def calculate_laplace(model, loss_of_model, variances_list=None, with_prior=True
         print(f"Corrected eig(H):{torch.linalg.eig(hessian)}")
         print(f"Old  eig(H):{torch.linalg.eig(oldHessian)}")
         print(f"Symmetry error: {hessian - hessian.t()}")
-        if any(torch.diag(constructed_diagonal) > 0):
+        if any(constructed_diagonal > 0):
             print("Something went horribly wrong with the c(i)s")
             #import pdb
             #pdb.set_trace()
@@ -431,7 +432,8 @@ def calculate_mc_STAN(model, likelihood, num_draws):
     #print(STAN_code)
     #print("========================")
     start = time.time()
-    posterior = stan.build(STAN_code, data=STAN_data, random_seed=1)
+    seed = random.randint(0, 1000000)
+    posterior = stan.build(STAN_code, data=STAN_data, random_seed=seed)
     end = time.time()
     STAN_model_generation_time = end - start
     if num_draws is None:
@@ -479,6 +481,7 @@ def calculate_mc_STAN(model, likelihood, num_draws):
     total_time = end - total_start
 
     logables["Kernel code"] = generate_STAN_kernel(covar_string, debug_param_name_list, covar_string_list)
+    logables["seed"] = seed
     logables["Likelihood time"] = likelihood_approximation_time
     logables["Model compile time"] = STAN_model_generation_time
     logables["Sampling time"] = STAN_MCMC_sampling_time
@@ -505,6 +508,8 @@ def CKS(X, Y, likelihood, base_kernels, list_of_variances=None,  experiment=None
     performance_steps = list()
     loss_steps = list()
     logables = list()
+    explosion_counter = 0
+    total_counter = 0
     for i in range(iterations):
         for k in candidates:
             models[gsr(k)] = ExactGPModel(X, Y, copy.deepcopy(likelihood), copy.deepcopy(k))
@@ -514,6 +519,7 @@ def CKS(X, Y, likelihood, base_kernels, list_of_variances=None,  experiment=None
                     threads[-1].start()
                 else:
                     try:
+                        total_counter += 1
                         train_start = time.time()
                         if BFGS:
                             models[gsr(k)].optimize_hyperparameters(with_BFGS=True)
@@ -521,6 +527,7 @@ def CKS(X, Y, likelihood, base_kernels, list_of_variances=None,  experiment=None
                             models[gsr(k)].optimize_hyperparameters()
                         train_end = time.time()
                     except:
+                        explosion_counter += 1
                         continue
         for t in threads:
             t.join()
@@ -570,5 +577,5 @@ def CKS(X, Y, likelihood, base_kernels, list_of_variances=None,  experiment=None
         candidates = create_candidates_CKS(best_model.covar_module, base_kernels, operations)
     if options["kernel search"]["print"]:
         print(f"KERNEL SEARCH: kernel search concluded, optimal expression: {gsr(best_model.covar_module)}")
-    return best_model, best_model.likelihood, model_steps, performance_steps, loss_steps, logables
+    return best_model, best_model.likelihood, model_steps, performance_steps, loss_steps, logables, explosion_counter, total_counter
 

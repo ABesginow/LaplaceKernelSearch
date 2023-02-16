@@ -7,6 +7,7 @@ from helpFunctions import get_string_representation_of_kernel as gsr, clean_kern
 from helpFunctions import amount_of_base_kernels, get_kernels_in_kernel_expression
 from itertools import chain
 import numpy as np
+import random
 import re
 from scipy.special import lambertw
 import stan
@@ -15,11 +16,13 @@ import torch
 import threading
 
 
-def evaluate_performance_via_likelihood(model):
-    return - model.get_current_loss()
+def calculate_AIC(loss, num_params):
+    logables = {"correction term" : 2*num_params,
+                "loss term": 2*loss}
+    return 2*num_params + 2*loss, logables
 
 
-def calculate_laplace(model, loss_of_model, variances_list=None, with_prior=True, param_punish_term = 2.0):
+def calculate_laplace(model, loss_of_model, variances_list=None, with_prior=False, param_punish_term = 2.0):
     """
         with_prior - Decides whether the version of the Laplace approx WITH the
                      prior is used or the one where the prior is not part of
@@ -362,14 +365,17 @@ def calculate_mc_STAN(model, likelihood, num_draws):
     #print(STAN_code)
     #print("========================")
     start = time.time()
-    posterior = stan.build(STAN_code, data=STAN_data, random_seed=1)
+    seed = random.randint(0, 1000000)
+    print(STAN_data)
+    print(STAN_code)
+    posterior = stan.build(STAN_code, data=STAN_data, random_seed=seed)
     end = time.time()
     STAN_model_generation_time = end - start
     if num_draws is None:
        raise("Number of draws not specified")
     start = time.time()
 
-    fit = posterior.sample(num_chains=10, num_samples=num_draws)
+    fit = posterior.sample(num_chains=1, num_samples=num_draws)
     end = time.time()
     STAN_MCMC_sampling_time = end - start
 
@@ -410,6 +416,7 @@ def calculate_mc_STAN(model, likelihood, num_draws):
     total_time = end - total_start
 
     logables["Kernel code"] = generate_STAN_kernel(covar_string, debug_param_name_list, covar_string_list)
+    logables["seed"] = seed
     logables["Likelihood time"] = likelihood_approximation_time
     logables["Model compile time"] = STAN_model_generation_time
     logables["Sampling time"] = STAN_MCMC_sampling_time
