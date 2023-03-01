@@ -127,3 +127,262 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+data_generation_experiment.py
+hardcoded_main.py
+hessians.store
+nohup.out
+stan_MWE.py
+test.stan
+configs/AIC/AIC_3.json
+configs/AIC/AIC_6.json
+configs/AIC/AIC_7.json
+configs/AIC/AIC_18.json
+configs/AIC/AIC_19.json
+configs/AIC/AIC_20.json
+configs/AIC/AIC_21.json
+configs/AIC/AIC_22.json
+configs/AIC/AIC_23.json
+configs/Laplace/Laplace_0.json
+configs/Laplace/Laplace_1.json
+configs/MC/MC_0.json
+configs/MC/MC_1.json
+configs/MLL/MLL_2.json
+configs/MLL/MLL_4.json
+configs/MLL/MLL_5.json
+configs/MLL/MLL_12.json
+configs/MLL/MLL_13.json
+configs/MLL/MLL_14.json
+configs/MLL/MLL_15.json
+configs/MLL/MLL_16.json
+configs/MLL/MLL_17.json
+parameter_prior_results_bak/data_RBF-model_LIN*PER.pickle
+parameter_prior_results_bak/data_RBF-model_LIN+PER.pickle
+parameter_prior_results_bak/data_RBF-model_PER.pickle
+parameter_prior_results_bak/data_RBF-model_SE.pickle
+parameter_prior_results_bak/data_RBF-model_SE*PER.pickle
+parameter_prior_results_bak/data_RBF-model_SE+PER.pickle
+parameter_prior_results_bak/data_SIN-model_LIN*PER.pickle
+parameter_prior_results_bak/data_SIN-model_LIN+PER.pickle
+parameter_prior_results_bak/data_SIN-model_PER.pickle
+parameter_prior_results_bak/data_SIN-model_SE.pickle
+parameter_prior_results_bak/data_SIN-model_SE*PER.pickle
+parameter_prior_results_bak/data_SIN-model_SE+PER.pickle
+parameter_prior_results_bak/data_SIN*LIN-model_LIN*PER.pickle
+parameter_prior_results_bak/data_SIN*LIN-model_LIN+PER.pickle
+parameter_prior_results_bak/data_SIN*LIN-model_PER.pickle
+parameter_prior_results_bak/data_SIN*LIN-model_SE.pickle
+parameter_prior_results_bak/data_SIN*LIN-model_SE*PER.pickle
+parameter_prior_results_bak/data_SIN*LIN-model_SE+PER.pickle
+parameter_prior_results_bak/data_SIN*RBF-model_LIN*PER.pickle
+parameter_prior_results_bak/data_SIN*RBF-model_LIN+PER.pickle
+parameter_prior_results_bak/data_SIN*RBF-model_PER.pickle
+parameter_prior_results_bak/data_SIN*RBF-model_SE.pickle
+parameter_prior_results_bak/data_SIN*RBF-model_SE*PER.pickle
+parameter_prior_results_bak/data_SIN*RBF-model_SE+PER.pickle
+parameter_prior_results_bak/data_SIN+RBF-model_LIN*PER.pickle
+parameter_prior_results_bak/data_SIN+RBF-model_LIN+PER.pickle
+parameter_prior_results_bak/data_SIN+RBF-model_PER.pickle
+parameter_prior_results_bak/data_SIN+RBF-model_SE.pickle
+parameter_prior_results_bak/data_SIN+RBF-model_SE*PER.pickle
+parameter_prior_results_bak/data_SIN+RBF-model_SE+PER.pickle
+parameter_prior_results_bak/parameter_eval.ipynb
+results/pickle-hack.py
+results/hardcoded/4PER/rest.pickle
+results/hardcoded/PER/rest.pickle
+results/hardcoded/RBF_PER/rest.pickle
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0/0.pickle
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0/1.pickle
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0/2.pickle
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0/3.pickle
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0/4.pickle
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0/5.pickle
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0/6.pickle
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0/7.pickle
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0/8.pickle
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0/9.pickle
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0/10.pickle
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0/11.pickle
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0/12.pickle
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0/13.pickle
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0/14.pickle
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0/15.pickle
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0/16.pickle
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0/17.pickle
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0/18.pickle
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0_0.png
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0_0.tex
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0_1.png
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0_1.tex
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0_2.png
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0_2.tex
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0_3.png
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0_3.tex
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0_4.png
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0_4.tex
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0_5.png
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0_5.tex
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0_6.png
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0_6.tex
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0_7.png
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0_7.tex
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0_8.png
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0_8.tex
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0_9.png
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0_9.tex
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0_10.png
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0_10.tex
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0_11.png
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0_11.tex
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0_12.png
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0_12.tex
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0_13.png
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0_13.tex
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0_14.png
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0_14.tex
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0_15.png
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0_15.tex
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0_16.png
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0_16.tex
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0_17.png
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0_17.tex
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0_18.png
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_10.0_18.tex
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0/0.pickle
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0/1.pickle
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0/2.pickle
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0/3.pickle
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0/4.pickle
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0/5.pickle
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0/6.pickle
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0/7.pickle
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0/8.pickle
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0/9.pickle
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0/10.pickle
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0/11.pickle
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0/12.pickle
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0/13.pickle
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0/14.pickle
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0/15.pickle
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0/16.pickle
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0/17.pickle
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0/18.pickle
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0_0.png
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0_0.tex
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0_1.png
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0_1.tex
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0_2.png
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0_2.tex
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0_3.png
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0_3.tex
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0_4.png
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0_4.tex
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0_5.png
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0_5.tex
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0_6.png
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0_6.tex
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0_7.png
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0_7.tex
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0_8.png
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0_8.tex
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0_9.png
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0_9.tex
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0_10.png
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0_10.tex
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0_11.png
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0_11.tex
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0_12.png
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0_12.tex
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0_13.png
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0_13.tex
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0_14.png
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0_14.tex
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0_15.png
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0_15.tex
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0_16.png
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0_16.tex
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0_17.png
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0_17.tex
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0_18.png
+results/Laplace/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_Laplace_2.0_18.tex
+results/MC/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100/0.pickle
+results/MC/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100/1.pickle
+results/MC/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100/2.pickle
+results/MC/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100/3.pickle
+results/MC/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100/4.pickle
+results/MC/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100/5.pickle
+results/MC/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100/6.pickle
+results/MC/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100/7.pickle
+results/MC/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100/8.pickle
+results/MC/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100/9.pickle
+results/MC/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100/10.pickle
+results/MC/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100/11.pickle
+results/MC/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100/12.pickle
+results/MC/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100/13.pickle
+results/MC/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100/14.pickle
+results/MC/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100/15.pickle
+results/MC/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100/16.pickle
+results/MC/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100_0.png
+results/MC/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100_0.tex
+results/MC/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100_1.png
+results/MC/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100_1.tex
+results/MC/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100_2.png
+results/MC/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100_2.tex
+results/MC/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100_3.png
+results/MC/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100_3.tex
+results/MC/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100_4.png
+results/MC/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100_4.tex
+results/MC/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100_5.png
+results/MC/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100_5.tex
+results/MC/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100_6.png
+results/MC/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100_6.tex
+results/MC/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100_7.png
+results/MC/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100_7.tex
+results/MC/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100_8.png
+results/MC/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100_8.tex
+results/MC/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100_9.png
+results/MC/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100_9.tex
+results/MC/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100_10.png
+results/MC/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100_10.tex
+results/MC/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100_11.png
+results/MC/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100_11.tex
+results/MC/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100_12.png
+results/MC/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100_12.tex
+results/MC/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100_13.png
+results/MC/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100_13.tex
+results/MC/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100_14.png
+results/MC/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100_14.tex
+results/MC/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100_15.png
+results/MC/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100_15.tex
+results/MC/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100_16.png
+results/MC/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100/CKS_0.5_SIN_[1.0, 1.0]_4_-10.0_10.0_200_Adam_200_0.1_0.0_False_True_MC_100_16.tex
+results/parameter_stuff/data_RBF-model_LIN*PER.pickle
+results/parameter_stuff/data_RBF-model_LIN+PER.pickle
+results/parameter_stuff/data_RBF-model_PER.pickle
+results/parameter_stuff/data_RBF-model_SE.pickle
+results/parameter_stuff/data_RBF-model_SE*PER.pickle
+results/parameter_stuff/data_RBF-model_SE+PER.pickle
+results/parameter_stuff/data_SIN-model_LIN*PER.pickle
+results/parameter_stuff/data_SIN-model_LIN+PER.pickle
+results/parameter_stuff/data_SIN-model_PER.pickle
+results/parameter_stuff/data_SIN-model_SE.pickle
+results/parameter_stuff/data_SIN-model_SE*PER.pickle
+results/parameter_stuff/data_SIN-model_SE+PER.pickle
+results/parameter_stuff/data_SIN*LIN-model_LIN*PER.pickle
+results/parameter_stuff/data_SIN*LIN-model_LIN+PER.pickle
+results/parameter_stuff/data_SIN*LIN-model_PER.pickle
+results/parameter_stuff/data_SIN*LIN-model_SE.pickle
+results/parameter_stuff/data_SIN*LIN-model_SE*PER.pickle
+results/parameter_stuff/data_SIN*LIN-model_SE+PER.pickle
+results/parameter_stuff/data_SIN*RBF-model_LIN*PER.pickle
+results/parameter_stuff/data_SIN*RBF-model_LIN+PER.pickle
+results/parameter_stuff/data_SIN*RBF-model_PER.pickle
+results/parameter_stuff/data_SIN*RBF-model_SE.pickle
+results/parameter_stuff/data_SIN*RBF-model_SE*PER.pickle
+results/parameter_stuff/data_SIN*RBF-model_SE+PER.pickle
+results/parameter_stuff/data_SIN+RBF-model_LIN*PER.pickle
+results/parameter_stuff/data_SIN+RBF-model_LIN+PER.pickle
+results/parameter_stuff/data_SIN+RBF-model_PER.pickle
+results/parameter_stuff/data_SIN+RBF-model_SE.pickle
+results/parameter_stuff/data_SIN+RBF-model_SE*PER.pickle
+results/parameter_stuff/data_SIN+RBF-model_SE+PER.pickle
+results/parameter_stuff/parameter_eval.ipynb
