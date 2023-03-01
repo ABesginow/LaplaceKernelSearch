@@ -105,7 +105,7 @@ def run_experiment(config):
     Returns nothing
 
     """
-    metrics = ["AIC", "Laplace", "MLL", "MC"]
+    metrics = ["Laplace"]#["AIC", "Laplace", "MLL", "MC"]
 
 
     eval_START = -5
@@ -119,6 +119,10 @@ def run_experiment(config):
     use_BFGS = True
     num_draws = 1000
     parameter_punishment = 2.0
+
+
+
+
 
     # set training iterations to the correct config
     options["training"]["max_iter"] = int(train_iterations)
@@ -153,15 +157,18 @@ def run_experiment(config):
     for metric in metrics:
         logables[metric] = dict()
 
-    EXPERIMENT_REPITITIONS = 1
+    EXPERIMENT_REPITITIONS = 100
     for exp_num in range(EXPERIMENT_REPITITIONS):
-        model_kernels = ["SIN*RBF", "C*C*RBF",
+        model_kernels = ["4C*SIN"]
+        """
+        ["SIN*RBF", "C*C*RBF",
         "C*RBF",
         "4C*SIN",
         "C*SIN + C*SIN + C*SIN",
         "C*SIN + C*SIN",
         "C*SIN"
         ]
+        """
 
         for model_kernel in model_kernels:
             print("\n###############")
@@ -193,6 +200,7 @@ def run_experiment(config):
 
             if use_BFGS:
                 # Additional BFGS optimization to better ensure optimal parameters
+                #LBFGS_optimizer = torch.optim.LBFGS(model.parameters(), max_iter=50, line_search_fn='strong_wolfe')
                 LBFGS_optimizer = torch.optim.LBFGS(model.parameters(), line_search_fn='strong_wolfe')
                 # define closure
                 def closure():
@@ -210,6 +218,26 @@ def run_experiment(config):
             output = model(observations_x)
             # Calc loss and backprop gradients
             loss = -mll(output, observations_y)
+
+#
+            #model.eval()
+            #likelihood.eval()
+            #with torch.no_grad(), gpytorch.settings.prior_mode(True):
+            #    observed_pred_prior = likelihood(model(observations_x))
+            #    f_preds = model(observations_x)
+            #    mean_posterior = observed_pred_prior.mean
+            #    lower_posterior, upper_posterior = observed_pred_prior.confidence_region()
+
+            #mean_y = model(observations_x).mean
+
+            #f, ax = plt.subplots()
+            #f, ax = plot_model(model, likelihood, observations_x, observations_y, True, f, ax)
+            #ax.plot(observations_x, observations_y, 'k*')
+            #image_time = time.time()
+            ## Store the plots as .png
+            #f.savefig(os.path.join(experiment_path, f"{experiment_keyword}_{exp_num}.png"))
+            ## Store the plots as .tex
+            #tikzplotlib.save(os.path.join(experiment_path, f"{experiment_keyword}_{exp_num}.tex"))
 
 
             if "MLL" in metrics:
@@ -252,7 +280,7 @@ def run_experiment(config):
             os.makedirs(experiment_path)
         with open(os.path.join(experiment_path, f"rest.pickle"), 'wb') as fh:
             pickle.dump(logables, fh)
-        return 0
+    return 0
 
 
 
@@ -261,7 +289,7 @@ def run_experiment(config):
 with open("FINISHED.log", "r") as f:
     finished_configs = [line.strip().split("/")[-1] for line in f.readlines()]
 curdir = os.getcwd()
-keywords = ["PER", "4PER", "RBF_PER"]
+keywords = ["4PER"]#, "PER", "RBF_PER"]
 for config in keywords:
     run_experiment(config)
 

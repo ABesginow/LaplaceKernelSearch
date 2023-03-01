@@ -19,7 +19,7 @@ import threading
 def calculate_AIC(loss, num_params):
     logables = {"correction term" : 2*num_params,
                 "loss term": 2*loss}
-    return 2*num_params + 2*loss, logables
+    return -2*num_params + 2*loss, logables
 
 
 def calculate_laplace(model, loss_of_model, variances_list=None, with_prior=False, param_punish_term = 2.0):
@@ -184,6 +184,9 @@ def calculate_laplace(model, loss_of_model, variances_list=None, with_prior=Fals
     logables["Prior generation time"]   = prior_generation_time
     logables["Total time"]              = total_time
 
+    if not torch.isfinite(laplace):
+        import pdb
+        pdb.set_trace()
 
     return laplace, logables
 
