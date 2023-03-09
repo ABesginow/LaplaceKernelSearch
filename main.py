@@ -254,7 +254,7 @@ def run_experiment(config_file):
         # Store the plots as .png
         f.savefig(os.path.join(experiment_path, f"{experiment_keyword}_{exp_num}.png"))
         # Store the plots as .tex
-        tikzplotlib.save(os.path.join(experiment_path, f"{experiment_keyword}_{exp_num}.tex"))
+        #tikzplotlib.save(os.path.join(experiment_path, f"{experiment_keyword}_{exp_num}.tex"))
 
 
 
@@ -282,7 +282,7 @@ if __name__ == "__main__":
     with open("FINISHED.log", "r") as f:
         finished_configs = [line.strip().split("/")[-1] for line in f.readlines()]
     curdir = os.getcwd()
-    keywords = ["MC"]#, "MLL", "AIC", "Laplace"]
+    keywords = ["MC", "MLL", "AIC", "Laplace"]
     configs = []
     for KEYWORD in keywords:
         configs.extend([os.path.join(curdir, "configs", KEYWORD, item) for item in os.listdir(os.path.join(curdir, "configs", KEYWORD))])
