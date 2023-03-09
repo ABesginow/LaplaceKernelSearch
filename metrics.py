@@ -22,6 +22,52 @@ def calculate_AIC(loss, num_params):
     return -2*num_params + 2*loss, logables
 
 
+def Eigenvalue_correction(hessian, theta_mu, params, sigma, param_punish_term):
+    import pdb
+    pdb.set_trace()
+    vals, vecs = torch.linalg.eig(hessian)
+    vecs = vecs.real
+    trans_theta_mu = vecs.t()@theta_mu
+    trans_params =   vecs.t()@params
+    trans_sigma =    vecs.t()@sigma
+
+    def cor(i):
+        import pdb
+        if i == 3:
+            print(trans_sigma[i][i])
+            pdb.set_trace()
+        c = (trans_theta_mu[i] - trans_params[i])**2
+        lamw_val = np.real(lambertw(c/trans_sigma[i][i] * torch.exp(c/trans_sigma[i][i] - param_punish_term)))
+        return -(c/(trans_sigma[i][i]**2*lamw_val) + 1/trans_sigma[i][i])
+
+
+
+        # return -((trans_theta_mu[i] - trans_params[i])**2 /
+        #          (np.real(lambertw((trans_theta_mu[i] - trans_params[i])**2
+        #                            * 1/trans_sigma[i][i]
+        #                            * torch.exp((trans_theta_mu[i] - trans_params[i])**2
+        #                                        * 1/trans_sigma[i][i]-param_punish_term)))
+        #           * trans_sigma[i][i]**2)+
+        #           (1/trans_sigma[i][i])
+
+
+                
+
+
+    import pdb
+    pdb.set_trace()
+    constructed_eigvals = torch.diag(torch.Tensor(
+        [min(val.real, cor(i)) for i, val in enumerate(vals)]))
+    corrected_hessian = vecs.real@constructed_eigvals@vecs.t().real
+    if any(torch.diag(constructed_eigvals) > 0):
+        print("Something went horribly wrong with the c(i)s")
+        import pdb
+        pdb.set_trace()
+        print(constructed_eigvals)
+    return corrected_hessian
+
+         
+
 def calculate_laplace(model, loss_of_model, variances_list=None, with_prior=False, param_punish_term = 2.0):
     """
         with_prior - Decides whether the version of the Laplace approx WITH the
@@ -108,6 +154,7 @@ def calculate_laplace(model, loss_of_model, variances_list=None, with_prior=Fals
 
     if with_prior:
         #This is the original
+        raise NotImplementedError("Not yet done")
         laplace = mll - (1/2)*torch.log(sigma.det()) - (1/2)*(params-theta_mu).t()@sigma.inverse()@(params-theta_mu) - (1/2)*torch.log((-hessian).det())
     else:
 
@@ -118,10 +165,8 @@ def calculate_laplace(model, loss_of_model, variances_list=None, with_prior=Fals
 
         # Hessian correcting part (for Eigenvalues < 0 < c(i)  )
         start = time.time()
-        vals, vecs = torch.linalg.eig(hessian)
-        c = lambda i : -((theta_mu[i] - params[i])**2/(np.real(lambertw((theta_mu[i] - params[i])**2*1/sigma[i][i] * torch.exp((theta_mu[i] - params[i])**2*1/sigma[i][i]-param_punish_term)))*sigma[i][i]**2)+(1/sigma[i][i]))
-        constructed_eigvals = torch.diag(torch.Tensor([min(val.real, c(i)) for i, val in enumerate(vals)]))
-        hessian = vecs.real@constructed_eigvals@vecs.t().real
+        hessian = Eigenvalue_correction(
+            hessian, theta_mu, params, sigma, param_punish_term)
         end = time.time()
         hessian_correction_time = end - start
 
@@ -151,12 +196,7 @@ def calculate_laplace(model, loss_of_model, variances_list=None, with_prior=Fals
         print(f"Corrected eig(H):{torch.linalg.eig(hessian)}")
         print(f"Old  eig(H):{torch.linalg.eig(oldHessian)}")
         print(f"Symmetry error: {hessian - hessian.t()}")
-        if any(torch.diag(constructed_eigvals) > 0):
-            print("Something went horribly wrong with the c(i)s")
-            import pdb
-            pdb.set_trace()
-            print(constructed_eigvals)
-        elif matmuls > 0:
+        if matmuls > 0:
             print("matmuls positive!!")
             import pdb
             pdb.set_trace()
