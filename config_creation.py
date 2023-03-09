@@ -81,6 +81,8 @@ def json_iter_combinations(json_iterable):
     else:
         data1 = json_iterable[key]
     total_combinations = list()
+    if keys == []:
+        return [data1]
     for key in keys:
         if not isinstance(json_iterable[key], Iterable):
             new_data = [json_iterable[key]]
