@@ -167,18 +167,21 @@ def run_experiment(config):
     for metric in metrics:
         logables[metric] = dict()
 
-    EXPERIMENT_REPITITIONS = 100
+    EXPERIMENT_REPITITIONS = 1
     for exp_num in range(EXPERIMENT_REPITITIONS):
+        """
         model_kernels = ["4C*SIN"]
         """
-        ["SIN*RBF", "C*C*RBF",
-        "C*RBF",
+        model_kernels = ["SIN*RBF", "C*C*RBF",
+        "C*RBF"]
+        """,
         "4C*SIN",
         "C*SIN + C*SIN + C*SIN",
         "C*SIN + C*SIN",
         "C*SIN"
         ]
         """
+
 
         for model_kernel in model_kernels:
             print("\n###############")

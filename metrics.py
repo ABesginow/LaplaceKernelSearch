@@ -23,24 +23,15 @@ def calculate_AIC(loss, num_params):
 
 
 def Eigenvalue_correction(hessian, theta_mu, params, sigma, param_punish_term):
-    import pdb
-    pdb.set_trace()
-    vals, vecs = torch.linalg.eig(hessian)
-    vecs = vecs.real
-    trans_theta_mu = vecs.t()@theta_mu
-    trans_params =   vecs.t()@params
-    trans_sigma =    vecs.t()@sigma
+    vals, vecs = torch.linalg.eigh(hessian)
+    #vecs = vecs.real
+    theta_bar = vecs@(theta_mu - params)
 
     def cor(i):
         import pdb
-        if i == 3:
-            print(trans_sigma[i][i])
-            pdb.set_trace()
-        c = (trans_theta_mu[i] - trans_params[i])**2
-        lamw_val = np.real(lambertw(c/trans_sigma[i][i] * torch.exp(c/trans_sigma[i][i] - param_punish_term)))
-        return -(c/(trans_sigma[i][i]**2*lamw_val) + 1/trans_sigma[i][i])
-
-
+        c = (theta_bar[i])**2
+        lamw_val = np.real(lambertw(c/sigma[i][i] * torch.exp(c/sigma[i][i] - param_punish_term)))
+        return -(c/(sigma[i][i]**2*lamw_val) + 1/sigma[i][i])
 
         # return -((trans_theta_mu[i] - trans_params[i])**2 /
         #          (np.real(lambertw((trans_theta_mu[i] - trans_params[i])**2
@@ -50,12 +41,6 @@ def Eigenvalue_correction(hessian, theta_mu, params, sigma, param_punish_term):
         #           * trans_sigma[i][i]**2)+
         #           (1/trans_sigma[i][i])
 
-
-                
-
-
-    import pdb
-    pdb.set_trace()
     constructed_eigvals = torch.diag(torch.Tensor(
         [min(val.real, cor(i)) for i, val in enumerate(vals)]))
     corrected_hessian = vecs.real@constructed_eigvals@vecs.t().real
@@ -64,7 +49,7 @@ def Eigenvalue_correction(hessian, theta_mu, params, sigma, param_punish_term):
         import pdb
         pdb.set_trace()
         print(constructed_eigvals)
-    return corrected_hessian
+    return corrected_hessian, torch.diag(constructed_eigvals)
 
          
 
@@ -165,7 +150,7 @@ def calculate_laplace(model, loss_of_model, variances_list=None, with_prior=Fals
 
         # Hessian correcting part (for Eigenvalues < 0 < c(i)  )
         start = time.time()
-        hessian = Eigenvalue_correction(
+        hessian, constructed_eigvals_log = Eigenvalue_correction(
             hessian, theta_mu, params, sigma, param_punish_term)
         end = time.time()
         hessian_correction_time = end - start
@@ -177,7 +162,7 @@ def calculate_laplace(model, loss_of_model, variances_list=None, with_prior=Fals
         middle_term = (sigma.inverse()-hessian).inverse()
         matmuls = thetas_added_transposed @ sigma.inverse() @ middle_term @ hessian @ thetas_added
 
-        laplace = mll - (1/2)*torch.log(sigma.det()) - (1/2)*torch.log( (sigma.inverse()-hessian).det() )  + (1/2) * matmuls
+        laplace = mll - (1/2)*torch.log(sigma.det()) - (1/2)*torch.log((sigma.inverse()-hessian).det()) + (1/2) * matmuls
         end = time.time()
         approximation_time = end - start
 
@@ -193,8 +178,8 @@ def calculate_laplace(model, loss_of_model, variances_list=None, with_prior=Fals
         print(f"matmuls: {matmuls}")
         print(f"----")
         print(f"param_list:{debug_param_name_list}")
-        print(f"Corrected eig(H):{torch.linalg.eig(hessian)}")
-        print(f"Old  eig(H):{torch.linalg.eig(oldHessian)}")
+        print(f"Corrected eig(H):{torch.linalg.eigh(hessian)}")
+        print(f"Old  eig(H):{torch.linalg.eigh(oldHessian)}")
         print(f"Symmetry error: {hessian - hessian.t()}")
         if matmuls > 0:
             print("matmuls positive!!")
@@ -212,7 +197,7 @@ def calculate_laplace(model, loss_of_model, variances_list=None, with_prior=Fals
     logables["parameter list"] = debug_param_name_list
     logables["parameter values"] = params
     logables["corrected Hessian"] = hessian
-    logables["diag(constructed eigvals)"] = torch.diag(constructed_eigvals)
+    logables["diag(constructed eigvals)"] = constructed_eigvals_log
     logables["original symmetrized Hessian"] = oldHessian
     logables["prior mean"] = theta_mu
     logables["diag(prior var)"] = torch.diag(sigma)
@@ -225,7 +210,7 @@ def calculate_laplace(model, loss_of_model, variances_list=None, with_prior=Fals
     logables["Prior generation time"]   = prior_generation_time
     logables["Total time"]              = total_time
 
-    if not torch.isfinite(laplace):
+    if not torch.isfinite(laplace) and laplace > 0:
         import pdb
         pdb.set_trace()
 
