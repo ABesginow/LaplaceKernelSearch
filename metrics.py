@@ -27,13 +27,12 @@ def Eigenvalue_correction(hessian, theta_mu, params, sigma, param_punish_term):
     #vecs = vecs.real
     theta_bar = vecs@(theta_mu - params)
     sigma_bar = vecs@sigma@vecs.t()
-    sigma = sigma_bar
 
     def cor(i):
         import pdb
         c = (theta_bar[i])**2
-        lamw_val = np.real(lambertw(c/sigma[i][i] * torch.exp(c/sigma[i][i] - param_punish_term)))
-        return -(c/(sigma[i][i]**2*lamw_val) + 1/sigma[i][i])
+        lamw_val = np.real(lambertw(c/sigma_bar[i][i] * torch.exp(c/sigma_bar[i][i] - param_punish_term)))
+        return -(c/(sigma_bar[i][i]**2*lamw_val) + 1/sigma_bar[i][i])
 
         # return -((trans_theta_mu[i] - trans_params[i])**2 /
         #          (np.real(lambertw((trans_theta_mu[i] - trans_params[i])**2
