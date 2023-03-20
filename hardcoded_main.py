@@ -171,14 +171,17 @@ def run_experiment(config):
     for exp_num in range(EXPERIMENT_REPITITIONS):
         
         #model_kernels = ["4C*SIN"]
-        model_kernels = ["SIN*RBF", 
+        model_kernels = [
         "C*RBF",
-        "C*C*RBF",
-        "C*SIN",
-        "C*SIN + C*SIN",
-        "C*SIN + C*SIN + C*SIN",
-        "4C*SIN"
-        ]
+        "C*C*RBF"]
+        #model_kernels = ["SIN*RBF", 
+        #"C*RBF",
+        #"C*C*RBF",
+        #"C*SIN",
+        #"C*SIN + C*SIN",
+        #"C*SIN + C*SIN + C*SIN",
+        #"4C*SIN"
+        #]
 
 
         for model_kernel in model_kernels:

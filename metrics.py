@@ -46,7 +46,7 @@ def Eigenvalue_correction(hessian, theta_mu, params, sigma, param_punish_term):
     constructed_eigvals = torch.diag(torch.Tensor(
         [min(val, cor(i)) for i, val in enumerate(vals)]))
     corrected_hessian = vecs@constructed_eigvals@vecs.t()
-    print(f"new vals: {torch.linalg.eigh(corrected_hessian)[0]}")
+    #print(f"new vals: {torch.linalg.eigh(corrected_hessian)[0]}")
     if any(torch.diag(constructed_eigvals) > 0):
         print("Something went horribly wrong with the c(i)s")
         import pdb
@@ -175,8 +175,10 @@ def calculate_laplace(model, loss_of_model, variances_list=None, with_prior=Fals
         total_time = end - total_start
 
         #oldLaplace = mll - (1/2)*torch.log(sigma.det()) - (1/2)*torch.log( (sigma.inverse()-oldHessian).det() )  + (1/2) * thetas_added_transposed @ sigma.inverse() @ (sigma.inverse()-oldHessian).inverse() @ oldHessian @ thetas_added
-        debug=False
+        debug=True
         if(debug):
+            print(f"params: {params}")
+            print(f"theta_mu: {theta_mu}")
             print(f"theta_s: {thetas_added_transposed}")
             print(f"Sigma inv: {sigma.inverse()}")
             print(f"(sigma.inverse()-hessian): {(sigma.inverse()-hessian)}")
