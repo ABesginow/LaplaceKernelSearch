@@ -167,23 +167,24 @@ def run_experiment(config):
     for metric in metrics:
         logables[metric] = dict()
 
-    EXPERIMENT_REPITITIONS = 100
+    EXPERIMENT_REPITITIONS = 1
     for exp_num in range(EXPERIMENT_REPITITIONS):
-        model_kernels = ["4C*SIN"]
-        """
-        ["SIN*RBF", "C*C*RBF",
+        
+        #model_kernels = ["4C*SIN"]
+        model_kernels = [
         "C*RBF",
-        "4C*SIN",
-        "C*SIN + C*SIN + C*SIN",
-        "C*SIN + C*SIN",
-        "C*SIN"
-        ]
-        """
+        "C*C*RBF"]
+        #model_kernels = ["SIN*RBF", 
+        #"C*RBF",
+        #"C*C*RBF",
+        #"C*SIN",
+        #"C*SIN + C*SIN",
+        #"C*SIN + C*SIN + C*SIN",
+        #"4C*SIN"
+        #]
+
 
         for model_kernel in model_kernels:
-            print("\n###############")
-            print(model_kernel)
-            print("###############\n")
             # Initialize the model
             likelihood = gpytorch.likelihoods.GaussianLikelihood()
             # list_of_variances = [float(variance_list_variance) for i in range(28)]
@@ -288,11 +289,16 @@ def run_experiment(config):
                 MC_logs["details"] = MC_log
                 logables["MC"][model_kernel] = MC_logs
 
+            print("\n###############")
+            print(model_kernel)
+            print("###############\n")
+            print("------\n")
         experiment_path = os.path.join("results", "hardcoded", config)
         if not os.path.exists(experiment_path):
             os.makedirs(experiment_path)
         with open(os.path.join(experiment_path, f"rest.pickle"), 'wb') as fh:
             pickle.dump(logables, fh)
+
     return 0
 
 
