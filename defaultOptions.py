@@ -18,11 +18,11 @@ default_options = {
                  "legend": True}}
 
 
-hyperparameter_limits = {"RBFKernel": {"lengthscale": [1e-4,1]},
+hyperparameter_limits = {"RBFKernel": {"lengthscale": [1e-3,1]},
                          "LinearKernel": {"variance": [1e-4,1]},
-                         "PeriodicKernel": {"lengthscale": [1e-4,1],
-                                            "period_length": [1e-4,3]},
-                         "ScaleKernel": {"outputscale": [1e-4,10]},
+                         "PeriodicKernel": {"lengthscale": [1e-3,1],
+                                            "period_length": [1e-3,3]},
+                         "ScaleKernel": {"outputscale": [1e-3,10]},
                          "Noise": [1e-2,1e-1]}
 
 prior_dict = {"SE": {"raw_lengthscale" : {"mean": 0.891, "std":2.195}},

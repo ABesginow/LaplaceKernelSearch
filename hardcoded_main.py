@@ -2,10 +2,11 @@ import copy
 import configparser
 from experiment_functions import Experiment
 from GaussianProcess import ExactGPModel
-from globalParams import options
+from globalParams import options, hyperparameter_limits
 import gpytorch
 from helpFunctions import get_string_representation_of_kernel as gsr
 from helpFunctions import clean_kernel_expression
+from helpFunctions import get_kernels_in_kernel_expression
 from helpFunctions import amount_of_base_kernels
 import json
 from kernelSearch import *
@@ -109,6 +110,102 @@ def load_config(config_file):
     return var_dict
 
 
+def optimize_hyperparameters(model, likelihood, train_iterations, X, Y, with_BFGS=False):
+    """
+    find optimal hyperparameters either by BO or by starting from random initial values multiple times, using an optimizer every time
+    and then returning the best result
+    """
+    # setup
+    best_loss = 1e400
+    optimal_parameters = dict()
+    limits = hyperparameter_limits
+    # start runs
+    #for iteration in range(options["training"]["restarts"]+1):
+    for iteration in range(2):
+        # optimize and determine loss
+        # Perform a training for AIC and Laplace
+        model.train()
+        likelihood.train()
+
+        optimizer = torch.optim.Adam(model.parameters(), lr=0.1)
+
+        mll = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood, model)
+
+        for i in range(train_iterations):
+            # Zero gradients from previous iteration
+            optimizer.zero_grad()
+            # Output from model
+            output = model(X)
+            # Calc loss and backprop gradients
+            loss = -mll(output, Y)
+            loss.backward()
+            optimizer.step()
+
+        if with_BFGS:
+            # Additional BFGS optimization to better ensure optimal parameters
+            # LBFGS_optimizer = torch.optim.LBFGS(model.parameters(), max_iter=50, line_search_fn='strong_wolfe')
+            LBFGS_optimizer = torch.optim.LBFGS(
+                model.parameters(), max_iter=50,
+                line_search_fn='strong_wolfe')
+            # define closure
+
+            def closure():
+                LBFGS_optimizer.zero_grad()
+                output = model(X)
+                loss = -mll(output, Y)
+                LBFGS_optimizer.zero_grad()
+                loss.backward()
+                return loss
+            LBFGS_optimizer.step(closure)
+
+        # Zero gradients from previous iteration
+        optimizer.zero_grad()
+        # Output from model
+        output = model(X)
+        # Calc loss and backprop gradients
+        loss = -mll(output, Y)
+
+#        model.train_model(with_BFGS=with_BFGS)
+        current_loss = loss
+        # check if the current run is better than previous runs
+        if current_loss < best_loss:
+            # if it is the best, save all used parameters
+            best_loss = current_loss
+            for param_name, param in model.named_parameters():
+                optimal_parameters[param_name] = copy.deepcopy(param)
+
+        parameter_prior_dict = {"SE": {"raw_lengthscale": {"mean": 0.891, "std": 2.195}},
+                                "PER": {"raw_lengthscale": {"mean": 0.338, "std": 2.636}, 
+                                        "raw_period_length": {"mean": 0.284, "std": 0.902}},
+                                "LIN": {"raw_variance": {"mean": -1.463, "std": 1.633}},
+                                "c": {"raw_outputscale": {"mean": -2.163, "std": 2.448}},
+                                "noise": {"raw_noise": {"mean": -1.792, "std": 3.266}}}
+        # set new random inital values
+        model.likelihood.noise_covar.noise = torch.rand(1) * (limits["Noise"][1] - limits["Noise"][0]) + limits["Noise"][0]
+        #self.mean_module.constant = torch.rand(1) * (limits["Mean"][1] - limits["Mean"][0]) + limits["Mean"][0]
+        for kernel in get_kernels_in_kernel_expression(model.covar_module):
+            hypers = limits[kernel._get_name()]
+            for hyperparameter in hypers:
+                new_value = torch.rand(1) * (hypers[hyperparameter][1] - hypers[hyperparameter][0]) + hypers[hyperparameter][0]
+                setattr(kernel, hyperparameter, new_value)
+
+        # print output if enabled
+        if options["training"]["print_optimizing_output"]:
+            print(f"HYPERPARAMETER OPTIMIZATION: Random Restart {iteration}: loss: {current_loss}, optimal loss: {best_loss}")
+
+    # finally, set the hyperparameters those in the optimal run
+    model.initialize(**optimal_parameters)
+    output = model(X)
+    mll = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood, model)
+    loss = -mll(output, Y)
+    if not loss == best_loss:
+        import pdb
+        pdb.set_trace()
+        print(loss)
+        print(best_loss)
+    return loss
+
+
 def run_experiment(config):
     """
     This contains the training, kernel search, evaluation, logging, plotting.
@@ -116,18 +213,18 @@ def run_experiment(config):
     Returns nothing
 
     """
-    metrics = ["Laplace"]  # ["AIC", "Laplace", "MLL", "MC"]
-
+    metrics = ["AIC", "Laplace", "MLL", "MC"]
+    metrics = ["Laplace"]
     eval_START = -5
     eval_END = 5
     eval_COUNT = 100
     optimizer = "Adam"
-    train_iterations = 200
+    train_iterations = 300
     LR = 0.1
     # noise =
     data_scaling = True
     use_BFGS = True
-    num_draws = 1000
+    num_draws = 10000
     parameter_punishment = 2.0
 
     # set training iterations to the correct config
@@ -167,72 +264,35 @@ def run_experiment(config):
     for metric in metrics:
         logables[metric] = dict()
 
-    EXPERIMENT_REPITITIONS = 100
+    EXPERIMENT_REPITITIONS = 1
     for exp_num in range(EXPERIMENT_REPITITIONS):
-        model_kernels = ["4C*SIN"]
-        """
-        ["SIN*RBF", "C*C*RBF",
-        "C*RBF",
-        "4C*SIN",
-        "C*SIN + C*SIN + C*SIN",
-        "C*SIN + C*SIN",
-        "C*SIN"
+        model_kernels = ["SIN*RBF", "C*C*RBF",
+            "C*RBF",
+            "4C*SIN",
+            "C*SIN + C*SIN + C*SIN",
+            "C*SIN + C*SIN",
+            "C*SIN"
         ]
-        """
 
         for model_kernel in model_kernels:
+            loss = np.nan
             print("\n###############")
             print(model_kernel)
             print("###############\n")
             # Initialize the model
             likelihood = gpytorch.likelihoods.GaussianLikelihood()
             # list_of_variances = [float(variance_list_variance) for i in range(28)]
-
+            model = None
             model = ExactGPModel(
                 observations_x, observations_y, likelihood, model_kernel)
-
-            # Perform a training for AIC and Laplace
-            model.train()
-            likelihood.train()
-
-            optimizer = torch.optim.Adam(model.parameters(), lr=LR)
-
-            mll = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood, model)
-
-            for i in range(train_iterations):
-                # Zero gradients from previous iteration
-                optimizer.zero_grad()
-                # Output from model
-                output = model(observations_x)
-                # Calc loss and backprop gradients
-                loss = -mll(output, observations_y)
-                loss.backward()
-                optimizer.step()
-
-            if use_BFGS:
-                # Additional BFGS optimization to better ensure optimal parameters
-                # LBFGS_optimizer = torch.optim.LBFGS(model.parameters(), max_iter=50, line_search_fn='strong_wolfe')
-                LBFGS_optimizer = torch.optim.LBFGS(
-                    model.parameters(), line_search_fn='strong_wolfe')
-                # define closure
-
-                def closure():
-                    LBFGS_optimizer.zero_grad()
-                    output = model(observations_x)
-                    loss = -mll(output, observations_y)
-                    LBFGS_optimizer.zero_grad()
-                    loss.backward()
-                    return loss
-                LBFGS_optimizer.step(closure)
-
-            # Zero gradients from previous iteration
-            optimizer.zero_grad()
-            # Output from model
-            output = model(observations_x)
-            # Calc loss and backprop gradients
-            loss = -mll(output, observations_y)
-
-#
+            for i in range(10000):
+                try:
+                    loss = optimize_hyperparameters(model, likelihood, train_iterations, observations_x, observations_y, use_BFGS)
+                    break
+                except:
+                    continue
+            if loss is np.nan:
+                raise ValueError("training fucked up")
             # model.eval()
             # likelihood.eval()
             # with torch.no_grad(), gpytorch.settings.prior_mode(True):
@@ -252,9 +312,19 @@ def run_experiment(config):
             # Store the plots as .tex
             # tikzplotlib.save(os.path.join(experiment_path, f"{experiment_keyword}_{exp_num}.tex"))
 
+            if "Laplace" in metrics:
+                laplace_approx, LApp_log = calculate_laplace(
+                    model, loss, param_punish_term=parameter_punishment)
+                Laplace_logs = dict()
+                Laplace_logs["parameter_punishment"] = parameter_punishment
+                Laplace_logs["loss"] = laplace_approx
+                Laplace_logs["details"] = LApp_log
+                logables["Laplace"][model_kernel] = Laplace_logs
+
             if "MLL" in metrics:
                 MLL_logs = dict()
                 MLL_logs["loss"] = -loss * len(observations_x)
+                MLL_logs["model parameters"] = list(model.named_parameters())
                 logables["MLL"][model_kernel] = MLL_logs
 
             if "AIC" in metrics:
@@ -269,15 +339,6 @@ def run_experiment(config):
                 AIC_logs["parameter_punishment"] = parameter_punishment
                 logables["AIC"][model_kernel] = AIC_logs
 
-            if "Laplace" in metrics:
-                laplace_approx, LApp_log = calculate_laplace(
-                    model, loss, param_punish_term=parameter_punishment)
-                Laplace_logs = dict()
-                Laplace_logs["parameter_punishment"] = parameter_punishment
-                Laplace_logs["loss"] = laplace_approx
-                Laplace_logs["details"] = LApp_log
-                logables["Laplace"][model_kernel] = Laplace_logs
-
             # Perform MCMC
             if "MC" in metrics:
                 MCMC_approx, MC_log = calculate_mc_STAN(
@@ -287,7 +348,11 @@ def run_experiment(config):
                 MC_logs["num_draws"] = num_draws
                 MC_logs["details"] = MC_log
                 logables["MC"][model_kernel] = MC_logs
-
+        if "MC" in metrics and "MLL" in metrics:
+            if MCMC_approx > MLL_logs["loss"]:
+                import pdb
+                #pdb.set_trace()
+                print("MCMC is higher than MLL, again")
         experiment_path = os.path.join("results", "hardcoded", config)
         if not os.path.exists(experiment_path):
             os.makedirs(experiment_path)
@@ -299,6 +364,6 @@ def run_experiment(config):
 with open("FINISHED.log", "r") as f:
     finished_configs = [line.strip().split("/")[-1] for line in f.readlines()]
 curdir = os.getcwd()
-keywords = ["4PER"]  # , "PER", "RBF_PER"]
+keywords = ["RBF_PER"]#["4PER"]#, "PER", "RBF_PER"]
 for config in keywords:
     run_experiment(config)

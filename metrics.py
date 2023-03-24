@@ -38,7 +38,11 @@ def calculate_laplace(model, loss_of_model, variances_list=None, with_prior=Fals
     # This is NEGATIVE MLL
     #mll         = (num_of_observations * (loss_of_model))
     start = time.time()
-    env_grads   = torch.autograd.grad(mll, params_list, retain_graph=True, create_graph=True)
+    try:
+        env_grads   = torch.autograd.grad(mll, params_list, retain_graph=True, create_graph=True)
+    except:
+        import pdb
+        pdb.set_trace()
     hess_params = []
     for i in range(len(env_grads)):
             hess_params.append(torch.autograd.grad(env_grads[i], params_list, retain_graph=True))
@@ -208,7 +212,7 @@ def generate_STAN_kernel(kernel_representation : str, parameter_list : list, cov
     # Take care of theta order!
     # Replace the matrix muliplications by elementwise operation to prevent issues
     kernel_representation = kernel_representation.replace("*", ".*")
-    STAN_str_kernel = f"identity_matrix(dims(x)[1])*softplus(theta[i]) + {kernel_representation}"
+    STAN_str_kernel = f"(identity_matrix(dims(x)[1]).*softplus(theta[i])) + {kernel_representation}"
     search_str = "[i]"
     # str.replace(old, new, count) replaces the leftmost entry
     # Thus by iterating over all occurences of search_str I can hack this
@@ -382,10 +386,12 @@ def calculate_mc_STAN(model, likelihood, num_draws):
     fit = posterior.sample(num_chains=1, num_samples=num_draws)
     end = time.time()
     STAN_MCMC_sampling_time = end - start
-
     # Use the sampled parameters to reconstruct the mean and cov. matr.
     # Average(?) to get the actual posterior likelihood
     post_frame = fit.to_frame()
+    import pdb
+    #pdb.set_trace()
+    print(fit)
     manual_lp_list = list()
     bad_entries = 0
 
@@ -427,6 +433,7 @@ def calculate_mc_STAN(model, likelihood, num_draws):
     logables["Total time"] = total_time
     logables["Bad entries"] = bad_entries
     logables["likelihood approximation"] = torch.mean(torch.Tensor(manual_lp_list))
+    #logables["manual lp list"] = manual_lp_list
     print(f"Num bad entries: {bad_entries}")
     return torch.mean(torch.Tensor(manual_lp_list)), logables
 
