@@ -264,18 +264,53 @@ def run_experiment(config):
 
     EXPERIMENT_REPITITIONS = 1
     for exp_num in range(EXPERIMENT_REPITITIONS):
+<<<<<<< HEAD
         model_kernels = ["SIN*RBF", "C*C*RBF",
             "C*RBF",
             "C*SIN + C*SIN + C*SIN",
             "C*SIN + C*SIN",
             "C*SIN"
         ]
+||||||| 10d14ae
+        model_kernels = ["4C*SIN"]
+        """
+        ["SIN*RBF", "C*C*RBF",
+        "C*RBF",
+        "4C*SIN",
+        "C*SIN + C*SIN + C*SIN",
+        "C*SIN + C*SIN",
+        "C*SIN"
+        ]
+        """
+=======
+        
+        #model_kernels = ["4C*SIN"]
+        model_kernels = [
+        "C*RBF",
+        "C*C*RBF"]
+        #model_kernels = ["SIN*RBF", 
+        #"C*RBF",
+        #"C*C*RBF",
+        #"C*SIN",
+        #"C*SIN + C*SIN",
+        #"C*SIN + C*SIN + C*SIN",
+        #"4C*SIN"
+        #]
+
+>>>>>>> 44ae9a57b8f90bb518b6a9c8296629ebad499302
 
         for model_kernel in model_kernels:
+<<<<<<< HEAD
             loss = np.nan
             print("\n###############")
             print(model_kernel)
             print("###############\n")
+||||||| 10d14ae
+            print("\n###############")
+            print(model_kernel)
+            print("###############\n")
+=======
+>>>>>>> 44ae9a57b8f90bb518b6a9c8296629ebad499302
             # Initialize the model
             likelihood = gpytorch.likelihoods.GaussianLikelihood()
             # list_of_variances = [float(variance_list_variance) for i in range(28)]
@@ -348,16 +383,27 @@ def run_experiment(config):
                 MC_logs["num_draws"] = num_draws
                 MC_logs["details"] = MC_log
                 logables["MC"][model_kernel] = MC_logs
+<<<<<<< HEAD
         if "MC" in metrics and "MLL" in metrics:
             if MCMC_approx > MLL_logs["loss"]:
                 import pdb
                 #pdb.set_trace()
                 print("MCMC is higher than MLL, again")
+||||||| 10d14ae
+
+=======
+
+            print("\n###############")
+            print(model_kernel)
+            print("###############\n")
+            print("------\n")
+>>>>>>> 44ae9a57b8f90bb518b6a9c8296629ebad499302
         experiment_path = os.path.join("results", "hardcoded", config)
         if not os.path.exists(experiment_path):
             os.makedirs(experiment_path)
         with open(os.path.join(experiment_path, f"rest.pickle"), 'wb') as fh:
             pickle.dump(logables, fh)
+
     return 0
 
 
