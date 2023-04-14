@@ -23,7 +23,7 @@ import time
 import torch
 
 
-def plot_model(model, likelihood, X, Y, return_figure=False, figure=None, 
+def plot_model(model, likelihood, X, Y, return_figure=False, figure=None,
                ax=None):
     interval_length = torch.max(X) - torch.min(X)
     shift = interval_length * options["plotting"]["border_ratio"]
@@ -120,14 +120,14 @@ def optimize_hyperparameters(model, likelihood, train_iterations, X, Y, with_BFG
     optimal_parameters = dict()
     limits = hyperparameter_limits
     # start runs
-    #for iteration in range(options["training"]["restarts"]+1):
-    for iteration in range(2):
+    for iteration in range(options["training"]["restarts"]+1):
+    #for iteration in range(2):
         # optimize and determine loss
         # Perform a training for AIC and Laplace
         model.train()
         likelihood.train()
 
-        optimizer = torch.optim.Adam(model.parameters(), lr=0.1)
+        optimizer = torch.optim.Adam(model.parameters(), lr=0.05)
 
         mll = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood, model)
 
@@ -173,20 +173,19 @@ def optimize_hyperparameters(model, likelihood, train_iterations, X, Y, with_BFG
             best_loss = current_loss
             for param_name, param in model.named_parameters():
                 optimal_parameters[param_name] = copy.deepcopy(param)
-
-        parameter_prior_dict = {"SE": {"raw_lengthscale": {"mean": 0.891, "std": 2.195}},
-                                "PER": {"raw_lengthscale": {"mean": 0.338, "std": 2.636}, 
-                                        "raw_period_length": {"mean": 0.284, "std": 0.902}},
-                                "LIN": {"raw_variance": {"mean": -1.463, "std": 1.633}},
-                                "c": {"raw_outputscale": {"mean": -2.163, "std": 2.448}},
-                                "noise": {"raw_noise": {"mean": -1.792, "std": 3.266}}}
+        parameter_prior_dict = {"RBFKernel": {"lengthscale" : {"mean": 1.607, "std":1.650}},
+                              "PeriodicKernel":{"lengthscale": {"mean": 1.473, "std":1.582}, "period_length":{"mean": 0.920, "std":0.690}},
+                              "LinearKernel":{"variance" : {"mean":0.374, "std":0.309}},
+                              "ScaleKernel":{"outputscale": {"mean":0.427, "std":0.754}},
+                              "Noise": {"noise": {"mean":0.531, "std":0.384}}}
         # set new random inital values
-        model.likelihood.noise_covar.noise = torch.rand(1) * (limits["Noise"][1] - limits["Noise"][0]) + limits["Noise"][0]
+        model.likelihood.noise_covar.noise = torch.distributions.Normal(parameter_prior_dict["Noise"]["noise"]["mean"],
+                                                                        parameter_prior_dict["Noise"]["noise"]["std"]).sample()
         #self.mean_module.constant = torch.rand(1) * (limits["Mean"][1] - limits["Mean"][0]) + limits["Mean"][0]
         for kernel in get_kernels_in_kernel_expression(model.covar_module):
-            hypers = limits[kernel._get_name()]
+            hypers = parameter_prior_dict[kernel._get_name()]
             for hyperparameter in hypers:
-                new_value = torch.rand(1) * (hypers[hyperparameter][1] - hypers[hyperparameter][0]) + hypers[hyperparameter][0]
+                new_value = torch.distributions.Normal(hypers[hyperparameter]["mean"], hypers[hyperparameter]["std"]).sample()
                 setattr(kernel, hyperparameter, new_value)
 
         # print output if enabled
@@ -214,7 +213,7 @@ def run_experiment(config):
 
     """
     metrics = ["AIC", "Laplace", "MLL", "MC"]
-    metrics = ["Laplace"]
+    #metrics = ["Laplace"]
     eval_START = -5
     eval_END = 5
     eval_COUNT = 100
@@ -234,10 +233,9 @@ def run_experiment(config):
     observations_x = torch.linspace(eval_START, eval_END, eval_COUNT)
     if config == "PER":
         observations_y = torch.sin(observations_x * 2*np.pi)
-    elif config == "4PER":
+    elif config == "3PER":
         observations_y = torch.sin(observations_x * 2*np.pi) + 0.5*torch.sin(observations_x * 3*np.pi) + \
-            0.2*torch.sin(observations_x * 7*np.pi) + 0.1 * \
-            torch.sin(observations_x * 11*np.pi)
+            0.2*torch.sin(observations_x * 7*np.pi)
     elif config == "RBF_PER":
         observations_y = torch.sin(
             observations_x * 2*np.pi) * torch.exp(0.3*observations_x)
@@ -268,7 +266,6 @@ def run_experiment(config):
     for exp_num in range(EXPERIMENT_REPITITIONS):
         model_kernels = ["SIN*RBF", "C*C*RBF",
             "C*RBF",
-            "4C*SIN",
             "C*SIN + C*SIN + C*SIN",
             "C*SIN + C*SIN",
             "C*SIN"
@@ -285,11 +282,14 @@ def run_experiment(config):
             model = None
             model = ExactGPModel(
                 observations_x, observations_y, likelihood, model_kernel)
-            for i in range(10000):
+            for i in range(100000):
                 try:
                     loss = optimize_hyperparameters(model, likelihood, train_iterations, observations_x, observations_y, use_BFGS)
                     break
                 except:
+                    model = None
+                    model = ExactGPModel(
+                        observations_x, observations_y, likelihood, model_kernel)
                     continue
             if loss is np.nan:
                 raise ValueError("training fucked up")
@@ -364,6 +364,6 @@ def run_experiment(config):
 with open("FINISHED.log", "r") as f:
     finished_configs = [line.strip().split("/")[-1] for line in f.readlines()]
 curdir = os.getcwd()
-keywords = ["RBF_PER"]#["4PER"]#, "PER", "RBF_PER"]
+keywords = ["RBF_PER"]#["3PER", "PER", "RBF_PER"]
 for config in keywords:
     run_experiment(config)

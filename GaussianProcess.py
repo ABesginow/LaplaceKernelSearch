@@ -33,25 +33,26 @@ class ExactGPModel(gpt.models.ExactGP):
             observed_pred = self.likelihood(self(x))
         return observed_pred.mean
 
-    def train_model(self, with_BFGS=False):
+    def train_model(self, with_BFGS=False, with_Adam=True):
         self.train()
         self.likelihood.train()
         optimizer = torch.optim.Adam([{"params": self.parameters()}], lr=options["training"]["learning_rate"])
         mll = gpt.mlls.ExactMarginalLogLikelihood(self.likelihood, self)
 
-        for i in range(options["training"]["max_iter"]):
-            optimizer.zero_grad()
-            output = self.__call__(self.train_inputs[0])
-            loss = -mll(output, self.train_targets)
-            loss.backward()
-            if options["training"]["print_training_output"]:
-                parameter_string = ""
-                for param_name, param in self.covar_module.named_parameters():
-                    parameter_string += f"{param_name:20}: raw: {param.item():10}, transformed: {self.covar_module.constraint_for_parameter_name(param_name).transform(param).item():10}\n"
-                parameter_string += f"{'noise':20}: raw: {self.likelihood.raw_noise.item():10}, transformed: {self.likelihood.noise.item():10}"
-                print(
-                f"HYPERPARAMETER TRAINING: Iteration {i} - Loss: {loss.item()}  \n{parameter_string}")
-            optimizer.step()
+        if with_Adam:
+            for i in range(options["training"]["max_iter"]):
+                optimizer.zero_grad()
+                output = self.__call__(self.train_inputs[0])
+                loss = -mll(output, self.train_targets)
+                loss.backward()
+                if options["training"]["print_training_output"]:
+                    parameter_string = ""
+                    for param_name, param in self.covar_module.named_parameters():
+                        parameter_string += f"{param_name:20}: raw: {param.item():10}, transformed: {self.covar_module.constraint_for_parameter_name(param_name).transform(param).item():10}\n"
+                    parameter_string += f"{'noise':20}: raw: {self.likelihood.raw_noise.item():10}, transformed: {self.likelihood.noise.item():10}"
+                    print(
+                    f"HYPERPARAMETER TRAINING: Iteration {i} - Loss: {loss.item()}  \n{parameter_string}")
+                optimizer.step()
 
         if with_BFGS:
             # Additional BFGS optimization to better ensure optimal parameters
@@ -90,7 +91,7 @@ class ExactGPModel(gpt.models.ExactGP):
         output = self.__call__(X)
         return torch.exp(mll(output, Y)).item()
 
-    def optimize_hyperparameters(self, with_BFGS=False):
+    def optimize_hyperparameters(self, with_BFGS=False, with_Adam=True):
         """
         find optimal hyperparameters either by BO or by starting from random initial values multiple times, using an optimizer every time
         and then returning the best result
@@ -102,7 +103,7 @@ class ExactGPModel(gpt.models.ExactGP):
         # start runs
         for iteration in range(options["training"]["restarts"]+1):
             # optimize and determine loss
-            self.train_model(with_BFGS=with_BFGS)
+            self.train_model(with_BFGS=with_BFGS, with_Adam=with_Adam)
             current_loss = self.get_current_loss()
             # check if the current run is better than previous runs
             if current_loss < best_loss:

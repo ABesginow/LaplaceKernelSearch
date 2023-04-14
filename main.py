@@ -134,7 +134,7 @@ def run_experiment(config_file):
 
     """
 
-    EXPERIMENT_REPITITIONS = 50
+    EXPERIMENT_REPITITIONS = 50 
     for exp_num in range(EXPERIMENT_REPITITIONS):
 
         ### Initialization
@@ -199,12 +199,16 @@ def run_experiment(config_file):
         f_covar = f_preds.covariance_matrix
         observations_y = f_preds.sample()           # samples from the model
 
+        X = observations_x  #[int((1-train_data_ratio)*0.5*eval_COUNT):int((1+train_data_ratio)*0.5*eval_COUNT)]
+        Y = observations_y  #[int((1-train_data_ratio)*0.5*eval_COUNT):int((1+train_data_ratio)*0.5*eval_COUNT)]
 
-        X = observations_x#[int((1-train_data_ratio)*0.5*eval_COUNT):int((1+train_data_ratio)*0.5*eval_COUNT)]
-        Y = observations_y#[int((1-train_data_ratio)*0.5*eval_COUNT):int((1+train_data_ratio)*0.5*eval_COUNT)]
-
-        X = (X - torch.mean(X) )/ torch.std(X)
-        Y = (Y - torch.mean(Y) )/ torch.std(Y)
+        # Percentage noise
+        if noise:
+            Y = Y + torch.randn(Y.shape) * (noise * Y.max())
+        # Z-Score scaling
+        if data_scaling:
+            X = (X - torch.mean(X)) / torch.std(X)
+            Y = (Y - torch.mean(Y)) / torch.std(Y)
 
 
 
@@ -212,6 +216,7 @@ def run_experiment(config_file):
         list_of_kernels = [gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel()),
                            gpytorch.kernels.ScaleKernel(gpytorch.kernels.PeriodicKernel()),
                            gpytorch.kernels.ScaleKernel(gpytorch.kernels.LinearKernel())]
+                           #gpytorch.kernels.ScaleKernel(gpytorch.kernels.MaternKernel())]
         likelihood = gpytorch.likelihoods.GaussianLikelihood()
         list_of_variances = [float(variance_list_variance) for i in range(28)] # ist das richtig so?? Kommt mir falsch vor...
         #try:
@@ -250,6 +255,7 @@ def run_experiment(config_file):
         f, ax = plt.subplots()
         f, ax = model.plot_model(return_figure=True, figure = f, ax=ax)
         ax.plot(observations_x, observations_y, 'k*')
+        ax.set_title(gsr(model.covar_module)) 
         image_time = time.time()
         # Store the plots as .png
         f.savefig(os.path.join(experiment_path, f"{experiment_keyword}_{exp_num}.png"))
@@ -282,7 +288,7 @@ if __name__ == "__main__":
     with open("FINISHED.log", "r") as f:
         finished_configs = [line.strip().split("/")[-1] for line in f.readlines()]
     curdir = os.getcwd()
-    keywords = ["MC", "MLL", "AIC", "Laplace"]
+    keywords = ["MLL", "AIC", "Laplace"] # "MC" only when there's a lot of time
     configs = []
     for KEYWORD in keywords:
         configs.extend([os.path.join(curdir, "configs", KEYWORD, item) for item in os.listdir(os.path.join(curdir, "configs", KEYWORD))])
@@ -294,19 +300,8 @@ if __name__ == "__main__":
     configs = [c for c in configs if not c.split("/")[-1] in finished_configs and os.path.isfile(c)]
     #configs = [c for c in configs if not c.split("/")[-1] in finished_configs and os.path.isfile(c)]
 
-
-    with open("running.log", "r") as f:
-        running_confs = [line.strip().split("/")[-1] for line in f.readlines()]
-
-    config = configs.pop()
-    while config.split("/")[-1] in running_confs:
-        config = configs.pop()
-
-    with open("running.log", "a") as f:
-        f.writelines(config + "\n")
-
-    #for config in configs:
-    run_experiment(config)
+    for config in configs:
+        run_experiment(config)
 
     with open("running.log", "r") as fin, open("running.log", "w+") as fout:
         for line in fin:

@@ -143,18 +143,18 @@ def calculate_laplace(model, loss_of_model, variances_list=None, with_prior=Fals
         total_time = end - total_start
 
         #oldLaplace = mll - (1/2)*torch.log(sigma.det()) - (1/2)*torch.log( (sigma.inverse()-oldHessian).det() )  + (1/2) * thetas_added_transposed @ sigma.inverse() @ (sigma.inverse()-oldHessian).inverse() @ oldHessian @ thetas_added
-        print(f"theta_s: {thetas_added_transposed}")
-        print(f"Sigma inv: {sigma.inverse()}")
-        print(f"(sigma.inverse()-hessian): {(sigma.inverse()-hessian)}")
-        print(f"(sigma.inverse()-hessian).inverse(): {(sigma.inverse()-hessian).inverse()}")
-        print(f"Hessian: {hessian}")
-        print(f"Frob. norm(H):{np.linalg.norm(hessian)}")
-        print(f"matmuls: {matmuls}")
-        print(f"----")
-        print(f"param_list:{debug_param_name_list}")
-        print(f"Corrected eig(H):{torch.linalg.eig(hessian)}")
-        print(f"Old  eig(H):{torch.linalg.eig(oldHessian)}")
-        print(f"Symmetry error: {hessian - hessian.t()}")
+        #print(f"theta_s: {thetas_added_transposed}")
+        #print(f"Sigma inv: {sigma.inverse()}")
+        #print(f"(sigma.inverse()-hessian): {(sigma.inverse()-hessian)}")
+        #print(f"(sigma.inverse()-hessian).inverse(): {(sigma.inverse()-hessian).inverse()}")
+        #print(f"Hessian: {hessian}")
+        #print(f"Frob. norm(H):{np.linalg.norm(hessian)}")
+        #print(f"matmuls: {matmuls}")
+        #print(f"----")
+        #print(f"param_list:{debug_param_name_list}")
+        #print(f"Corrected eig(H):{torch.linalg.eig(hessian)}")
+        #print(f"Old  eig(H):{torch.linalg.eig(oldHessian)}")
+        #print(f"Symmetry error: {hessian - hessian.t()}")
         if any(torch.diag(constructed_eigvals) > 0):
             print("Something went horribly wrong with the c(i)s")
             import pdb

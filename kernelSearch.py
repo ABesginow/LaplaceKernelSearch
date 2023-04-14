@@ -115,7 +115,7 @@ def CKS(X, Y, likelihood, base_kernels, list_of_variances=None,  experiment=None
                         total_counter += 1
                         train_start = time.time()
                         if BFGS:
-                            models[gsr(k)].optimize_hyperparameters(with_BFGS=True)
+                            models[gsr(k)].optimize_hyperparameters(with_Adam=False, with_BFGS=True)
                         else:
                             models[gsr(k)].optimize_hyperparameters()
                         train_end = time.time()
@@ -144,7 +144,8 @@ def CKS(X, Y, likelihood, base_kernels, list_of_variances=None,  experiment=None
                 #    performance[gsr(k)] = np.NINF
             if metric == "AIC":
                 try:
-                    performance[gsr(k)] = calculate_AIC(-models[gsr(k)].get_current_loss()* models[gsr(k)].train_inputs[0].numel(), sum(p.numel() for p in models[gsr(k)].parameters() if p.requires_grad))
+                    performance[gsr(k)], logs = calculate_AIC(-models[gsr(k)].get_current_loss()* models[gsr(k)].train_inputs[0].numel(), sum(p.numel() for p in models[gsr(k)].parameters() if p.requires_grad))
+                    logables.append(logs)
                 except:
                     performance[gsr(k)] = np.NINF
             elif metric == "MLL":
@@ -169,5 +170,6 @@ def CKS(X, Y, likelihood, base_kernels, list_of_variances=None,  experiment=None
         candidates = create_candidates_CKS(best_model.covar_module, base_kernels, operations)
     if options["kernel search"]["print"]:
         print(f"KERNEL SEARCH: kernel search concluded, optimal expression: {gsr(best_model.covar_module)}")
+
     return best_model, best_model.likelihood, model_steps, performance_steps, loss_steps, logables, explosion_counter, total_counter
 
