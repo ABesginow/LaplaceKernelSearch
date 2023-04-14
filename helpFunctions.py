@@ -47,6 +47,8 @@ def get_string_representation_of_kernel(kernel_expression):
         return "LIN"
     elif kernel_expression._get_name() == "PeriodicKernel":
         return "PER"
+    elif kernel_expression._get_name() == "MaternKernel":
+        return "MAT"
     else:
         return kernel_expression._get_name()
 
