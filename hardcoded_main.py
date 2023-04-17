@@ -109,6 +109,62 @@ def load_config(config_file):
 
     return var_dict
 
+def log_prior(model, theta_mu, sigma):
+    # params - 
+    # TODO de-spaghettize this once the priors are coded properly
+    prior_dict = {"SE": {"raw_lengthscale": {"mean": 0.891, "std": 2.195}},
+                  "PER": {"raw_lengthscale": {"mean": 0.338, "std": 2.636}, 
+                          "raw_period_length": {"mean": 0.284, "std": 0.902}},
+                  "LIN": {"raw_variance": {"mean": -1.463, "std": 1.633}},
+                  "c": {"raw_outputscale": {"mean": -2.163, "std": 2.448}},
+                  "noise": {"raw_noise": {"mean": -1.792, "std": 3.266}}}
+
+    variances_list = list()
+    debug_param_name_list = list()
+    params = list()
+    if variances_list == [] and theta_mu == []:
+        covar_string = gsr(model.covar_module)
+        covar_string = covar_string.replace("(", "")
+        covar_string = covar_string.replace(")", "")
+        covar_string = covar_string.replace(" ", "")
+        covar_string = covar_string.replace("PER", "PER+PER")
+        covar_string_list = [s.split("*") for s in covar_string.split("+")]
+        covar_string_list.insert(0, ["LIKELIHOOD"])
+        covar_string_list = list(chain.from_iterable(covar_string_list))
+        both_PER_params = False
+        for (param_name, param), cov_str in zip(model.named_parameters(), covar_string_list):
+            params.append(param)
+            debug_param_name_list.append(param_name)
+            # First param is (always?) noise and is always with the likelihood
+            if "likelihood" in param_name:
+                theta_mu.append(prior_dict["noise"]["raw_noise"]["mean"])
+                variances_list.append(prior_dict["noise"]["raw_noise"]["std"])
+                continue
+            else:
+                if cov_str == "PER" and not both_PER_params:
+                    theta_mu.append(prior_dict[cov_str][param_name.split(".")[-1]]["mean"])
+                    variances_list.append(prior_dict[cov_str][param_name.split(".")[-1]]["std"])
+                    both_PER_params = True
+                elif cov_str == "PER" and both_PER_params:
+                    theta_mu.append(prior_dict[cov_str][param_name.split(".")[-1]]["mean"])
+                    variances_list.append(prior_dict[cov_str][param_name.split(".")[-1]]["std"])
+                    both_PER_params = False
+                else:
+                    try:
+                        theta_mu.append(prior_dict[cov_str][param_name.split(".")[-1]]["mean"])
+                        variances_list.append(prior_dict[cov_str][param_name.split(".")[-1]]["std"])
+                    except:
+                        import pdb
+                        pdb.set_trace()
+            prev_cov = cov_str
+
+    theta_mu = torch.tensor(theta_mu)
+    theta_mu = theta_mu.unsqueeze(0).t()
+    sigma = torch.diag(torch.Tensor(variances_list))
+
+    prior = torch.distributions.MultivariateNormal(theta_mu, sigma)
+
+    return prior.log_prob(params)
 
 def optimize_hyperparameters(model, likelihood, train_iterations, X, Y, with_BFGS=False, MAP=False, prior=None):
     """
@@ -214,7 +270,8 @@ def run_experiment(config):
     Returns nothing
 
     """
-    metrics = ["AIC", "Laplace", "MLL", "MC", "Laplace_prior"]
+    #metrics = ["AIC", "Laplace", "MLL", "MC", "Laplace_prior"]
+    metrics = ["Laplace_prior"]
     eval_START = -5
     eval_END = 5
     eval_COUNT = 100
