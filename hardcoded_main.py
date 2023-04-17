@@ -121,50 +121,50 @@ def log_prior(model, theta_mu=None, sigma=None):
 
     variances_list = list()
     debug_param_name_list = list()
+    theta_mu = list()
     params = list()
-    if variances_list == [] and theta_mu == []:
-        covar_string = gsr(model.covar_module)
-        covar_string = covar_string.replace("(", "")
-        covar_string = covar_string.replace(")", "")
-        covar_string = covar_string.replace(" ", "")
-        covar_string = covar_string.replace("PER", "PER+PER")
-        covar_string_list = [s.split("*") for s in covar_string.split("+")]
-        covar_string_list.insert(0, ["LIKELIHOOD"])
-        covar_string_list = list(chain.from_iterable(covar_string_list))
-        both_PER_params = False
-        for (param_name, param), cov_str in zip(model.named_parameters(), covar_string_list):
-            params.append(param)
-            debug_param_name_list.append(param_name)
-            # First param is (always?) noise and is always with the likelihood
-            if "likelihood" in param_name:
-                theta_mu.append(prior_dict["noise"]["raw_noise"]["mean"])
-                variances_list.append(prior_dict["noise"]["raw_noise"]["std"])
-                continue
+    covar_string = gsr(model.covar_module)
+    covar_string = covar_string.replace("(", "")
+    covar_string = covar_string.replace(")", "")
+    covar_string = covar_string.replace(" ", "")
+    covar_string = covar_string.replace("PER", "PER+PER")
+    covar_string_list = [s.split("*") for s in covar_string.split("+")]
+    covar_string_list.insert(0, ["LIKELIHOOD"])
+    covar_string_list = list(chain.from_iterable(covar_string_list))
+    both_PER_params = False
+    for (param_name, param), cov_str in zip(model.named_parameters(), covar_string_list):
+        params.append(param[0].detach())
+        debug_param_name_list.append(param_name)
+        # First param is (always?) noise and is always with the likelihood
+        if "likelihood" in param_name:
+            theta_mu.append(prior_dict["noise"]["raw_noise"]["mean"])
+            variances_list.append(prior_dict["noise"]["raw_noise"]["std"])
+            continue
+        else:
+            if cov_str == "PER" and not both_PER_params:
+                theta_mu.append(prior_dict[cov_str][param_name.split(".")[-1]]["mean"])
+                variances_list.append(prior_dict[cov_str][param_name.split(".")[-1]]["std"])
+                both_PER_params = True
+            elif cov_str == "PER" and both_PER_params:
+                theta_mu.append(prior_dict[cov_str][param_name.split(".")[-1]]["mean"])
+                variances_list.append(prior_dict[cov_str][param_name.split(".")[-1]]["std"])
+                both_PER_params = False
             else:
-                if cov_str == "PER" and not both_PER_params:
+                try:
                     theta_mu.append(prior_dict[cov_str][param_name.split(".")[-1]]["mean"])
                     variances_list.append(prior_dict[cov_str][param_name.split(".")[-1]]["std"])
-                    both_PER_params = True
-                elif cov_str == "PER" and both_PER_params:
-                    theta_mu.append(prior_dict[cov_str][param_name.split(".")[-1]]["mean"])
-                    variances_list.append(prior_dict[cov_str][param_name.split(".")[-1]]["std"])
-                    both_PER_params = False
-                else:
-                    try:
-                        theta_mu.append(prior_dict[cov_str][param_name.split(".")[-1]]["mean"])
-                        variances_list.append(prior_dict[cov_str][param_name.split(".")[-1]]["std"])
-                    except:
-                        import pdb
-                        pdb.set_trace()
-            prev_cov = cov_str
+                except:
+                    import pdb
+                    pdb.set_trace()
+        prev_cov = cov_str
 
     theta_mu = torch.tensor(theta_mu)
     theta_mu = theta_mu.unsqueeze(0).t()
     sigma = torch.diag(torch.Tensor(variances_list))
 
-    prior = torch.distributions.MultivariateNormal(theta_mu, sigma)
+    prior = torch.distributions.MultivariateNormal(theta_mu.t(), sigma)
 
-    return prior.log_prob(params)
+    return prior.log_prob(torch.Tensor(params))[0]
 
 def optimize_hyperparameters(model, likelihood, train_iterations, X, Y, with_BFGS=False, MAP=False, prior=None):
     """
@@ -195,7 +195,8 @@ def optimize_hyperparameters(model, likelihood, train_iterations, X, Y, with_BFG
             # Calc loss and backprop gradients
             loss = -mll(output, Y)
             if MAP:
-                loss += log_prior(model)
+                log_p = log_prior(model)
+                loss += log_p 
             loss.backward()
             optimizer.step()
 
@@ -211,6 +212,9 @@ def optimize_hyperparameters(model, likelihood, train_iterations, X, Y, with_BFG
                 LBFGS_optimizer.zero_grad()
                 output = model(X)
                 loss = -mll(output, Y)
+                if MAP:
+                    log_p = log_prior(model)
+                    loss += log_p 
                 LBFGS_optimizer.zero_grad()
                 loss.backward()
                 return loss
@@ -222,6 +226,9 @@ def optimize_hyperparameters(model, likelihood, train_iterations, X, Y, with_BFG
         output = model(X)
         # Calc loss and backprop gradients
         loss = -mll(output, Y)
+        if MAP:
+            log_p = log_prior(model)
+            loss += log_p 
 
 #        model.train_model(with_BFGS=with_BFGS)
         current_loss = loss
@@ -231,19 +238,14 @@ def optimize_hyperparameters(model, likelihood, train_iterations, X, Y, with_BFG
             best_loss = current_loss
             for param_name, param in model.named_parameters():
                 optimal_parameters[param_name] = copy.deepcopy(param)
-        parameter_prior_dict = {"RBFKernel": {"lengthscale" : {"mean": 1.607, "std":1.650}},
-                              "PeriodicKernel":{"lengthscale": {"mean": 1.473, "std":1.582}, "period_length":{"mean": 0.920, "std":0.690}},
-                              "LinearKernel":{"variance" : {"mean":0.374, "std":0.309}},
-                              "ScaleKernel":{"outputscale": {"mean":0.427, "std":0.754}},
-                              "Noise": {"noise": {"mean":0.531, "std":0.384}}}
+        
         # set new random inital values
-        model.likelihood.noise_covar.noise = torch.distributions.Normal(parameter_prior_dict["Noise"]["noise"]["mean"],
-                                                                        parameter_prior_dict["Noise"]["noise"]["std"]).sample()
+        model.likelihood.noise_covar.noise = torch.rand(1) * (limits["Noise"][1] - limits["Noise"][0]) + limits["Noise"][0]
         #self.mean_module.constant = torch.rand(1) * (limits["Mean"][1] - limits["Mean"][0]) + limits["Mean"][0]
         for kernel in get_kernels_in_kernel_expression(model.covar_module):
-            hypers = parameter_prior_dict[kernel._get_name()]
+            hypers = limits[kernel._get_name()]
             for hyperparameter in hypers:
-                new_value = torch.distributions.Normal(hypers[hyperparameter]["mean"], hypers[hyperparameter]["std"]).sample()
+                new_value = torch.rand(1) * (hypers[hyperparameter][1] - hypers[hyperparameter][0]) + hypers[hyperparameter][0]
                 setattr(kernel, hyperparameter, new_value)
 
         # print output if enabled
@@ -255,6 +257,9 @@ def optimize_hyperparameters(model, likelihood, train_iterations, X, Y, with_BFG
     output = model(X)
     mll = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood, model)
     loss = -mll(output, Y)
+    if MAP:
+        log_p = log_prior(model)
+        loss += log_p 
     if not loss == best_loss:
         import pdb
         pdb.set_trace()
@@ -330,27 +335,28 @@ def run_experiment(config):
                          ]
 
         for model_kernel in model_kernels:
-            loss = np.nan
-            print("\n###############")
-            print(model_kernel)
-            print("###############\n")
-            # Initialize the model
-            likelihood = gpytorch.likelihoods.GaussianLikelihood()
-            # list_of_variances = [float(variance_list_variance) for i in range(28)]
-            model = None
-            model = ExactGPModel(
-                observations_x, observations_y, likelihood, model_kernel)
-            for i in range(100000):
-                try:
-                    loss = optimize_hyperparameters(model, likelihood, train_iterations, observations_x, observations_y, use_BFGS)
-                    break
-                except:
-                    model = None
-                    model = ExactGPModel(
-                        observations_x, observations_y, likelihood, model_kernel)
-                    continue
-            if loss is np.nan:
-                raise ValueError("training fucked up")
+            if any([m in metrics for m in ["Laplace", "MLL", "AIC"]]):
+                loss = np.nan
+                print("\n###############")
+                print(model_kernel)
+                print("###############\n")
+                # Initialize the model
+                likelihood = gpytorch.likelihoods.GaussianLikelihood()
+                # list_of_variances = [float(variance_list_variance) for i in range(28)]
+                model = None
+                model = ExactGPModel(
+                    observations_x, observations_y, likelihood, model_kernel)
+                for i in range(100000):
+                    try:
+                        loss = optimize_hyperparameters(model, likelihood, train_iterations, observations_x, observations_y, use_BFGS)
+                        break
+                    except:
+                        model = None
+                        model = ExactGPModel(
+                            observations_x, observations_y, likelihood, model_kernel)
+                        continue
+                if loss is np.nan:
+                    raise ValueError("training fucked up")
             # model.eval()
             # likelihood.eval()
             # with torch.no_grad(), gpytorch.settings.prior_mode(True):
@@ -412,14 +418,15 @@ def run_experiment(config):
                 model = ExactGPModel(
                     observations_x, observations_y, likelihood, model_kernel)
                 for i in range(100000):
-                    try:
-                        loss = optimize_hyperparameters(model, likelihood, train_iterations, observations_x, observations_y, use_BFGS)
-                        break
-                    except:
-                        model = None
-                        model = ExactGPModel(
-                            observations_x, observations_y, likelihood, model_kernel)
-                        continue
+                    #try:
+                    loss = optimize_hyperparameters(model, likelihood, train_iterations, observations_x, observations_y, use_BFGS, MAP=True)
+                    #    break
+                    #except Exception as E:
+                    #    print(E)
+                    #    model = None
+                    #    model = ExactGPModel(
+                    #        observations_x, observations_y, likelihood, model_kernel)
+                    #    continue
                 if loss is np.nan:
                     raise ValueError("training fucked up")
 
