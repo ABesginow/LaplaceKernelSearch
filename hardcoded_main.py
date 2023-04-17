@@ -133,7 +133,7 @@ def log_prior(model, theta_mu=None, sigma=None):
     covar_string_list = list(chain.from_iterable(covar_string_list))
     both_PER_params = False
     for (param_name, param), cov_str in zip(model.named_parameters(), covar_string_list):
-        params.append(param[0].detach())
+        params.append(param.item())
         debug_param_name_list.append(param_name)
         # First param is (always?) noise and is always with the likelihood
         if "likelihood" in param_name:
@@ -164,7 +164,8 @@ def log_prior(model, theta_mu=None, sigma=None):
 
     prior = torch.distributions.MultivariateNormal(theta_mu.t(), sigma)
 
-    return prior.log_prob(torch.Tensor(params))[0]
+    # for convention reasons I'm diving by the number of datapoints
+    return prior.log_prob(torch.Tensor(params)).item() / len(*model.train_inputs)
 
 def optimize_hyperparameters(model, likelihood, train_iterations, X, Y, with_BFGS=False, MAP=False, prior=None):
     """
@@ -196,7 +197,7 @@ def optimize_hyperparameters(model, likelihood, train_iterations, X, Y, with_BFG
             loss = -mll(output, Y)
             if MAP:
                 log_p = log_prior(model)
-                loss += log_p 
+                loss -= log_p 
             loss.backward()
             optimizer.step()
 
@@ -214,7 +215,7 @@ def optimize_hyperparameters(model, likelihood, train_iterations, X, Y, with_BFG
                 loss = -mll(output, Y)
                 if MAP:
                     log_p = log_prior(model)
-                    loss += log_p 
+                    loss -= log_p 
                 LBFGS_optimizer.zero_grad()
                 loss.backward()
                 return loss
@@ -228,7 +229,7 @@ def optimize_hyperparameters(model, likelihood, train_iterations, X, Y, with_BFG
         loss = -mll(output, Y)
         if MAP:
             log_p = log_prior(model)
-            loss += log_p 
+            loss -= log_p 
 
 #        model.train_model(with_BFGS=with_BFGS)
         current_loss = loss
@@ -259,7 +260,7 @@ def optimize_hyperparameters(model, likelihood, train_iterations, X, Y, with_BFG
     loss = -mll(output, Y)
     if MAP:
         log_p = log_prior(model)
-        loss += log_p 
+        loss -= log_p 
     if not loss == best_loss:
         import pdb
         pdb.set_trace()
@@ -417,20 +418,23 @@ def run_experiment(config):
                 model = None
                 model = ExactGPModel(
                     observations_x, observations_y, likelihood, model_kernel)
-                for i in range(100000):
-                    #try:
-                    loss = optimize_hyperparameters(model, likelihood, train_iterations, observations_x, observations_y, use_BFGS, MAP=True)
-                    #    break
-                    #except Exception as E:
-                    #    print(E)
-                    #    model = None
-                    #    model = ExactGPModel(
-                    #        observations_x, observations_y, likelihood, model_kernel)
-                    #    continue
+                for i in range(1000):
+                    try:
+                        loss = optimize_hyperparameters(model, likelihood, train_iterations, observations_x, observations_y, use_BFGS, MAP=True)
+                        break
+                    except Exception as E:
+                        model = None
+                        model = ExactGPModel(
+                            observations_x, observations_y, likelihood, model_kernel)
+                        continue
                 if loss is np.nan:
                     raise ValueError("training fucked up")
 
-
+                approx, Lapp_prior_log = calculate_laplace(model, (-loss)*len(*model.train_inputs), with_prior=True)
+                Lap_prior_logs = dict()
+                Lap_prior_logs["loss"] = approx 
+                Lap_prior_logs["details"] = Lapp_prior_log
+                logables["Laplace_prior"][model_kernel] = Lap_prior_logs
 
 
 

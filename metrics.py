@@ -187,7 +187,22 @@ def calculate_laplace(model, loss_of_model, variances_list=None, with_prior=Fals
         end = time.time()
         approximation_time = end - start
 
-        total_time = end - total_start
+        print(f"mll - 1/2 log sigma - 1/2 log sigma H + matmuls\n{mll} - {(1/2)*torch.log(sigma.det())} - {(1/2)*torch.log((sigma.inverse()-hessian).det())} + {(1/2) * matmuls}")
+        D = torch.diag(constructed_eigvals_log)
+        sigma_h = T@(sigma.inverse())@T.t() 
+        print(f"logdet sigma H; matmul\n {0.5*torch.log(torch.linalg.det(sigma_h - D))} ; {0.5*(thetas_added.t()@T.t())@sigma_h@((sigma_h - D).inverse())@D@(T@thetas_added)}")
+
+        if any(torch.diag(constructed_eigvals) > 0):
+            print("Something went horribly wrong with the c(i)s")
+            import pdb
+            pdb.set_trace()
+            print(constructed_eigvals)
+        elif matmuls > 0:
+            print("matmuls positive!!")
+            import pdb
+            pdb.set_trace()
+            print(matmuls)
+        #laplace = mll - (1/2)*torch.log(sigma.det()) - (1/2)*torch.log( (sigma.inverse()-hessian).det() )  + (1/2) * matmuls
 
         #oldLaplace = mll - (1/2)*torch.log(sigma.det()) - (1/2)*torch.log( (sigma.inverse()-oldHessian).det() )  + (1/2) * thetas_added_transposed @ sigma.inverse() @ (sigma.inverse()-oldHessian).inverse() @ oldHessian @ thetas_added
         #print(f"theta_s: {thetas_added_transposed}")
@@ -202,23 +217,10 @@ def calculate_laplace(model, loss_of_model, variances_list=None, with_prior=Fals
         #print(f"Corrected eig(H):{torch.linalg.eig(hessian)}")
         #print(f"Old  eig(H):{torch.linalg.eig(oldHessian)}")
         #print(f"Symmetry error: {hessian - hessian.t()}")
-        if any(torch.diag(constructed_eigvals) > 0):
-            print("Something went horribly wrong with the c(i)s")
-            import pdb
-            pdb.set_trace()
-            print(constructed_eigvals)
-        elif matmuls > 0:
-            print("matmuls positive!!")
-            import pdb
-            pdb.set_trace()
-            print(matmuls)
+    
 
-        print(f"mll - 1/2 log sigma - 1/2 log sigma H + matmuls\n{mll} - {(1/2)*torch.log(sigma.det())} - {(1/2)*torch.log((sigma.inverse()-hessian).det())} + {(1/2) * matmuls}")
-        D = torch.diag(constructed_eigvals_log)
-        sigma_h = T@(sigma.inverse())@T.t() 
-        print(f"logdet sigma H; matmul\n {0.5*torch.log(torch.linalg.det(sigma_h - D))} ; {0.5*(thetas_added.t()@T.t())@sigma_h@((sigma_h - D).inverse())@D@(T@thetas_added)}")
-        #laplace = mll - (1/2)*torch.log(sigma.det()) - (1/2)*torch.log( (sigma.inverse()-hessian).det() )  + (1/2) * matmuls
 
+    total_time = end - total_start
     # Everything worth logging
     logables["MLL"] = mll
     logables["parameter list"] = debug_param_name_list
