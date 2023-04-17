@@ -22,6 +22,15 @@ def calculate_AIC(loss, num_params):
     return -2*num_params + 2*loss, logables
 
 
+def Eigenvalue_correction_prior(hessian):
+    vals, vecs = torch.linalg.eigh(hessian)
+    k = len(vals)
+    constructed_eigvals = torch.diag(torch.Tensor(
+        [min(val, 1/((6.283)**k)) for i, val in enumerate(vals)]))
+    corrected_hessian = vecs@constructed_eigvals@vecs.t()
+    return corrected_hessian, torch.diag(constructed_eigvals)
+        
+
 def Eigenvalue_correction(hessian, theta_mu, params, sigma, param_punish_term):
     vals, vecs = torch.linalg.eigh(hessian)
     #vecs = vecs.real
@@ -53,27 +62,26 @@ def Eigenvalue_correction(hessian, theta_mu, params, sigma, param_punish_term):
         print(constructed_eigvals)
     return corrected_hessian, torch.diag(constructed_eigvals)
 
- 
 
 def calculate_laplace(model, loss_of_model, variances_list=None, with_prior=False, param_punish_term = 2.0):
     torch.set_default_tensor_type(torch.DoubleTensor)
     """
-        with_prior - Decides whether the version of the Laplace approx WITH the
-                     prior is used or the one where the prior is not part of
-                     the approx.
+        with_prior    - Decides whether the version of the Laplace approx WITH the
+                        prior is used or the one where the prior is not part of
+                        the approx.
+        loss_of_model - The positive optimal log likelihood from PyTorch 
     """
     logables = {}
     total_start = time.time()
-    num_of_observations = len(*model.train_inputs)
     # Save a list of model parameters and compute the Hessian of the MLL
     params_list = [p for p in model.parameters()]
     # This is now the positive MLL
-    mll         = (num_of_observations * (-loss_of_model))
+    mll = loss_of_model
     # This is NEGATIVE MLL
-    #mll         = (num_of_observations * (loss_of_model))
+    #mll = (num_of_observations * (loss_of_model))
     start = time.time()
     try:
-        env_grads   = torch.autograd.grad(mll, params_list, retain_graph=True, create_graph=True)
+        env_grads = torch.autograd.grad(mll, params_list, retain_graph=True, create_graph=True)
     except:
         import pdb
         pdb.set_trace()
@@ -144,19 +152,23 @@ def calculate_laplace(model, loss_of_model, variances_list=None, with_prior=Fals
     end = time.time()
     prior_generation_time = end - start
 
+    hessian = torch.tensor(hess_params).clone()
+    hessian = (hessian + hessian.t()) / 2
+    hessian = hessian.to(torch.float64)
+
+    _, T = torch.linalg.eigh(hessian)
+    oldHessian = hessian.clone()
     if with_prior:
-        #This is the original
-        raise NotImplementedError("Not yet done")
-        laplace = mll - (1/2)*torch.log(sigma.det()) - (1/2)*(params-theta_mu).t()@sigma.inverse()@(params-theta_mu) - (1/2)*torch.log((-hessian).det())
+        # it says mll, but it's actually the MAP here
+        start = time.time()
+        hessian, constructed_eigvals_log = Eigenvalue_correction_prior(hessian)
+        end = time.time()
+        hessian_correction_time = end - start
+        laplace = mll + 0.5*torch.log((6.283)**len(theta_mu)*torch.det(hessian))
+        end = time.time()
+        approximation_time = end - start
+
     else:
-
-        hessian = torch.tensor(hess_params).clone()
-        hessian = (hessian + hessian.t()) / 2
-        hessian = hessian.to(torch.float64)
-
-        _, T = torch.linalg.eigh(hessian)
-        oldHessian = hessian.clone()
-
         # Hessian correcting part (for Eigenvalues < 0 < c(i)  )
         start = time.time()
         hessian, constructed_eigvals_log = Eigenvalue_correction(
@@ -206,8 +218,6 @@ def calculate_laplace(model, loss_of_model, variances_list=None, with_prior=Fals
         sigma_h = T@(sigma.inverse())@T.t() 
         print(f"logdet sigma H; matmul\n {0.5*torch.log(torch.linalg.det(sigma_h - D))} ; {0.5*(thetas_added.t()@T.t())@sigma_h@((sigma_h - D).inverse())@D@(T@thetas_added)}")
         #laplace = mll - (1/2)*torch.log(sigma.det()) - (1/2)*torch.log( (sigma.inverse()-hessian).det() )  + (1/2) * matmuls
-
-
 
     # Everything worth logging
     logables["MLL"] = mll

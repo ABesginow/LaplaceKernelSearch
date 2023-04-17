@@ -125,9 +125,19 @@ def CKS(X, Y, likelihood, base_kernels, list_of_variances=None,  experiment=None
         for t in threads:
             t.join()
         for k in candidates:
+            if metric == "Laplace_prior":
+                try:
+                    performance[gsr(k)], logs = calculate_laplace(models[gsr(k)], (-models[gsr(k)].get_current_loss())*len(
+                        *models[gsr(k)].train_inputs), with_prior=True, param_punish_term=param_punish_term)
+                    logs["iteration"] = i
+                    logs["Train time"] = train_end - train_start
+                    logables.append(logs)
+                except:
+                    performance[gsr(k)] = np.NINF
             if metric == "Laplace":
                 try:
-                    performance[gsr(k)], logs = calculate_laplace(models[gsr(k)], models[gsr(k)].get_current_loss(), with_prior=False, param_punish_term = param_punish_term)
+                    performance[gsr(k)], logs = calculate_laplace(models[gsr(k)], (-models[gsr(k)].get_current_loss())*len(
+                        *models[gsr(k)].train_inputs), with_prior=False, param_punish_term=param_punish_term)
                     logs["iteration"] = i
                     logs["Train time"] = train_end - train_start
                     logables.append(logs)

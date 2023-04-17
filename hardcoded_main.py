@@ -315,7 +315,7 @@ def run_experiment(config):
 
             if "Laplace" in metrics:
                 laplace_approx, LApp_log = calculate_laplace(
-                    model, loss, param_punish_term=parameter_punishment)
+                    model, (-loss)*len(*model.train_inputs), param_punish_term=parameter_punishment)
                 Laplace_logs = dict()
                 Laplace_logs["parameter_punishment"] = parameter_punishment
                 Laplace_logs["loss"] = laplace_approx
