@@ -109,7 +109,7 @@ def load_config(config_file):
 
     return var_dict
 
-def log_prior(model, theta_mu, sigma):
+def log_prior(model, theta_mu=None, sigma=None):
     # params - 
     # TODO de-spaghettize this once the priors are coded properly
     prior_dict = {"SE": {"raw_lengthscale": {"mean": 0.891, "std": 2.195}},
@@ -183,7 +183,7 @@ def optimize_hyperparameters(model, likelihood, train_iterations, X, Y, with_BFG
         model.train()
         likelihood.train()
 
-        optimizer = torch.optim.Adam(model.parameters(), lr=0.05)
+        optimizer = torch.optim.Adam(model.parameters(), lr=0.1)
 
         mll = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood, model)
 
@@ -195,7 +195,7 @@ def optimize_hyperparameters(model, likelihood, train_iterations, X, Y, with_BFG
             # Calc loss and backprop gradients
             loss = -mll(output, Y)
             if MAP:
-                loss += prior(Y)
+                loss += log_prior(model)
             loss.backward()
             optimizer.step()
 
