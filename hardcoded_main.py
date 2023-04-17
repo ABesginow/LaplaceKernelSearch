@@ -110,7 +110,7 @@ def load_config(config_file):
     return var_dict
 
 
-def optimize_hyperparameters(model, likelihood, train_iterations, X, Y, with_BFGS=False):
+def optimize_hyperparameters(model, likelihood, train_iterations, X, Y, with_BFGS=False, MAP=False, prior=None):
     """
     find optimal hyperparameters either by BO or by starting from random initial values multiple times, using an optimizer every time
     and then returning the best result
@@ -138,6 +138,8 @@ def optimize_hyperparameters(model, likelihood, train_iterations, X, Y, with_BFG
             output = model(X)
             # Calc loss and backprop gradients
             loss = -mll(output, Y)
+            if MAP:
+                loss += prior(Y)
             loss.backward()
             optimizer.step()
 
@@ -212,8 +214,7 @@ def run_experiment(config):
     Returns nothing
 
     """
-    metrics = ["AIC", "Laplace", "MLL", "MC"]
-    #metrics = ["Laplace"]
+    metrics = ["AIC", "Laplace", "MLL", "MC", "Laplace_prior"]
     eval_START = -5
     eval_END = 5
     eval_COUNT = 100
@@ -264,53 +265,18 @@ def run_experiment(config):
 
     EXPERIMENT_REPITITIONS = 1
     for exp_num in range(EXPERIMENT_REPITITIONS):
-<<<<<<< HEAD
         model_kernels = ["SIN*RBF", "C*C*RBF",
-            "C*RBF",
-            "C*SIN + C*SIN + C*SIN",
-            "C*SIN + C*SIN",
-            "C*SIN"
-        ]
-||||||| 10d14ae
-        model_kernels = ["4C*SIN"]
-        """
-        ["SIN*RBF", "C*C*RBF",
-        "C*RBF",
-        "4C*SIN",
-        "C*SIN + C*SIN + C*SIN",
-        "C*SIN + C*SIN",
-        "C*SIN"
-        ]
-        """
-=======
-        
-        #model_kernels = ["4C*SIN"]
-        model_kernels = [
-        "C*RBF",
-        "C*C*RBF"]
-        #model_kernels = ["SIN*RBF", 
-        #"C*RBF",
-        #"C*C*RBF",
-        #"C*SIN",
-        #"C*SIN + C*SIN",
-        #"C*SIN + C*SIN + C*SIN",
-        #"4C*SIN"
-        #]
-
->>>>>>> 44ae9a57b8f90bb518b6a9c8296629ebad499302
+                         "C*RBF",
+                         "C*SIN + C*SIN + C*SIN",
+                         "C*SIN + C*SIN",
+                         "C*SIN"
+                         ]
 
         for model_kernel in model_kernels:
-<<<<<<< HEAD
             loss = np.nan
             print("\n###############")
             print(model_kernel)
             print("###############\n")
-||||||| 10d14ae
-            print("\n###############")
-            print(model_kernel)
-            print("###############\n")
-=======
->>>>>>> 44ae9a57b8f90bb518b6a9c8296629ebad499302
             # Initialize the model
             likelihood = gpytorch.likelihoods.GaussianLikelihood()
             # list_of_variances = [float(variance_list_variance) for i in range(28)]
@@ -374,8 +340,41 @@ def run_experiment(config):
                 AIC_logs["parameter_punishment"] = parameter_punishment
                 logables["AIC"][model_kernel] = AIC_logs
 
+
+
+            # Laplace approximation including prior requires different loss
+            if "Laplace_prior" in metrics:
+                loss = np.nan
+                print("\n###############")
+                print(model_kernel)
+                print("###############\n")
+                # Initialize the model
+                likelihood = gpytorch.likelihoods.GaussianLikelihood()
+                # list_of_variances = [float(variance_list_variance) for i in range(28)]
+                model = None
+                model = ExactGPModel(
+                    observations_x, observations_y, likelihood, model_kernel)
+                for i in range(100000):
+                    try:
+                        loss = optimize_hyperparameters(model, likelihood, train_iterations, observations_x, observations_y, use_BFGS)
+                        break
+                    except:
+                        model = None
+                        model = ExactGPModel(
+                            observations_x, observations_y, likelihood, model_kernel)
+                        continue
+                if loss is np.nan:
+                    raise ValueError("training fucked up")
+
+
+
+
+
+
+
+
             # Perform MCMC
-            if "MC" in metrics:
+            if "MC" in metrics and "MLL" in metrics:
                 MCMC_approx, MC_log = calculate_mc_STAN(
                     model, likelihood, num_draws)
                 MC_logs = dict()
@@ -383,26 +382,11 @@ def run_experiment(config):
                 MC_logs["num_draws"] = num_draws
                 MC_logs["details"] = MC_log
                 logables["MC"][model_kernel] = MC_logs
-<<<<<<< HEAD
-        if "MC" in metrics and "MLL" in metrics:
-            if MCMC_approx > MLL_logs["loss"]:
-                import pdb
-                #pdb.set_trace()
-                print("MCMC is higher than MLL, again")
-||||||| 10d14ae
-
-=======
-
-            print("\n###############")
-            print(model_kernel)
-            print("###############\n")
-            print("------\n")
->>>>>>> 44ae9a57b8f90bb518b6a9c8296629ebad499302
-        experiment_path = os.path.join("results", "hardcoded", config)
-        if not os.path.exists(experiment_path):
-            os.makedirs(experiment_path)
-        with open(os.path.join(experiment_path, f"rest.pickle"), 'wb') as fh:
-            pickle.dump(logables, fh)
+    experiment_path = os.path.join("results", "hardcoded", config)
+    if not os.path.exists(experiment_path):
+        os.makedirs(experiment_path)
+    with open(os.path.join(experiment_path, f"rest.pickle"), 'wb') as fh:
+        pickle.dump(logables, fh)
 
     return 0
 

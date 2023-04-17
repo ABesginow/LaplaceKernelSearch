@@ -53,7 +53,7 @@ def Eigenvalue_correction(hessian, theta_mu, params, sigma, param_punish_term):
         print(constructed_eigvals)
     return corrected_hessian, torch.diag(constructed_eigvals)
 
-         
+ 
 
 def calculate_laplace(model, loss_of_model, variances_list=None, with_prior=False, param_punish_term = 2.0):
     torch.set_default_tensor_type(torch.DoubleTensor)
