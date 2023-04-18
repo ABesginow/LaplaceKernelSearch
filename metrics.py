@@ -147,7 +147,7 @@ def calculate_laplace(model, loss_of_model, variances_list=None, with_prior=Fals
 
     # sigma is a matrix of variance priors
     sigma = torch.diag(torch.Tensor(variances_list))
-    params = torch.tensor(params_list).clone().reshape(-1,1)
+    params = torch.tensor(params_list).clone().reshape(-1, 1)
 
     end = time.time()
     prior_generation_time = end - start
@@ -161,13 +161,18 @@ def calculate_laplace(model, loss_of_model, variances_list=None, with_prior=Fals
     if with_prior:
         # it says mll, but it's actually the MAP here
         start = time.time()
-        hessian, constructed_eigvals_log = Eigenvalue_correction_prior(hessian)
+        hessian, constructed_eigvals_log = Eigenvalue_correction_prior(-hessian)
         end = time.time()
         hessian_correction_time = end - start
-        laplace = mll + 0.5*torch.log((6.283)**len(theta_mu)*torch.det(hessian))
+        laplace = mll + 0.5*torch.log((6.283)**len(theta_mu)*torch.det(-hessian))
         end = time.time()
         approximation_time = end - start
 
+        if any(constructed_eigvals_log < 0):
+            print("Something went horribly wrong with the c(i)s")
+            import pdb
+            pdb.set_trace()
+            print(constructed_eigvals)
     else:
         # Hessian correcting part (for Eigenvalues < 0 < c(i)  )
         start = time.time()
@@ -183,6 +188,7 @@ def calculate_laplace(model, loss_of_model, variances_list=None, with_prior=Fals
         middle_term = (sigma.inverse()-hessian).inverse()
         matmuls = thetas_added_transposed @ sigma.inverse() @ middle_term @ hessian @ thetas_added
 
+        # This can probably also be "-0.5 matmuls" where "matmuls" is based on the negative MLL
         laplace = mll - (1/2)*torch.log(sigma.det()) - (1/2)*torch.log((sigma.inverse()-hessian).det()) + (1/2) * matmuls
         end = time.time()
         approximation_time = end - start
