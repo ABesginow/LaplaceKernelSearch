@@ -18,7 +18,7 @@ import pdb
 general_json = {
     'Kernel_search': ["CKS"],
     'train_data_ratio': [0.5],#50% of the eval data
-    'Data_kernel': ["SIN"],
+    'Data_kernel': ["SIN", "MAT", "SIN*RBF", "SIN+RBF", "MAT*SIN"],
     'weights': [[1., 1.]],
     'Variance_list': [4],
     'eval_START':[-10.0],
@@ -28,7 +28,7 @@ general_json = {
     'train_iterations':[200],
     'LR': [0.1],
     'Noise': [0.0],#1%, 5%, 10% of max
-    'Data_scaling': [False],
+    'Data_scaling': [True],
     'BFGS' : [True]
 }
 

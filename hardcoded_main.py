@@ -46,13 +46,14 @@ def plot_model(model, likelihood, X, Y, return_figure=False, figure=None,
         alpha = (alpha_max-alpha_min)/amount_of_gradient_steps
         c = ax.fill_between(test_x.numpy(), lower.numpy(), upper.numpy(
         ), alpha=alpha+alpha_min, zorder=1).get_facecolor()
+
         for i in range(1, amount_of_gradient_steps):
             ax.fill_between(test_x.numpy(), (lower+(i/amount_of_gradient_steps)*(upper-lower)).numpy(),
                             (upper-(i/amount_of_gradient_steps)*(upper-lower)).numpy(), alpha=alpha, color=c, zorder=1)
         if options["plotting"]["legend"]:
             ax.plot([], [], 'k.', label="Data")
             ax.plot([], [], 'b', label="Mean")
-            ax.plot([], [], color=c, alpha=alpha_max, label="Confidence")
+            ax.plot([], [], color=c, alpha=1.0, label="Confidence")
             ax.legend(loc="upper left")
         ax.set_xlabel("Normalized Input")
         ax.set_ylabel("Normalized Output")
@@ -87,6 +88,10 @@ class ExactGPModel(gpytorch.models.ExactGP):
                 gpytorch.kernels.PeriodicKernel())
         elif kernel_text == "SIN*RBF":
             self.covar_module = gpytorch.kernels.PeriodicKernel() * gpytorch.kernels.RBFKernel()
+        elif kernel_text == "C*MAT":
+            self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.MaternKernel())
+        elif kernel_text == "MAT*SIN":
+            self.covar_module = gpytorch.kernels.MaternKernel() * gpytorch.kernels.PeriodicKernel()
 
     def forward(self, x):
         mean_x = self.mean_module(x)
@@ -112,12 +117,23 @@ def load_config(config_file):
 def log_prior(model, theta_mu=None, sigma=None):
     # params - 
     # TODO de-spaghettize this once the priors are coded properly
-    prior_dict = {"SE": {"raw_lengthscale": {"mean": 0.891, "std": 2.195}},
-                  "PER": {"raw_lengthscale": {"mean": 0.338, "std": 2.636}, 
-                          "raw_period_length": {"mean": 0.284, "std": 0.902}},
-                  "LIN": {"raw_variance": {"mean": -1.463, "std": 1.633}},
-                  "c": {"raw_outputscale": {"mean": -2.163, "std": 2.448}},
-                  "noise": {"raw_noise": {"mean": -1.792, "std": 3.266}}}
+    prior_dict = {'SE': {'raw_lengthscale' : {"mean": -0.21221139138922668 , "std":1.8895426067756804}},
+                'MAT52': {'raw_lengthscale' :{"mean": 0.7993038925994188, "std":2.145122566357853 } },
+                'MAT32': {'raw_lengthscale' :{"mean": 1.5711054238673443, "std":2.4453761235991216 } },
+                'RQ': {'raw_lengthscale' :{"mean": -0.049841950913676276, "std":1.9426354614713097 }, 
+                        'raw_alpha' :{"mean": 1.882148553921053, "std":3.096431944989054 } },
+                'PER':{'raw_lengthscale':{"mean": 0.7778461197268618, "std":2.288946656544974 },
+                        'raw_period_length':{"mean": 0.6485334993738499, "std":0.9930632050553377 } },
+                'LIN':{'raw_variance' :{"mean": -0.8017903983055685, "std":0.9966569921354465 } },
+                'C':{'raw_outputscale':{"mean": -1.6253091096349706, "std":2.2570021716661923 } },
+                'noise': {'raw_noise':{"mean": -3.51640656386717, "std":3.5831320474767407 }}}
+    #prior_dict = {"SE": {"raw_lengthscale": {"mean": 0.891, "std": 2.195}},
+    #              "MAT": {"raw_lengthscale": {"mean": 1.631, "std": 2.554}},
+    #              "PER": {"raw_lengthscale": {"mean": 0.338, "std": 2.636}, 
+    #                      "raw_period_length": {"mean": 0.284, "std": 0.902}},
+    #              "LIN": {"raw_variance": {"mean": -1.463, "std": 1.633}},
+    #              "c": {"raw_outputscale": {"mean": -2.163, "std": 2.448}},
+    #              "noise": {"raw_noise": {"mean": -1.792, "std": 3.266}}}
 
     variances_list = list()
     debug_param_name_list = list()
@@ -276,8 +292,8 @@ def run_experiment(config):
     Returns nothing
 
     """
-    #metrics = ["AIC", "Laplace", "MLL", "MC", "Laplace_prior"]
-    metrics = ["Laplace_prior"]
+    metrics = ["AIC", "Laplace", "MLL", "MC", "Laplace_prior"]
+    #metrics = ["Laplace_prior"]
     eval_START = -5
     eval_END = 5
     eval_COUNT = 100
@@ -303,11 +319,29 @@ def run_experiment(config):
     elif config == "RBF_PER":
         observations_y = torch.sin(
             observations_x * 2*np.pi) * torch.exp(0.3*observations_x)
+    elif config == "MAT_PER":
+        # Noise is basically as big as the sine, should be good for Matern
+        observations_y = torch.sin(observations_x) + torch.randn(observations_x.shape)
+
+    experiment_path = os.path.join("results", "hardcoded", config)
+    f, ax = plt.subplots()
+    ax.plot(observations_x, observations_y, 'k*')
+    #Store the plots as .png
+    f.savefig(os.path.join(experiment_path, f"DATA.png"))
+    #Store the plots as .tex
+    tikzplotlib.save(os.path.join(experiment_path, f"DATA.tex"))
 
     observations_x = (observations_x - torch.mean(observations_x)
                       ) / torch.std(observations_x)
     observations_y = (observations_y - torch.mean(observations_y)
                       ) / torch.std(observations_y)
+
+    f, ax = plt.subplots()
+    ax.plot(observations_x, observations_y, 'k*')
+    #Store the plots as .png
+    f.savefig(os.path.join(experiment_path, f"DATA_normalized.png"))
+    #Store the plots as .tex
+    tikzplotlib.save(os.path.join(experiment_path, f"DATA_normalized.tex"))
 
     logables = dict()
     # Make an "attributes" dictionary containing the settings
@@ -332,10 +366,14 @@ def run_experiment(config):
                          "C*RBF",
                          "C*SIN + C*SIN + C*SIN",
                          "C*SIN + C*SIN",
-                         "C*SIN"
+                         "C*SIN",
+                         "C*MAT",
+                         "MAT*SIN",
                          ]
 
         for model_kernel in model_kernels:
+            experiment_keyword = f"{model_kernel}_{exp_num}"
+
             if any([m in metrics for m in ["Laplace", "MLL", "AIC"]]):
                 loss = np.nan
                 print("\n###############")
@@ -358,24 +396,6 @@ def run_experiment(config):
                         continue
                 if loss is np.nan:
                     raise ValueError("training fucked up")
-            # model.eval()
-            # likelihood.eval()
-            # with torch.no_grad(), gpytorch.settings.prior_mode(True):
-            #    observed_pred_prior = likelihood(model(observations_x))
-            #    f_preds = model(observations_x)
-            #    mean_posterior = observed_pred_prior.mean
-            #    lower_posterior, upper_posterior = observed_pred_prior.confidence_region()
-
-            # mean_y = model(observations_x).mean
-
-            # f, ax = plt.subplots()
-            # f, ax = plot_model(model, likelihood, observations_x, observations_y, True, f, ax)
-            # ax.plot(observations_x, observations_y, 'k*')
-            # image_time = time.time()
-            # Store the plots as .png
-            # f.savefig(os.path.join(experiment_path, f"{experiment_keyword}_{exp_num}.png"))
-            # Store the plots as .tex
-            # tikzplotlib.save(os.path.join(experiment_path, f"{experiment_keyword}_{exp_num}.tex"))
 
             if "Laplace" in metrics:
                 laplace_approx, LApp_log = calculate_laplace(
@@ -385,6 +405,26 @@ def run_experiment(config):
                 Laplace_logs["loss"] = laplace_approx
                 Laplace_logs["details"] = LApp_log
                 logables["Laplace"][model_kernel] = Laplace_logs
+
+            if any([m in metrics for m in ["Laplace", "MLL", "AIC"]]):
+                model.eval()
+                likelihood.eval()
+                with torch.no_grad(), gpytorch.settings.prior_mode(True):
+                    observed_pred_prior = likelihood(model(observations_x))
+                    f_preds = model(observations_x)
+                    mean_posterior = observed_pred_prior.mean
+                    lower_posterior, upper_posterior = observed_pred_prior.confidence_region()
+
+                mean_y = model(observations_x).mean
+
+                f, ax = plt.subplots()
+                f, ax = plot_model(model, likelihood, observations_x, observations_y, True, f, ax)
+                ax.plot(observations_x, observations_y, 'k*')
+                image_time = time.time()
+                #Store the plots as .png
+                f.savefig(os.path.join(experiment_path, f"{experiment_keyword}_{exp_num}_MLL.png"))
+                #Store the plots as .tex
+                tikzplotlib.save(os.path.join(experiment_path, f"{experiment_keyword}_{exp_num}_MLL.tex"))
 
             if "MLL" in metrics:
                 MLL_logs = dict()
@@ -423,6 +463,7 @@ def run_experiment(config):
                         loss = optimize_hyperparameters(model, likelihood, train_iterations, observations_x, observations_y, use_BFGS, MAP=True)
                         break
                     except Exception as E:
+                        print(E)
                         model = None
                         model = ExactGPModel(
                             observations_x, observations_y, likelihood, model_kernel)
@@ -435,6 +476,25 @@ def run_experiment(config):
                 Lap_prior_logs["loss"] = approx 
                 Lap_prior_logs["details"] = Lapp_prior_log
                 logables["Laplace_prior"][model_kernel] = Lap_prior_logs
+
+                model.eval()
+                likelihood.eval()
+                with torch.no_grad(), gpytorch.settings.prior_mode(True):
+                    observed_pred_prior = likelihood(model(observations_x))
+                    f_preds = model(observations_x)
+                    mean_posterior = observed_pred_prior.mean
+                    lower_posterior, upper_posterior = observed_pred_prior.confidence_region()
+
+                mean_y = model(observations_x).mean
+
+                f, ax = plt.subplots()
+                f, ax = plot_model(model, likelihood, observations_x, observations_y, True, f, ax)
+                ax.plot(observations_x, observations_y, 'k*')
+                image_time = time.time()
+                #Store the plots as .png
+                f.savefig(os.path.join(experiment_path, f"{experiment_keyword}_{exp_num}_MAP.png"))
+                #Store the plots as .tex
+                tikzplotlib.save(os.path.join(experiment_path, f"{experiment_keyword}_{exp_num}_MAP.tex"))
 
 
 
@@ -450,6 +510,8 @@ def run_experiment(config):
                 MC_logs["num_draws"] = num_draws
                 MC_logs["details"] = MC_log
                 logables["MC"][model_kernel] = MC_logs
+    
+
     experiment_path = os.path.join("results", "hardcoded", config)
     if not os.path.exists(experiment_path):
         os.makedirs(experiment_path)
@@ -462,6 +524,6 @@ def run_experiment(config):
 with open("FINISHED.log", "r") as f:
     finished_configs = [line.strip().split("/")[-1] for line in f.readlines()]
 curdir = os.getcwd()
-keywords = ["RBF_PER"]#["3PER", "PER", "RBF_PER"]
+keywords = ["3PER", "PER", "RBF_PER", "MAT_PER"]
 for config in keywords:
     run_experiment(config)

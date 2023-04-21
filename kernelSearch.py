@@ -116,6 +116,8 @@ def CKS(X, Y, likelihood, base_kernels, list_of_variances=None,  experiment=None
                         train_start = time.time()
                         if BFGS:
                             models[gsr(k)].optimize_hyperparameters(with_Adam=False, with_BFGS=True)
+                        elif metric == "Laplace_prior":
+                            models[gsr(k)].optimize_hyperparameters(with_Adam=True, with_BFGS=True, MAP=True)
                         else:
                             models[gsr(k)].optimize_hyperparameters()
                         train_end = time.time()

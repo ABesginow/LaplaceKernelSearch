@@ -9,6 +9,75 @@ from helpFunctions import get_kernels_in_kernel_expression
 
 
 
+def log_prior(model, theta_mu=None, sigma=None):
+    # params - 
+    # TODO de-spaghettize this once the priors are coded properly
+    #prior_dict = {"SE": {"raw_lengthscale": {"mean": 0.891, "std": 2.195}},
+    #              "MAT": {"raw_lengthscale": {"mean": 1.631, "std": 2.554}},
+    #              "PER": {"raw_lengthscale": {"mean": 0.338, "std": 2.636}, 
+    #                      "raw_period_length": {"mean": 0.284, "std": 0.902}},
+    #              "LIN": {"raw_variance": {"mean": -1.463, "std": 1.633}},
+    #              "c": {"raw_outputscale": {"mean": -2.163, "std": 2.448}},
+    #              "noise": {"raw_noise": {"mean": -1.792, "std": 3.266}}}
+
+    prior_dict = {  'SE': {'raw_lengthscale': {"mean": -0.21221139138922668, "std":1.8895426067756804}},
+                    'MAT52': {'raw_lengthscale':{"mean": 0.7993038925994188, "std":2.145122566357853 } },
+                    'MAT32': {'raw_lengthscale':{"mean": 1.5711054238673443, "std":2.4453761235991216 } },
+                    'RQ': {'raw_lengthscale':{"mean": -0.049841950913676276, "std":1.9426354614713097 }, 
+                            'raw_alpha':{"mean": 1.882148553921053, "std":3.096431944989054 } },
+                    'PER':{'raw_lengthscale':{"mean": 0.7778461197268618, "std":2.288946656544974 },
+                            'raw_period_length':{"mean": 0.6485334993738499, "std":0.9930632050553377 } },
+                    'LIN':{'raw_variance':{"mean": -0.8017903983055685, "std":0.9966569921354465 } },
+                    'C':{'raw_outputscale':{"mean": -1.6253091096349706, "std":2.2570021716661923 } },
+                    'noise': {'raw_noise':{"mean": -3.51640656386717, "std":3.5831320474767407 }}}
+
+    variances_list = list()
+    debug_param_name_list = list()
+    theta_mu = list()
+    params = list()
+    covar_string = gsr(model.covar_module)
+    covar_string = covar_string.replace("(", "")
+    covar_string = covar_string.replace(")", "")
+    covar_string = covar_string.replace(" ", "")
+    covar_string = covar_string.replace("PER", "PER+PER")
+    covar_string_list = [s.split("*") for s in covar_string.split("+")]
+    covar_string_list.insert(0, ["LIKELIHOOD"])
+    covar_string_list = list(chain.from_iterable(covar_string_list))
+    both_PER_params = False
+    for (param_name, param), cov_str in zip(model.named_parameters(), covar_string_list):
+        params.append(param.item())
+        debug_param_name_list.append(param_name)
+        # First param is (always?) noise and is always with the likelihood
+        if "likelihood" in param_name:
+            theta_mu.append(prior_dict["noise"]["raw_noise"]["mean"])
+            variances_list.append(prior_dict["noise"]["raw_noise"]["std"])
+            continue
+        else:
+            if cov_str == "PER" and not both_PER_params:
+                theta_mu.append(prior_dict[cov_str][param_name.split(".")[-1]]["mean"])
+                variances_list.append(prior_dict[cov_str][param_name.split(".")[-1]]["std"])
+                both_PER_params = True
+            elif cov_str == "PER" and both_PER_params:
+                theta_mu.append(prior_dict[cov_str][param_name.split(".")[-1]]["mean"])
+                variances_list.append(prior_dict[cov_str][param_name.split(".")[-1]]["std"])
+                both_PER_params = False
+            else:
+                try:
+                    theta_mu.append(prior_dict[cov_str][param_name.split(".")[-1]]["mean"])
+                    variances_list.append(prior_dict[cov_str][param_name.split(".")[-1]]["std"])
+                except:
+                    import pdb
+                    pdb.set_trace()
+        prev_cov = cov_str
+
+    theta_mu = torch.tensor(theta_mu)
+    theta_mu = theta_mu.unsqueeze(0).t()
+    sigma = torch.diag(torch.Tensor(variances_list))
+
+    prior = torch.distributions.MultivariateNormal(theta_mu.t(), sigma)
+
+    # for convention reasons I'm diving by the number of datapoints
+    return prior.log_prob(torch.Tensor(params)).item() / len(*model.train_inputs)
 
 class ExactGPModel(gpt.models.ExactGP):
     """
@@ -33,7 +102,7 @@ class ExactGPModel(gpt.models.ExactGP):
             observed_pred = self.likelihood(self(x))
         return observed_pred.mean
 
-    def train_model(self, with_BFGS=False, with_Adam=True):
+    def train_model(self, with_BFGS=False, with_Adam=True, MAP=False):
         self.train()
         self.likelihood.train()
         optimizer = torch.optim.Adam([{"params": self.parameters()}], lr=options["training"]["learning_rate"])
@@ -44,6 +113,9 @@ class ExactGPModel(gpt.models.ExactGP):
                 optimizer.zero_grad()
                 output = self.__call__(self.train_inputs[0])
                 loss = -mll(output, self.train_targets)
+                if MAP:
+                    log_p = log_prior(self)
+                    loss -= log_p 
                 loss.backward()
                 if options["training"]["print_training_output"]:
                     parameter_string = ""
@@ -62,6 +134,9 @@ class ExactGPModel(gpt.models.ExactGP):
                 LBFGS_optimizer.zero_grad()
                 output = self.__call__(self.train_inputs[0])
                 loss = -mll(output, self.train_targets)
+                if MAP:
+                    log_p = log_prior(self)
+                    loss -= log_p 
                 LBFGS_optimizer.zero_grad()
                 loss.backward()
                 return loss
@@ -91,7 +166,7 @@ class ExactGPModel(gpt.models.ExactGP):
         output = self.__call__(X)
         return torch.exp(mll(output, Y)).item()
 
-    def optimize_hyperparameters(self, with_BFGS=False, with_Adam=True):
+    def optimize_hyperparameters(self, with_BFGS=False, with_Adam=True, MAP=False):
         """
         find optimal hyperparameters either by BO or by starting from random initial values multiple times, using an optimizer every time
         and then returning the best result
@@ -103,7 +178,7 @@ class ExactGPModel(gpt.models.ExactGP):
         # start runs
         for iteration in range(options["training"]["restarts"]+1):
             # optimize and determine loss
-            self.train_model(with_BFGS=with_BFGS, with_Adam=with_Adam)
+            self.train_model(with_BFGS=with_BFGS, with_Adam=with_Adam, MAP=MAP)
             current_loss = self.get_current_loss()
             # check if the current run is better than previous runs
             if current_loss < best_loss:

@@ -26,7 +26,7 @@ def Eigenvalue_correction_prior(hessian):
     vals, vecs = torch.linalg.eigh(hessian)
     k = len(vals)
     constructed_eigvals = torch.diag(torch.Tensor(
-        [min(val, 1/((6.283)**k)) for i, val in enumerate(vals)]))
+        [max(val, 1/(torch.exp(torch.tensor(2))*(6.283)**k)) for i, val in enumerate(vals)]))
     corrected_hessian = vecs@constructed_eigvals@vecs.t()
     return corrected_hessian, torch.diag(constructed_eigvals)
         
@@ -96,13 +96,24 @@ def calculate_laplace(model, loss_of_model, variances_list=None, with_prior=Fals
     #                          "C":{"outputscale": {"mean":0.427, "std":0.754}},
     #                          "noise": {"noise": {"mean":0.531, "std":0.384}}}
 
-    prior_dict = {"SE": {"raw_lengthscale": {"mean": 0.891, "std": 2.195}},
-                  "PER": {"raw_lengthscale": {"mean": 0.338, "std": 2.636}, 
-                          "raw_period_length": {"mean": 0.284, "std": 0.902}},
-                  "LIN": {"raw_variance": {"mean": -1.463, "std": 1.633}},
-                  "c": {"raw_outputscale": {"mean": -2.163, "std": 2.448}},
-                  "noise": {"raw_noise": {"mean": -1.792, "std": 3.266}}}
+    #prior_dict = {"SE": {"raw_lengthscale": {"mean": 0.891, "std": 2.195}},
+    #              "MAT": {"raw_lengthscale": {"mean": 1.631, "std": 2.554}},
+    #              "PER": {"raw_lengthscale": {"mean": 0.338, "std": 2.636}, 
+    #                      "raw_period_length": {"mean": 0.284, "std": 0.902}},
+    #              "LIN": {"raw_variance": {"mean": -1.463, "std": 1.633}},
+    #              "c": {"raw_outputscale": {"mean": -2.163, "std": 2.448}},
+    #              "noise": {"raw_noise": {"mean": -1.792, "std": 3.266}}}
 
+    prior_dict = {'SE': {'raw_lengthscale' : {"mean": -0.21221139138922668 , "std":1.8895426067756804}},
+                'MAT52': {'raw_lengthscale' :{"mean": 0.7993038925994188, "std":2.145122566357853 } },
+                'MAT32': {'raw_lengthscale' :{"mean": 1.5711054238673443, "std":2.4453761235991216 } },
+                'RQ': {'raw_lengthscale' :{"mean": -0.049841950913676276, "std":1.9426354614713097 }, 
+                        'raw_alpha' :{"mean": 1.882148553921053, "std":3.096431944989054 } },
+                'PER':{'raw_lengthscale':{"mean": 0.7778461197268618, "std":2.288946656544974 },
+                        'raw_period_length':{"mean": 0.6485334993738499, "std":0.9930632050553377 } },
+                'LIN':{'raw_variance' :{"mean": -0.8017903983055685, "std":0.9966569921354465 } },
+                'C':{'raw_outputscale':{"mean": -1.6253091096349706, "std":2.2570021716661923 } },
+                'noise': {'raw_noise':{"mean": -3.51640656386717, "std":3.5831320474767407 }}}
     start = time.time()
     theta_mu = []
     if variances_list is None:
@@ -164,7 +175,8 @@ def calculate_laplace(model, loss_of_model, variances_list=None, with_prior=Fals
         hessian, constructed_eigvals_log = Eigenvalue_correction_prior(-hessian)
         end = time.time()
         hessian_correction_time = end - start
-        laplace = mll + 0.5*torch.log((6.283)**len(theta_mu)*torch.det(-hessian))
+        # Here we use hessian since we have already gotten the corrected version
+        laplace = mll + 0.5*torch.log((6.283)**len(theta_mu)*torch.det(hessian))
         end = time.time()
         approximation_time = end - start
 
@@ -172,7 +184,7 @@ def calculate_laplace(model, loss_of_model, variances_list=None, with_prior=Fals
             print("Something went horribly wrong with the c(i)s")
             import pdb
             pdb.set_trace()
-            print(constructed_eigvals)
+            print(constructed_eigvals_log)
     else:
         # Hessian correcting part (for Eigenvalues < 0 < c(i)  )
         start = time.time()
@@ -196,13 +208,13 @@ def calculate_laplace(model, loss_of_model, variances_list=None, with_prior=Fals
         print(f"mll - 1/2 log sigma - 1/2 log sigma H + matmuls\n{mll} - {(1/2)*torch.log(sigma.det())} - {(1/2)*torch.log((sigma.inverse()-hessian).det())} + {(1/2) * matmuls}")
         D = torch.diag(constructed_eigvals_log)
         sigma_h = T@(sigma.inverse())@T.t() 
-        print(f"logdet sigma H; matmul\n {0.5*torch.log(torch.linalg.det(sigma_h - D))} ; {0.5*(thetas_added.t()@T.t())@sigma_h@((sigma_h - D).inverse())@D@(T@thetas_added)}")
+        print(f"logdet sigma H; matmul\n {0.5*torch.log(torch.linalg.det(sigma_h - D))} ; {0.5*(thetas_added.t()@T.t())@sigma_h@((sigma_h - D).inverse())@D@(T@thetas_added)}")
 
-        if any(torch.diag(constructed_eigvals) > 0):
+        if any(constructed_eigvals_log > 0):
             print("Something went horribly wrong with the c(i)s")
             import pdb
             pdb.set_trace()
-            print(constructed_eigvals)
+            print(constructed_eigvals_log)
         elif matmuls > 0:
             print("matmuls positive!!")
             import pdb
@@ -262,6 +274,7 @@ def generate_STAN_kernel(kernel_representation : str, parameter_list : list, cov
     replacement_dictionary = {
         "c" : "softplus(theta[i])",
         "SE": "gp_exp_quad_cov(x, 1.0, softplus(theta[i]))",
+        "MAT": "gp_matern52_cov(x, 1.0, softplus(theta[i]))",
         "PER": "gp_periodic_cov(x, 1.0, sqrt(softplus(theta[i])), softplus(theta[i]))",
         "LIN": "softplus(theta[i]) * gp_dot_prod_cov(x, 0.0)"
     }
@@ -344,11 +357,23 @@ def generate_STAN_code(kernel_representation : str,  parameter_list : list, cova
 def calculate_mc_STAN(model, likelihood, num_draws):
     # Yes, this is code duplication from above.
     # No, I am not happy with this
-    prior_dict = {"SE": {"raw_lengthscale" : {"mean": 0.891, "std":2.195}},
-                  "PER":{"raw_lengthscale": {"mean": 0.338, "std":2.636}, "raw_period_length":{"mean": 0.284, "std":0.902}},
-                  "LIN":{"raw_variance" : {"mean":-1.463, "std":1.633}},
-                  "c":{"raw_outputscale": {"mean":-2.163, "std":2.448}},
-                  "noise": {"raw_noise": {"mean":-1.792, "std":3.266}}}
+    #prior_dict = {"SE": {"raw_lengthscale" : {"mean": 0.891, "std":2.195}},
+    #              "MAT": {"raw_lengthscale": {"mean": 1.631, "std": 2.554}},
+    #              "PER":{"raw_lengthscale": {"mean": 0.338, "std":2.636}, "raw_period_length":{"mean": 0.284, "std":0.902}},
+    #              "LIN":{"raw_variance" : {"mean":-1.463, "std":1.633}},
+    #              "c":{"raw_outputscale": {"mean":-2.163, "std":2.448}},
+    #              "noise": {"raw_noise": {"mean":-1.792, "std":3.266}}}
+
+    prior_dict = {'SE': {'raw_lengthscale' : {"mean": -0.21221139138922668 , "std":1.8895426067756804}},
+                'MAT52': {'raw_lengthscale' :{"mean": 0.7993038925994188, "std":2.145122566357853 } },
+                'MAT32': {'raw_lengthscale' :{"mean": 1.5711054238673443, "std":2.4453761235991216 } },
+                'RQ': {'raw_lengthscale' :{"mean": -0.049841950913676276, "std":1.9426354614713097 }, 
+                        'raw_alpha' :{"mean": 1.882148553921053, "std":3.096431944989054 } },
+                'PER':{'raw_lengthscale':{"mean": 0.7778461197268618, "std":2.288946656544974 },
+                        'raw_period_length':{"mean": 0.6485334993738499, "std":0.9930632050553377 } },
+                'LIN':{'raw_variance' :{"mean": -0.8017903983055685, "std":0.9966569921354465 } },
+                'C':{'raw_outputscale':{"mean": -1.6253091096349706, "std":2.2570021716661923 } },
+                'noise': {'raw_noise':{"mean": -3.51640656386717, "std":3.5831320474767407 }}}
     logables = {}
 
     total_start = time.time()
@@ -431,8 +456,8 @@ def calculate_mc_STAN(model, likelihood, num_draws):
     #print("========================")
     start = time.time()
     seed = random.randint(0, 1000000)
-    print(STAN_data)
-    print(STAN_code)
+    #print(STAN_data)
+    #print(STAN_code)
     posterior = stan.build(STAN_code, data=STAN_data, random_seed=seed)
     end = time.time()
     STAN_model_generation_time = end - start
@@ -482,7 +507,7 @@ def calculate_mc_STAN(model, likelihood, num_draws):
     likelihood_approximation_time = end - start
     total_time = end - total_start
 
-    logables["Kernel code"] = generate_STAN_kernel(covar_string, debug_param_name_list, covar_string_list)
+    logables["Kernel code"] = STAN_code
     logables["seed"] = seed
     logables["Likelihood time"] = likelihood_approximation_time
     logables["Model compile time"] = STAN_model_generation_time

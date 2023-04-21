@@ -19,6 +19,7 @@ default_options = {
 
 
 hyperparameter_limits = {"RBFKernel": {"lengthscale": [1e-3,1]},
+                         "MaternKernel": {"lengthscale": [1e-3,1]},
                          "LinearKernel": {"variance": [1e-4,1]},
                          "PeriodicKernel": {"lengthscale": [1e-3,1],
                                             "period_length": [1e-3,3]},

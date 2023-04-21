@@ -79,10 +79,12 @@ import torch
 class ExactGPModel(gpytorch.models.ExactGP):
     def __init__(self, train_x, train_y, likelihood, kernel_text="RBF", weights=None):
         super(ExactGPModel, self).__init__(train_x, train_y, likelihood)
-        self.mean_module = gpytorch.means.ConstantMean()
+        self.mean_module = gpytorch.means.ZeroMean()
 
         if kernel_text == "RBF":
             self.covar_module = gpytorch.kernels.RBFKernel()
+        elif kernel_text == "RQ":
+            self.covar_module = gpytorch.kernels.RQKernel()
         elif kernel_text == "SIN":
             self.covar_module = gpytorch.kernels.PeriodicKernel()
         elif kernel_text == "SIN+RBF":
@@ -94,6 +96,20 @@ class ExactGPModel(gpytorch.models.ExactGP):
             self.covar_module = gpytorch.kernels.PeriodicKernel() * gpytorch.kernels.RBFKernel()
         elif kernel_text == "SIN*LIN":
             self.covar_module = gpytorch.kernels.PeriodicKernel() * gpytorch.kernels.LinearKernel()
+        elif kernel_text == "MAT32":
+            self.covar_module = gpytorch.kernels.MaternKernel(nu=1.5) 
+        elif kernel_text == "MAT32*SIN":
+            self.covar_module = gpytorch.kernels.PeriodicKernel() * gpytorch.kernels.MaternKernel(nu=1.5)
+        elif kernel_text == "MAT52":
+            self.covar_module = gpytorch.kernels.MaternKernel() 
+        elif kernel_text == "MAT52*SIN":
+            self.covar_module = gpytorch.kernels.PeriodicKernel() * gpytorch.kernels.MaternKernel()
+        elif kernel_text == "RQ*SIN":
+            self.covar_module = gpytorch.kernels.PeriodicKernel() * gpytorch.kernels.RQKernel()
+        elif kernel_text == "RQ*MAT32":
+            self.covar_module = gpytorch.kernels.MaternKernel(nu=1.5) * gpytorch.kernels.RQKernel()
+        elif kernel_text == "RQ*RBF":
+            self.covar_module = gpytorch.kernels.RBFKernel() * gpytorch.kernels.RQKernel()
 
     def forward(self, x):
         mean_x = self.mean_module(x)
@@ -215,8 +231,10 @@ def run_experiment(config_file):
         # Run CKS
         list_of_kernels = [gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel()),
                            gpytorch.kernels.ScaleKernel(gpytorch.kernels.PeriodicKernel()),
-                           gpytorch.kernels.ScaleKernel(gpytorch.kernels.LinearKernel())]
-                           #gpytorch.kernels.ScaleKernel(gpytorch.kernels.MaternKernel())]
+                           gpytorch.kernels.ScaleKernel(gpytorch.kernels.LinearKernel()), 
+                           gpytorch.kernels.ScaleKernel(gpytorch.kernels.RQKernel()),
+                           gpytorch.kernels.ScaleKernel(gpytorch.kernels.MaternKernel(nu=1.5)),
+                           gpytorch.kernels.ScaleKernel(gpytorch.kernels.MaternKernel())]
         likelihood = gpytorch.likelihoods.GaussianLikelihood()
         list_of_variances = [float(variance_list_variance) for i in range(28)] # ist das richtig so?? Kommt mir falsch vor...
         #try:
@@ -288,7 +306,7 @@ if __name__ == "__main__":
     with open("FINISHED.log", "r") as f:
         finished_configs = [line.strip().split("/")[-1] for line in f.readlines()]
     curdir = os.getcwd()
-    keywords = ["MLL", "AIC", "Laplace"] # "MC" only when there's a lot of time
+    keywords = ["MLL", "AIC", "Laplace", "Laplace_prior"] # "MC" only when there's a lot of time
     configs = []
     for KEYWORD in keywords:
         configs.extend([os.path.join(curdir, "configs", KEYWORD, item) for item in os.listdir(os.path.join(curdir, "configs", KEYWORD))])

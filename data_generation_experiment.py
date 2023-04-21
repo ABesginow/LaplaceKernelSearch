@@ -44,10 +44,13 @@ def get_kernels_in_kernel_expression(kernel_expression):
 def reparameterize(kernels):
     limits = {"RBFKernel": {"lengthscale": [0.5,1.5]},
                              "LinearKernel": {"variance": [0.5,1.5]},
+                             "RQKernel": {"lengthscale": [0.5,1.5],
+                                          "alpha": [0.5, 1.5]},
                              "PeriodicKernel": {"lengthscale": [0.5,1.5],
                                                 "period_length": [0.5,1.5]},
                              "ScaleKernel": {"outputscale": [0.5,1.5]},
                              "WhiteNoiseKernel": {'lengthscale': [0.5,1.5]},
+                             "MaternKernel": {'lengthscale': [0.5,1.5]},
                              "CosineKernel": {"period_length": [0.5,1.5]}
                              }
 
@@ -62,19 +65,32 @@ class ExactGPModel(gpytorch.models.ExactGP):
     def __init__(self, train_x, train_y, likelihood, kernel_text="RBF", weights=None):
         super(ExactGPModel, self).__init__(train_x, train_y, likelihood)
         self.mean_module = gpytorch.means.ZeroMean()
-
         if kernel_text == "SE":
             self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel())
+        elif kernel_text == "RQ":
+            self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.RQKernel())
         elif kernel_text == "PER":
             self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.PeriodicKernel())
-        elif kernel_text == "SE+PER":
-            self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel()) + gpytorch.kernels.ScaleKernel(gpytorch.kernels.PeriodicKernel())
-        elif kernel_text == "SE*PER":
-            self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel() * gpytorch.kernels.PeriodicKernel())
-        elif kernel_text == "LIN+PER":
-            self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.LinearKernel()) + gpytorch.kernels.ScaleKernel(gpytorch.kernels.PeriodicKernel())
-        elif kernel_text == "LIN*PER":
-            self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.LinearKernel() * gpytorch.kernels.PeriodicKernel())
+        elif kernel_text == "PER+SE":
+            self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.PeriodicKernel()) + gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel())
+        elif kernel_text == "PER*SE":
+            self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.PeriodicKernel() * gpytorch.kernels.RBFKernel())
+        elif kernel_text == "PER*LIN":
+            self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.PeriodicKernel() * gpytorch.kernels.LinearKernel())
+        elif kernel_text == "MAT32":
+            self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.MaternKernel(nu=1.5)) 
+        elif kernel_text == "MAT32*PER":
+            self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.MaternKernel(nu=1.5) * gpytorch.kernels.PeriodicKernel())
+        elif kernel_text == "MAT52":
+            self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.MaternKernel()) 
+        elif kernel_text == "MAT52*PER":
+            self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.MaternKernel() * gpytorch.kernels.PeriodicKernel())
+        elif kernel_text == "RQ*PER":
+            self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.RQKernel() * gpytorch.kernels.PeriodicKernel())
+        elif kernel_text == "RQ*MAT32":
+            self.covar_module =  gpytorch.kernels.ScaleKernel(gpytorch.kernels.RQKernel() * gpytorch.kernels.MaternKernel(nu=1.5))
+        elif kernel_text == "RQ*SE":
+            self.covar_module =  gpytorch.kernels.ScaleKernel(gpytorch.kernels.RQKernel() * gpytorch.kernels.RBFKernel())
 
 
     def forward(self, x):
@@ -84,24 +100,39 @@ class ExactGPModel(gpytorch.models.ExactGP):
 
 
 class DataGPModel(gpytorch.models.ExactGP):
-    def __init__(self, train_x, train_y, likelihood, kernel_text="RBF", weights=None):
+    def __init__(self, train_x, train_y, likelihood, kernel_text="SE", weights=None):
         super(DataGPModel, self).__init__(train_x, train_y, likelihood)
         self.mean_module = gpytorch.means.ConstantMean()
 
-        if kernel_text == "RBF":
+        if kernel_text == "SE":
             self.covar_module = gpytorch.kernels.RBFKernel()
-        elif kernel_text == "SIN":
+        elif kernel_text == "RQ":
+            self.covar_module = gpytorch.kernels.RQKernel()
+        elif kernel_text == "PER":
             self.covar_module = gpytorch.kernels.PeriodicKernel()
-        elif kernel_text == "SIN+RBF":
+        elif kernel_text == "PER+SE":
             if weights is None:
                 self.covar_module = gpytorch.kernels.PeriodicKernel() + gpytorch.kernels.RBFKernel()
             else:
                 self.covar_module = weights[0]*gpytorch.kernels.PeriodicKernel() + weights[1]*gpytorch.kernels.RBFKernel()
-        elif kernel_text == "SIN*RBF":
+        elif kernel_text == "PER*SE":
             self.covar_module = gpytorch.kernels.PeriodicKernel() * gpytorch.kernels.RBFKernel()
-        elif kernel_text == "SIN*LIN":
+        elif kernel_text == "PER*LIN":
             self.covar_module = gpytorch.kernels.PeriodicKernel() * gpytorch.kernels.LinearKernel()
-
+        elif kernel_text == "MAT32":
+            self.covar_module = gpytorch.kernels.MaternKernel(nu=1.5) 
+        elif kernel_text == "MAT32*PER":
+            self.covar_module =  gpytorch.kernels.MaternKernel(nu=1.5) * gpytorch.kernels.PeriodicKernel()
+        elif kernel_text == "MAT52":
+            self.covar_module = gpytorch.kernels.MaternKernel() 
+        elif kernel_text == "MAT52*PER":
+            self.covar_module =  gpytorch.kernels.MaternKernel() * gpytorch.kernels.PeriodicKernel()
+        elif kernel_text == "RQ*PER":
+            self.covar_module = gpytorch.kernels.RQKernel() * gpytorch.kernels.PeriodicKernel()
+        elif kernel_text == "RQ*MAT32":
+            self.covar_module = gpytorch.kernels.RQKernel() * gpytorch.kernels.MaternKernel(nu=1.5) 
+        elif kernel_text == "RQ*SE":
+            self.covar_module = gpytorch.kernels.RQKernel() * gpytorch.kernels.RBFKernel()
         reparameterize(self.covar_module)
 
     def forward(self, x):
@@ -120,7 +151,6 @@ def RMSE(goal, prediction):
 
 
 def ZScore(data):
-
     return (data - torch.mean(data)) / torch.std(data)
 
 
@@ -227,12 +257,12 @@ def run_experiment(data_kernel = "PER", model_kernel="SE"):
 
         parameter_results[j] = list(model.named_parameters())
 
-        if j == 0 or j == 25 or j == 49:
-            draw_store_GP(model, likelihood, X, Y, name=f"{data_kernel}-{model_kernel}-{j}")
+        #if j == 0 or j == 25 or j == 49:
+        #    draw_store_GP(model, likelihood, X, Y, name=f"{data_kernel}-{model_kernel}-{j}")
 
     # Write parameter dicts to a file
-    #with open(f"results/parameter_stuff/data_{data_kernel}-model_{model_kernel}.pickle", "wb+") as f:
-    #     pickle.dump(parameter_results, f)
+    with open(f"results/parameter_stuff/data_{data_kernel}-model_{model_kernel}.pickle", "wb+") as f:
+         pickle.dump(parameter_results, f)
 
     ## TODO write filename in FINISHED.log
     #with open("FINISHED.log", "a") as f:
@@ -248,8 +278,9 @@ if __name__ == "__main__":
         finished_configs = [line.strip() for line in f.readlines()]
     curdir = os.getcwd()
     configs = []
-    data_kernels = ["RBF", "SIN", "SIN+RBF", "SIN*RBF", "SIN*LIN"]
-    model_kernels = ["SE", "PER", "SE+PER", "SE*PER", "LIN*PER", "LIN+PER"]
+    data_kernels = ["SE", "PER", "MAT32", "MAT52", "RQ", "PER+SE", "PER*SE", "PER*LIN", "MAT32*PER", "MAT52*PER", "RQ*PER", "RQ*SE", "RQ*MAT32"]
+    #model_kernels = ["SE", "PER", "SE+PER", "SE*PER", "LIN*PER", "LIN+PER"]
+    model_kernels = ["SE", "PER", "PER+SE", "PER*SE", "PER*LIN", "RQ", "RQ*PER", "MAT52", "MAT52*PER", "MAT32", "MAT32*PER"]
     configs = product(data_kernels, model_kernels)
     # Check if the config file is already finished and if it even exists
     for config in configs:
