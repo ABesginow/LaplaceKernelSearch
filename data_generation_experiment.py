@@ -271,8 +271,6 @@ def run_experiment(data_kernel = "PER", model_kernel="SE"):
 
 
 
-
-
 if __name__ == "__main__":
     with open("FINISHED.log", "r") as f:
         finished_configs = [line.strip() for line in f.readlines()]

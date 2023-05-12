@@ -48,9 +48,9 @@ def get_string_representation_of_kernel(kernel_expression):
     elif kernel_expression._get_name() == "PeriodicKernel":
         return "PER"
     elif kernel_expression._get_name() == "MaternKernel":
-        if kernel_expression.nu.item() == 1.5:
+        if kernel_expression.nu == 1.5:
             return "MAT32"
-        elif kernel_expression.nu.item() == 2.5:
+        elif kernel_expression.nu == 2.5:
             return "MAT52"
         else:
             raise "shit"

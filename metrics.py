@@ -16,19 +16,33 @@ import torch
 import threading
 
 
-def calculate_AIC(loss, num_params):
-    logables = {"correction term" : 2*num_params,
+def calculate_BIC(loss, num_params, num_data):
+    start = time.time()
+    BIC = -num_params*torch.log(num_data) + 2*loss
+    end = time.time()
+    logables = {"punish term" : -num_params*torch.log(num_data),
+                "Total time": end - start,
                 "loss term": 2*loss}
-    return -2*num_params + 2*loss, logables
+    return BIC, logables
 
 
-def Eigenvalue_correction_prior(hessian):
+def calculate_AIC(loss, num_params):
+    start = time.time()
+    AIC = -2*num_params + 2*loss
+    end = time.time()
+    logables = {"punish term" : 2*num_params,
+                "Total time": end - start,
+                "loss term": 2*loss}
+    return AIC, logables
+
+
+def Eigenvalue_correction_prior(hessian, param_punish_term):
     vals, vecs = torch.linalg.eigh(hessian)
-    k = len(vals)
     constructed_eigvals = torch.diag(torch.Tensor(
-        [max(val, 1/(torch.exp(torch.tensor(2))*(6.283)**k)) for i, val in enumerate(vals)]))
+        [max(val, (torch.exp(torch.tensor(param_punish_term))*(6.283))) for i, val in enumerate(vals)]))
+    num_replaced = torch.count_nonzero(vals - torch.diag(constructed_eigvals))
     corrected_hessian = vecs@constructed_eigvals@vecs.t()
-    return corrected_hessian, torch.diag(constructed_eigvals)
+    return corrected_hessian, torch.diag(constructed_eigvals), num_replaced
         
 
 def Eigenvalue_correction(hessian, theta_mu, params, sigma, param_punish_term):
@@ -53,6 +67,7 @@ def Eigenvalue_correction(hessian, theta_mu, params, sigma, param_punish_term):
 
     constructed_eigvals = torch.diag(torch.Tensor(
         [min(val, cor(i)) for i, val in enumerate(vals)]))
+    num_replaced = torch.count_nonzero(vals - torch.diag(constructed_eigvals))
     corrected_hessian = vecs@constructed_eigvals@vecs.t()
     #print(f"new vals: {torch.linalg.eigh(corrected_hessian)[0]}")
     if any(torch.diag(constructed_eigvals) > 0):
@@ -60,7 +75,7 @@ def Eigenvalue_correction(hessian, theta_mu, params, sigma, param_punish_term):
         import pdb
         pdb.set_trace()
         print(constructed_eigvals)
-    return corrected_hessian, torch.diag(constructed_eigvals)
+    return corrected_hessian, torch.diag(constructed_eigvals), num_replaced
 
 
 def calculate_laplace(model, loss_of_model, variances_list=None, with_prior=False, param_punish_term = 2.0):
@@ -90,20 +105,6 @@ def calculate_laplace(model, loss_of_model, variances_list=None, with_prior=Fals
             hess_params.append(torch.autograd.grad(env_grads[i], params_list, retain_graph=True))
     end = time.time()
     derivative_calc_time = end - start
-    #prior_dict_softplussed = {"SE": {"lengthscale" : {"mean": 1.607, "std":1.650}},
-    #                          "PER":{"lengthscale": {"mean": 1.473, "std":1.582}, "period_length":{"mean": 0.920, "std":0.690}},
-    #                          "LIN":{"variance" : {"mean":0.374, "std":0.309}},
-    #                          "C":{"outputscale": {"mean":0.427, "std":0.754}},
-    #                          "noise": {"noise": {"mean":0.531, "std":0.384}}}
-
-    #prior_dict = {"SE": {"raw_lengthscale": {"mean": 0.891, "std": 2.195}},
-    #              "MAT": {"raw_lengthscale": {"mean": 1.631, "std": 2.554}},
-    #              "PER": {"raw_lengthscale": {"mean": 0.338, "std": 2.636}, 
-    #                      "raw_period_length": {"mean": 0.284, "std": 0.902}},
-    #              "LIN": {"raw_variance": {"mean": -1.463, "std": 1.633}},
-    #              "c": {"raw_outputscale": {"mean": -2.163, "std": 2.448}},
-    #              "noise": {"raw_noise": {"mean": -1.792, "std": 3.266}}}
-
     prior_dict = {'SE': {'raw_lengthscale' : {"mean": -0.21221139138922668 , "std":1.8895426067756804}},
                 'MAT52': {'raw_lengthscale' :{"mean": 0.7993038925994188, "std":2.145122566357853 } },
                 'MAT32': {'raw_lengthscale' :{"mean": 1.5711054238673443, "std":2.4453761235991216 } },
@@ -112,8 +113,9 @@ def calculate_laplace(model, loss_of_model, variances_list=None, with_prior=Fals
                 'PER':{'raw_lengthscale':{"mean": 0.7778461197268618, "std":2.288946656544974 },
                         'raw_period_length':{"mean": 0.6485334993738499, "std":0.9930632050553377 } },
                 'LIN':{'raw_variance' :{"mean": -0.8017903983055685, "std":0.9966569921354465 } },
-                'C':{'raw_outputscale':{"mean": -1.6253091096349706, "std":2.2570021716661923 } },
+                'c':{'raw_outputscale':{"mean": -1.6253091096349706, "std":2.2570021716661923 } },
                 'noise': {'raw_noise':{"mean": -3.51640656386717, "std":3.5831320474767407 }}}
+
     start = time.time()
     theta_mu = []
     if variances_list is None:
@@ -125,6 +127,7 @@ def calculate_laplace(model, loss_of_model, variances_list=None, with_prior=Fals
         covar_string = covar_string.replace(")", "")
         covar_string = covar_string.replace(" ", "")
         covar_string = covar_string.replace("PER", "PER+PER")
+        covar_string = covar_string.replace("RQ", "RQ+RQ")
         covar_string_list = [s.split("*") for s in covar_string.split("+")]
         covar_string_list.insert(0, ["LIKELIHOOD"])
         covar_string_list = list(chain.from_iterable(covar_string_list))
@@ -137,11 +140,11 @@ def calculate_laplace(model, loss_of_model, variances_list=None, with_prior=Fals
                 variances_list.append(prior_dict["noise"]["raw_noise"]["std"])
                 continue
             else:
-                if cov_str == "PER" and not both_PER_params:
+                if (cov_str == "PER" or cov_str == "RQ") and not both_PER_params:
                     theta_mu.append(prior_dict[cov_str][param_name.split(".")[-1]]["mean"])
                     variances_list.append(prior_dict[cov_str][param_name.split(".")[-1]]["std"])
                     both_PER_params = True
-                elif cov_str == "PER" and both_PER_params:
+                elif (cov_str == "PER" or cov_str == "RQ") and both_PER_params:
                     theta_mu.append(prior_dict[cov_str][param_name.split(".")[-1]]["mean"])
                     variances_list.append(prior_dict[cov_str][param_name.split(".")[-1]]["std"])
                     both_PER_params = False
@@ -149,10 +152,10 @@ def calculate_laplace(model, loss_of_model, variances_list=None, with_prior=Fals
                     try:
                         theta_mu.append(prior_dict[cov_str][param_name.split(".")[-1]]["mean"])
                         variances_list.append(prior_dict[cov_str][param_name.split(".")[-1]]["std"])
-                    except:
+                    except Exception as E:
                         import pdb
                         pdb.set_trace()
-            prev_cov = cov_str
+                        prev_cov = cov_str
         theta_mu = torch.tensor(theta_mu)
         theta_mu = theta_mu.unsqueeze(0).t()
 
@@ -167,48 +170,63 @@ def calculate_laplace(model, loss_of_model, variances_list=None, with_prior=Fals
     hessian = (hessian + hessian.t()) / 2
     hessian = hessian.to(torch.float64)
 
-    _, T = torch.linalg.eigh(hessian)
+    vals, T = torch.linalg.eigh(hessian)
     oldHessian = hessian.clone()
+    if param_punish_term == "BIC":
+        param_punish_term = 2*torch.log(torch.tensor(model.train_targets.numel()))
     if with_prior:
         # it says mll, but it's actually the MAP here
+        hessian = -hessian
         start = time.time()
-        hessian, constructed_eigvals_log = Eigenvalue_correction_prior(-hessian)
+        hessian, constructed_eigvals_log, num_replaced = Eigenvalue_correction_prior(hessian, param_punish_term)
         end = time.time()
         hessian_correction_time = end - start
-        # Here we use hessian since we have already gotten the corrected version
-        laplace = mll + 0.5*torch.log((6.283)**len(theta_mu)*torch.det(hessian))
+        punish_term = 0.5*len(theta_mu)*torch.tensor(1.8378) - 0.5*torch.log(torch.det(hessian))
+        laplace = mll + punish_term
+        punish_without_replacement = 0.5*len(theta_mu)*torch.tensor(1.8378) - 0.5*torch.log(torch.det(oldHessian))
         end = time.time()
         approximation_time = end - start
+        if param_punish_term == 2.0:
+            if (len(theta_mu) + punish_term) > 0:
+                print("Something went horribly wrong with the c(i)s")
+                import pdb
+                pdb.set_trace()
+                print(constructed_eigvals_log)
+        else:
+            if (len(theta_mu) + punish_term) > len(theta_mu):
+                print("Something went horribly wrong with the c(i)s")
+                import pdb
+                pdb.set_trace()
+                print(constructed_eigvals_log)
 
-        if any(constructed_eigvals_log < 0):
-            print("Something went horribly wrong with the c(i)s")
-            import pdb
-            pdb.set_trace()
-            print(constructed_eigvals_log)
     else:
         # Hessian correcting part (for Eigenvalues < 0 < c(i)  )
         start = time.time()
-        hessian, constructed_eigvals_log = Eigenvalue_correction(
+        hessian, constructed_eigvals_log, num_replaced = Eigenvalue_correction(
             hessian, theta_mu, params, sigma, param_punish_term)
         end = time.time()
+        #print(f"{num_replaced}")
         hessian_correction_time = end - start
 
         start = time.time()
         # Here comes what's wrapped in the exp-function:
         thetas_added = params-theta_mu
-        thetas_added_transposed = (params-theta_mu).reshape(1,-1)
+        thetas_added_transposed = (params-theta_mu).reshape(1, -1)
         middle_term = (sigma.inverse()-hessian).inverse()
         matmuls = thetas_added_transposed @ sigma.inverse() @ middle_term @ hessian @ thetas_added
 
         # This can probably also be "-0.5 matmuls" where "matmuls" is based on the negative MLL
-        laplace = mll - (1/2)*torch.log(sigma.det()) - (1/2)*torch.log((sigma.inverse()-hessian).det()) + (1/2) * matmuls
+        punish_term = - (1/2)*torch.log(sigma.det()) - (1/2)*torch.log((sigma.inverse()-hessian).det()) + (1/2) * matmuls
+        matmuls_without_replacement = thetas_added_transposed @ sigma.inverse() @ middle_term @ oldHessian @ thetas_added
+        punish_without_replacement = - (1/2)*torch.log(sigma.det()) - (1/2)*torch.log((sigma.inverse()-oldHessian).det()) + (1/2) * matmuls_without_replacement
+        laplace = mll + punish_term
         end = time.time()
         approximation_time = end - start
 
-        print(f"mll - 1/2 log sigma - 1/2 log sigma H + matmuls\n{mll} - {(1/2)*torch.log(sigma.det())} - {(1/2)*torch.log((sigma.inverse()-hessian).det())} + {(1/2) * matmuls}")
+        #print(f"mll - 1/2 log sigma - 1/2 log sigma H + matmuls\n{mll} - {(1/2)*torch.log(sigma.det())} - {(1/2)*torch.log((sigma.inverse()-hessian).det())} + {(1/2) * matmuls}")
         D = torch.diag(constructed_eigvals_log)
         sigma_h = T@(sigma.inverse())@T.t() 
-        print(f"logdet sigma H; matmul\n {0.5*torch.log(torch.linalg.det(sigma_h - D))} ; {0.5*(thetas_added.t()@T.t())@sigma_h@((sigma_h - D).inverse())@D@(T@thetas_added)}")
+        #print(f"logdet sigma H; matmul\n {0.5*torch.log(torch.linalg.det(sigma_h - D))} ; {0.5*(thetas_added.t()@T.t())@sigma_h@((sigma_h - D).inverse())@D@(T@thetas_added)}")
 
         if any(constructed_eigvals_log > 0):
             print("Something went horribly wrong with the c(i)s")
@@ -241,6 +259,9 @@ def calculate_laplace(model, loss_of_model, variances_list=None, with_prior=Fals
     total_time = end - total_start
     # Everything worth logging
     logables["MLL"] = mll
+    logables["punish term"] = punish_term 
+    logables["punish without replacement"] = punish_without_replacement
+    logables["num_replaced"] = num_replaced
     logables["parameter list"] = debug_param_name_list
     logables["parameter values"] = params
     logables["corrected Hessian"] = hessian
@@ -274,7 +295,8 @@ def generate_STAN_kernel(kernel_representation : str, parameter_list : list, cov
     replacement_dictionary = {
         "c" : "softplus(theta[i])",
         "SE": "gp_exp_quad_cov(x, 1.0, softplus(theta[i]))",
-        "MAT": "gp_matern52_cov(x, 1.0, softplus(theta[i]))",
+        "MAT52": "gp_matern52_cov(x, 1.0, softplus(theta[i]))",
+        "MAT32": "gp_matern32_cov(x, 1.0, softplus(theta[i]))",
         "PER": "gp_periodic_cov(x, 1.0, sqrt(softplus(theta[i])), softplus(theta[i]))",
         "LIN": "softplus(theta[i]) * gp_dot_prod_cov(x, 0.0)"
     }
@@ -372,7 +394,7 @@ def calculate_mc_STAN(model, likelihood, num_draws):
                 'PER':{'raw_lengthscale':{"mean": 0.7778461197268618, "std":2.288946656544974 },
                         'raw_period_length':{"mean": 0.6485334993738499, "std":0.9930632050553377 } },
                 'LIN':{'raw_variance' :{"mean": -0.8017903983055685, "std":0.9966569921354465 } },
-                'C':{'raw_outputscale':{"mean": -1.6253091096349706, "std":2.2570021716661923 } },
+                'c':{'raw_outputscale':{"mean": -1.6253091096349706, "std":2.2570021716661923 } },
                 'noise': {'raw_noise':{"mean": -3.51640656386717, "std":3.5831320474767407 }}}
     logables = {}
 
@@ -516,7 +538,5 @@ def calculate_mc_STAN(model, likelihood, num_draws):
     logables["Bad entries"] = bad_entries
     logables["likelihood approximation"] = torch.mean(torch.Tensor(manual_lp_list))
     #logables["manual lp list"] = manual_lp_list
-    print(f"Num bad entries: {bad_entries}")
+    print(f"Num bad entries: {bad_entries}")
     return torch.mean(torch.Tensor(manual_lp_list)), logables
-
-

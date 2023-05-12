@@ -9,8 +9,32 @@ import pprint
 import os
 import pdb
 
+import copy
+
+def make_hash(o):
+
+  """
+  Makes a hash from a dictionary, list, tuple or set to any level, that contains
+  only other hashable types (including any lists, tuples, sets, and
+  dictionaries).
+  """
+
+  if isinstance(o, (set, tuple, list)):
+
+    return tuple([make_hash(e) for e in o])    
+
+  elif not isinstance(o, dict):
+
+    return hash(o)
+
+  new_o = copy.deepcopy(o)
+  for k, v in new_o.items():
+    new_o[k] = make_hash(v)
+
+  return hash(tuple(frozenset(sorted(new_o.items()))))
 
 # In[9]:
+
 
 
 # This block creates ALL the config files!
@@ -18,12 +42,13 @@ import pdb
 general_json = {
     'Kernel_search': ["CKS"],
     'train_data_ratio': [0.5],#50% of the eval data
-    'Data_kernel': ["SIN", "MAT", "SIN*RBF", "SIN+RBF", "MAT*SIN"],
+    #'Data_kernel': ["SE", "PER", "MAT32", "PER*SE", "PER+SE", "MAT32*PER", "MAT32+PER", "MAT32+SE", "MAT32*SE"],
+    'Data_kernel': ["SE", "MAT32", "MAT32+SE", "MAT32*SE"],
     'weights': [[1., 1.]],
     'Variance_list': [4],
-    'eval_START':[-10.0],
-    'eval_END':[10.0],
-    'eval_COUNT':[200],
+    'eval_START':[-5.0],
+    'eval_END':[5.0],
+    'eval_COUNT':[10, 20, 50, 70, 100],#, 100, 250, 500],
     'optimizer':['Adam'],
     'train_iterations':[200],
     'LR': [0.1],
@@ -39,7 +64,12 @@ MC_json = {
 
 Laplace_json = {
     "Metric": ["Laplace"],
-    "parameter_punishment": [2.0, 10.0]
+    "parameter_punishment": [0.0, 2.0, "BIC"]
+}
+
+Laplace_prior_json = {
+    "Metric": ["Laplace_prior"],
+    "parameter_punishment": [0.0, 2.0, "BIC"]
 }
 
 MLL_json = {
@@ -50,7 +80,11 @@ AIC_json = {
     "Metric" : ["AIC"]
 }
 
-specific_jsons = [MC_json, Laplace_json, MLL_json, AIC_json]
+BIC_json = {
+    "Metric" : ["BIC"]
+}
+
+specific_jsons = [MC_json, Laplace_json, MLL_json, AIC_json, BIC_json, Laplace_prior_json]
 #general_json = {
 #                'Metric': ["Laplace", "MC", "MLL", "AIC"],
 #                'Kernel_search': ["CKS"],
@@ -113,7 +147,8 @@ def generate_config(keys, configurations):
             config_dict = {}
             config_dict = {key:value for key, value in zip(keys, config)}
             #config_dict[keys[2]] = {key:value for key, value in zip(keys[3], config[1])}
-            config_file_name = f"{config_dict['Metric']}_{i}"
+            config_file_name = "_".join([str(config_dict[k]) for k in config_dict]) 
+            #config_file_name = f"{config_dict['Metric']}_{i}"
             conf_dir = config_dict['Metric']
             with open(os.path.join("configs", f"{conf_dir}", f"{config_file_name}.json"), 'w') as configfile:
                 configfile.write(json.dumps(config_dict, indent=4))

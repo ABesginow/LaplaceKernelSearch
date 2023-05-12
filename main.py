@@ -1,62 +1,3 @@
-# Purpose of the script
-# Automatic run of experiments with configurations taken from a config file/dir
-# Goals of experiments:
-# 1. Check if Laplace Approx is better than MLL/MCMC
-# 2. Real data experiments
-# 3. Reproducibility experiments
-# 4. "Better" structure discovery?
-# 5. Test out noise levels and impacts
-# 6. Vary the kernel algorithms?
-# 7. How high is the threshold to detect structures? (0.9*sin + 0.1*RBF)
-# 8. Ablation: Physical kernel ?
-# 9. Ablation: Robust against different parametrizations?
-# 10. Training runtimes (100, 200, 300 iterations)?
-# ~~11. Loss thresholds (-1, -2, -3)?~~
-# 12. Runtime evaluations
-# 13. Calculate Fourier series of a signal and cut after n to generate data
-# 14. Vary the values in the variance_list for the different parameters
-#     (broader and narrower)
-
-# Not goals of experiments
-# - Parameter training
-
-
-
-# Things to do in config
-
-# Things to do in code
-# - Deal with multiple times the same parameter in the MCMC case
-#   (Probably look into the parameter names and store a dict of names+values)
-# - Deal with the issue of non PD matrices when parametrizations are bad
-# 13. Calculate Fourier series of a signal/function and cut after n for data ?
-#     Purpose: Gives a linear combination of sine/cosine and "represent" real
-#     data
-# 12. Runtime evaluations (Logging)
-# 3. Reproducibility experiments (Logging/Repetitions)
-
-# Things to do afterwards
-# 1. Check if Laplace Approx is better than MLL/MCMC
-# 12. Runtime evaluations
-
-
-
-# Things to log
-# - Parameters and their values (post training)
-# - The kernels that were tried (basically a progress tree)
-# - Loss at each kernel try
-# - The metrics with those kernels
-#   - Question: Do we calculate ALL metrics and highlight the current choice?
-# - Finale kernel
-# - Parameter starting points at random restarts?
-#   - Q: What would/could we hope to learn from this?
-
-
-
-# Known issues:
-# - The periodic kernel is prone to creating a non-PSD matrix
-# - The MC metric is prone to creating non-PSD matrices due to the random parametrizations
-
-
 import copy
 import configparser
 from experiment_functions import Experiment
@@ -81,35 +22,42 @@ class ExactGPModel(gpytorch.models.ExactGP):
         super(ExactGPModel, self).__init__(train_x, train_y, likelihood)
         self.mean_module = gpytorch.means.ZeroMean()
 
-        if kernel_text == "RBF":
+        if kernel_text == "SE":
             self.covar_module = gpytorch.kernels.RBFKernel()
         elif kernel_text == "RQ":
             self.covar_module = gpytorch.kernels.RQKernel()
-        elif kernel_text == "SIN":
+        elif kernel_text == "PER":
             self.covar_module = gpytorch.kernels.PeriodicKernel()
-        elif kernel_text == "SIN+RBF":
+        elif kernel_text == "PER+SE":
             if weights is None:
                 self.covar_module = gpytorch.kernels.PeriodicKernel() + gpytorch.kernels.RBFKernel()
             else:
                 self.covar_module = weights[0]*gpytorch.kernels.PeriodicKernel() + weights[1]*gpytorch.kernels.RBFKernel()
-        elif kernel_text == "SIN*RBF":
+        elif kernel_text == "PER*SE":
             self.covar_module = gpytorch.kernels.PeriodicKernel() * gpytorch.kernels.RBFKernel()
-        elif kernel_text == "SIN*LIN":
+        elif kernel_text == "PER*LIN":
             self.covar_module = gpytorch.kernels.PeriodicKernel() * gpytorch.kernels.LinearKernel()
         elif kernel_text == "MAT32":
             self.covar_module = gpytorch.kernels.MaternKernel(nu=1.5) 
-        elif kernel_text == "MAT32*SIN":
-            self.covar_module = gpytorch.kernels.PeriodicKernel() * gpytorch.kernels.MaternKernel(nu=1.5)
+        elif kernel_text == "MAT32*PER":
+            self.covar_module =  gpytorch.kernels.MaternKernel(nu=1.5) * gpytorch.kernels.PeriodicKernel()
+        elif kernel_text == "MAT32+PER":
+            self.covar_module =  gpytorch.kernels.MaternKernel(nu=1.5) + gpytorch.kernels.PeriodicKernel()
+        elif kernel_text == "MAT32*SE":
+            self.covar_module =  gpytorch.kernels.MaternKernel(nu=1.5) * gpytorch.kernels.RBFKernel()
+        elif kernel_text == "MAT32+SE":
+            self.covar_module =  gpytorch.kernels.MaternKernel(nu=1.5) + gpytorch.kernels.RBFKernel()
         elif kernel_text == "MAT52":
             self.covar_module = gpytorch.kernels.MaternKernel() 
-        elif kernel_text == "MAT52*SIN":
-            self.covar_module = gpytorch.kernels.PeriodicKernel() * gpytorch.kernels.MaternKernel()
-        elif kernel_text == "RQ*SIN":
-            self.covar_module = gpytorch.kernels.PeriodicKernel() * gpytorch.kernels.RQKernel()
+        elif kernel_text == "MAT52*PER":
+            self.covar_module =  gpytorch.kernels.MaternKernel() * gpytorch.kernels.PeriodicKernel()
+        elif kernel_text == "RQ*PER":
+            self.covar_module = gpytorch.kernels.RQKernel() * gpytorch.kernels.PeriodicKernel()
         elif kernel_text == "RQ*MAT32":
-            self.covar_module = gpytorch.kernels.MaternKernel(nu=1.5) * gpytorch.kernels.RQKernel()
-        elif kernel_text == "RQ*RBF":
-            self.covar_module = gpytorch.kernels.RBFKernel() * gpytorch.kernels.RQKernel()
+            self.covar_module = gpytorch.kernels.RQKernel() * gpytorch.kernels.MaternKernel(nu=1.5) 
+        elif kernel_text == "RQ*SE":
+            self.covar_module = gpytorch.kernels.RQKernel() * gpytorch.kernels.RBFKernel()
+
 
     def forward(self, x):
         mean_x = self.mean_module(x)
@@ -142,17 +90,19 @@ def load_config(config_file):
 
 
 
-def run_experiment(config_file):
+def run_experiment(config_file, torch_seed):
     """
     This contains the training, kernel search, evaluation, logging, plotting.
     It takes an input file, processes the whole training, evaluation and log
     Returns nothing
 
     """
-
-    EXPERIMENT_REPITITIONS = 50 
-    for exp_num in range(EXPERIMENT_REPITITIONS):
-
+    torch.manual_seed(torch_seed)
+    EXPERIMENT_REPITITIONS = 1
+    total_time_start = time.time()
+    options["kernel search"]["print"] = False
+    options["training"]["restarts"] = 2 
+    for exp_num in range(0, EXPERIMENT_REPITITIONS, 1):
         ### Initialization
         var_dict = load_config(config_file)
 
@@ -172,23 +122,23 @@ def run_experiment(config_file):
         data_scaling = var_dict["Data_scaling"]
         use_BFGS = var_dict["BFGS"]
         num_draws = var_dict["num_draws"] if metric == "MC" else None
-        parameter_punishment = var_dict["parameter_punishment"] if metric == "Laplace" else None
+        parameter_punishment = var_dict["parameter_punishment"] if metric == "Laplace" or metric == "Laplace_prior" else None
 
         # set training iterations to the correct config
         options["training"]["max_iter"] = int(train_iterations)
 
-        print(metric)
+        print(f"{metric} - {exp_num}/{EXPERIMENT_REPITITIONS} - {time.strftime('%Y-%m-%d %H:%M', time.localtime())}")
 
         log_name = "..."
         experiment_keyword = var_dict["experiment name"]
-        experiment_path = os.path.join("results", metric, f"{experiment_keyword}")
+        experiment_path = os.path.join("results_100_04", metric, f"{experiment_keyword}")
         if not os.path.exists(experiment_path):
             os.makedirs(experiment_path)
         log_experiment_path = os.path.join(experiment_path, f"{experiment_keyword}")
         experiment = Experiment(log_experiment_path, exp_num, attributes=var_dict)
 
 
-
+        
         ## Create train data
         # Create base model to generate data
 
@@ -218,13 +168,13 @@ def run_experiment(config_file):
         X = observations_x  #[int((1-train_data_ratio)*0.5*eval_COUNT):int((1+train_data_ratio)*0.5*eval_COUNT)]
         Y = observations_y  #[int((1-train_data_ratio)*0.5*eval_COUNT):int((1+train_data_ratio)*0.5*eval_COUNT)]
 
+        noise_level = 0.4
         # Percentage noise
-        if noise:
-            Y = Y + torch.randn(Y.shape) * (noise * Y.max())
+        Y = Y + torch.randn(Y.shape) * torch.tensor(noise_level)
         # Z-Score scaling
         if data_scaling:
             X = (X - torch.mean(X)) / torch.std(X)
-            Y = (Y - torch.mean(Y)) / torch.std(Y)
+            #Y = (Y - torch.mean(Y)) / torch.std(Y)
 
 
 
@@ -232,9 +182,7 @@ def run_experiment(config_file):
         list_of_kernels = [gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel()),
                            gpytorch.kernels.ScaleKernel(gpytorch.kernels.PeriodicKernel()),
                            gpytorch.kernels.ScaleKernel(gpytorch.kernels.LinearKernel()), 
-                           gpytorch.kernels.ScaleKernel(gpytorch.kernels.RQKernel()),
-                           gpytorch.kernels.ScaleKernel(gpytorch.kernels.MaternKernel(nu=1.5)),
-                           gpytorch.kernels.ScaleKernel(gpytorch.kernels.MaternKernel())]
+                           gpytorch.kernels.ScaleKernel(gpytorch.kernels.MaternKernel(nu=1.5))]
         likelihood = gpytorch.likelihoods.GaussianLikelihood()
         list_of_variances = [float(variance_list_variance) for i in range(28)] # ist das richtig so?? Kommt mir falsch vor...
         #try:
@@ -246,57 +194,115 @@ def run_experiment(config_file):
         experiment.store_result("details", logables)
         experiment.store_result("total count", total_counter)
         experiment.store_result("explosion count", explosion_counter)
-        # With the exception check in CKS hyperparameter training this shouldn't
-        # happen
-        #except Exception as e:
-        #    experiment.store_result("catastrophic failure", True)
-        #    experiment.store_result("Exception", e)
-        #    experiment.write_results()
-        #    print("CATASTROPHIC FAILURE")
-        #    return -1
 
-
-        ### Calculating various metrics
-        # Metrics
-        # - RMSE?
-        #
+        # Calculate p_k(y* | X) for the found kernel
+        # This is directly comparable for ALL metrics, even MAP-LApp
+        
+        # Do this without training
         model.eval()
         likelihood.eval()
-        with torch.no_grad(), gpytorch.settings.prior_mode(True):
-            observed_pred_prior = likelihood(model(observations_x))
-            f_preds = model(observations_x)
-            mean_posterior = observed_pred_prior.mean
-            lower_posterior, upper_posterior = observed_pred_prior.confidence_region()
-
-        mean_y = model(observations_x).mean
-
-        f, ax = plt.subplots()
-        f, ax = model.plot_model(return_figure=True, figure = f, ax=ax)
-        ax.plot(observations_x, observations_y, 'k*')
-        ax.set_title(gsr(model.covar_module)) 
-        image_time = time.time()
-        # Store the plots as .png
-        f.savefig(os.path.join(experiment_path, f"{experiment_keyword}_{exp_num}.png"))
-        # Store the plots as .tex
-        #tikzplotlib.save(os.path.join(experiment_path, f"{experiment_keyword}_{exp_num}.tex"))
+        test_samples = f_preds.sample_n(10)
+        test_samples = test_samples + torch.randn(test_samples.shape) * torch.tensor(noise_level)
+        mll = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood, model)
+        test_mll = list()
+        try:
+            for s in test_samples:
+                model.set_train_data(observations_x, s)
+                test_mll.append(mll(model(observations_x), s))
+                #test_mll = [mll(model(observations_x), s) * model.train_targets.numel() for test_sample in test_samples]
+        except Exception as E:
+            print(E)
+            print("----")
+            test_mll = [np.nan]
+        experiment.store_result("test mll list", test_mll)
+        experiment.store_result("avg test mll", torch.mean(torch.Tensor(test_mll)))
 
 
+        try:
+            model.set_train_data(observations_x, test_samples[test_mll.index(max(test_mll))])
+            f, ax = plt.subplots()
+            f, ax = model.plot_model(return_figure=True, figure = f, ax=ax, posterior=True, test_y = test_samples[test_mll.index(max(test_mll))])
+            #ax.plot(X, Y, 'k*')
+            ax.set_title(gsr(model.covar_module))
+            image_time = time.time()
+            # Store the plots as .png
+            f.savefig(os.path.join(experiment_path, f"{experiment_keyword}_{exp_num}_best_eval.png"))
+            # Store the plots as .tex
+            tikzplotlib.save(os.path.join(experiment_path, f"{experiment_keyword}_{exp_num}_best_eval.tex"))
+            plt.close(f)
+            model.set_train_data(observations_x, test_samples[test_mll.index(min(test_mll))])
+            f, ax = plt.subplots()
+            f, ax = model.plot_model(return_figure=True, figure = f, ax=ax, posterior=True, test_y = test_samples[test_mll.index(min(test_mll))])
+            ax.set_title(gsr(model.covar_module))
+            image_time = time.time()
+            # Store the plots as .png
+            f.savefig(os.path.join(experiment_path, f"{experiment_keyword}_{exp_num}_worst_eval.png"))
+            # Store the plots as .tex
+            tikzplotlib.save(os.path.join(experiment_path, f"{experiment_keyword}_{exp_num}_worst_eval.tex"))
+            plt.close(f)
+        except Exception as E:
+            print(E)
+            print("----")
+            open(os.path.join(experiment_path, f"{experiment_keyword}_{exp_num}.png"), "w+").close()
+            open(os.path.join(experiment_path, f"{experiment_keyword}_{exp_num}.tex"), "w+").close()
 
-        #eval_rmse = RMSE(observations_y.numpy(), mean_y.detach().numpy())
-        #print(eval_rmse)
+        # Do this with training a couple iterations on the new data
+        #options["training"]["max_iter"] = 50
+        #test_mll_retrained = list()
+        #try:
+        #    for test_sample in test_samples:
+        #        model.train_targets = test_sample
+        #        model.optimize_hyperparameters(with_BFGS=False, with_Adam=True, MAP=False)
+        #        mll = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood, model)
+        #        model.eval()
+        #        likelihood.eval()
+        #        test_mll_retrained.append(mll(model(observations_x), test_sample) * model.train_targets.numel())
+        #except Exception as E:
+        #    print(E)
+        #    print("----")
+        #    test_mll_retrained = [np.nan]
+        #experiment.store_result("avg test mll retrained", torch.mean(torch.Tensor(test_mll_retrained)))
 
-        #experiment.store_result("eval RMSE", eval_rmse)
+
+        try:
+            model.set_train_data(X, Y)
+            f, ax = plt.subplots()
+            f, ax = model.plot_model(return_figure=True, figure = f, ax=ax)
+            ax.plot(X, Y, 'k*')
+            ax.set_title(gsr(model.covar_module))
+            image_time = time.time()
+            # Store the plots as .png
+            f.savefig(os.path.join(experiment_path, f"{experiment_keyword}_{exp_num}.png"))
+            # Store the plots as .tex
+            tikzplotlib.save(os.path.join(experiment_path, f"{experiment_keyword}_{exp_num}.tex"))
+            plt.close(f)
+        except Exception as E:
+            print(E)
+            print("----")
+            open(os.path.join(experiment_path, f"{experiment_keyword}_{exp_num}.png"), "w+").close()
+            open(os.path.join(experiment_path, f"{experiment_keyword}_{exp_num}.tex"), "w+").close()
+
+
+
+
         experiment.store_result("model history", model_history)
+        experiment.store_result("random seed", torch_seed)
         experiment.store_result("performance history", performance_history)
         experiment.store_result("loss history", loss_history)
         experiment.store_result("final model", gsr(model.covar_module))
         experiment.store_result("parameters", dict(model.named_parameters())) # oder lieber als reinen string?
 
         experiment.write_results(os.path.join(experiment_path, f"{exp_num}.pickle"))
+        print(f"END {metric} - {exp_num}/{EXPERIMENT_REPITITIONS} - {time.strftime('%Y-%m-%d %H:%M', time.localtime())}")
         # TODO write filename in FINISHED.log
     with open("FINISHED.log", "a") as f:
         f.writelines(config_file + "\n")
+
+    m, s = divmod(time.time() - total_time_start, 60)
+    h, m = divmod(m, 60)
+    print(f"Total time for {config_file}\n{int(h)}:{int(m)}:{int(s)}")
     return 0
+
 
 
 
@@ -306,7 +312,7 @@ if __name__ == "__main__":
     with open("FINISHED.log", "r") as f:
         finished_configs = [line.strip().split("/")[-1] for line in f.readlines()]
     curdir = os.getcwd()
-    keywords = ["MLL", "AIC", "Laplace", "Laplace_prior"] # "MC" only when there's a lot of time
+    keywords = ["MLL", "AIC", "BIC", "Laplace", "Laplace_prior"] # "MC" only when there's a lot of time
     configs = []
     for KEYWORD in keywords:
         configs.extend([os.path.join(curdir, "configs", KEYWORD, item) for item in os.listdir(os.path.join(curdir, "configs", KEYWORD))])
@@ -318,15 +324,18 @@ if __name__ == "__main__":
     configs = [c for c in configs if not c.split("/")[-1] in finished_configs and os.path.isfile(c)]
     #configs = [c for c in configs if not c.split("/")[-1] in finished_configs and os.path.isfile(c)]
 
+    #torch_seed = random.randint(1, 1e+7)
+    #run_experiment(os.path.join(curdir, "configs/Laplace_prior/-480495070506691892.json"), torch_seed)
+    torch_seed = random.randint(1, 1e+7)
     for config in configs:
-        run_experiment(config)
+        run_experiment(config, torch_seed)
 
-    with open("running.log", "r") as fin, open("running.log", "w+") as fout:
-        for line in fin:
-            line = line.replace(config.split("/")[-1], "")
-            fout.write(line)
+    #with open("running.log", "r") as fin, open("running.log", "w+") as fout:
+    #    for line in fin:
+    #        line = line.replace(config.split("/")[-1], "")
+    #        fout.write(line)
 
     #for config in configs:
     #    run_experiment(config)
-    #with Pool(processes=7) as pool: # multithreading will lead to problems with the training iterations
-    #    pool.map(run_experiment, configs)
+    #with Pool(processes=4) as pool: # multithreading will lead to problems with the training iterations
+    #    pool.starmap(run_experiment, [(config, torch_seed) for config in configs])

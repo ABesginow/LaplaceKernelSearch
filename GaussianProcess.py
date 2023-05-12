@@ -28,7 +28,7 @@ def log_prior(model, theta_mu=None, sigma=None):
                     'PER':{'raw_lengthscale':{"mean": 0.7778461197268618, "std":2.288946656544974 },
                             'raw_period_length':{"mean": 0.6485334993738499, "std":0.9930632050553377 } },
                     'LIN':{'raw_variance':{"mean": -0.8017903983055685, "std":0.9966569921354465 } },
-                    'C':{'raw_outputscale':{"mean": -1.6253091096349706, "std":2.2570021716661923 } },
+                    'c':{'raw_outputscale':{"mean": -1.6253091096349706, "std":2.2570021716661923 } },
                     'noise': {'raw_noise':{"mean": -3.51640656386717, "std":3.5831320474767407 }}}
 
     variances_list = list()
@@ -206,7 +206,7 @@ class ExactGPModel(gpt.models.ExactGP):
     def eval_model(self):
         pass
 
-    def plot_model(self, return_figure = False, figure = None, ax = None):
+    def plot_model(self, return_figure = False, figure = None, ax = None, posterior=False, test_y=None):
         self.eval()
         self.likelihood.eval()
 
@@ -223,7 +223,10 @@ class ExactGPModel(gpt.models.ExactGP):
 
 
             lower, upper = observed_pred.confidence_region()
-            ax.plot(self.train_inputs[0].numpy(), self.train_targets.numpy(), 'k.', zorder=2)
+            #if not posterior:
+            #    ax.plot(self.train_inputs[0].numpy(), self.train_targets.numpy(), 'k.', zorder=2)
+            if posterior:
+                ax.plot(self.train_inputs[0].numpy(), test_y.numpy(), 'kx', zorder=2)
             ax.plot(test_x.numpy(), observed_pred.mean.numpy(), color="b", zorder=3)
             amount_of_gradient_steps = 30
             alpha_min=0.05

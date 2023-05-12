@@ -14,7 +14,7 @@ import stan
 import time
 import torch
 import threading
-from metrics import calculate_AIC, calculate_laplace, calculate_mc_STAN
+from metrics import calculate_AIC, calculate_laplace, calculate_mc_STAN, calculate_BIC
 
 
 # ----------------------------------------------------------------------------------------------------
@@ -131,6 +131,9 @@ def CKS(X, Y, likelihood, base_kernels, list_of_variances=None,  experiment=None
                 try:
                     performance[gsr(k)], logs = calculate_laplace(models[gsr(k)], (-models[gsr(k)].get_current_loss())*len(
                         *models[gsr(k)].train_inputs), with_prior=True, param_punish_term=param_punish_term)
+                    print(gsr(k))
+                    print(logs["MLL"])
+                    print(logs["punish term"])
                     logs["iteration"] = i
                     logs["Train time"] = train_end - train_start
                     logables.append(logs)
@@ -143,11 +146,12 @@ def CKS(X, Y, likelihood, base_kernels, list_of_variances=None,  experiment=None
                     logs["iteration"] = i
                     logs["Train time"] = train_end - train_start
                     logables.append(logs)
-                except:
+                except Exception as E:
+                    print(E)
                     performance[gsr(k)] = np.NINF
             if metric == "MC":
                 #try:
-                performance[gsr(k)], logs =  calculate_mc_STAN(models[gsr(k)], models[gsr(k)].likelihood, num_draws=num_draws)
+                performance[gsr(k)], logs = calculate_mc_STAN(models[gsr(k)], models[gsr(k)].likelihood, num_draws=num_draws)
                 logables.append(logs)
 
                 #except:
@@ -159,6 +163,15 @@ def CKS(X, Y, likelihood, base_kernels, list_of_variances=None,  experiment=None
                     performance[gsr(k)], logs = calculate_AIC(-models[gsr(k)].get_current_loss()* models[gsr(k)].train_inputs[0].numel(), sum(p.numel() for p in models[gsr(k)].parameters() if p.requires_grad))
                     logables.append(logs)
                 except:
+                    performance[gsr(k)] = np.NINF
+            if metric == "BIC":
+                try:
+                    bic_loss = -models[gsr(k)].get_current_loss()* models[gsr(k)].train_inputs[0].numel()
+                    bic_params = sum(p.numel() for p in models[gsr(k)].parameters() if p.requires_grad)
+                    bic_data_count =  torch.tensor(models[gsr(k)].train_inputs[0].numel())
+                    performance[gsr(k)], logs = calculate_BIC(bic_loss, bic_params, bic_data_count)
+                    logables.append(logs)
+                except Exception as E:
                     performance[gsr(k)] = np.NINF
             elif metric == "MLL":
                 try:
