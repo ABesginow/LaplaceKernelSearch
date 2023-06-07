@@ -98,7 +98,7 @@ def run_experiment(config_file, torch_seed):
 
     """
     torch.manual_seed(torch_seed)
-    EXPERIMENT_REPITITIONS = 1
+    EXPERIMENT_REPITITIONS = 5
     total_time_start = time.time()
     options["kernel search"]["print"] = False
     options["training"]["restarts"] = 2 
@@ -131,7 +131,7 @@ def run_experiment(config_file, torch_seed):
 
         log_name = "..."
         experiment_keyword = var_dict["experiment name"]
-        experiment_path = os.path.join("results_100_04", metric, f"{experiment_keyword}")
+        experiment_path = os.path.join("results", metric, f"{experiment_keyword}")
         if not os.path.exists(experiment_path):
             os.makedirs(experiment_path)
         log_experiment_path = os.path.join(experiment_path, f"{experiment_keyword}")
@@ -143,12 +143,13 @@ def run_experiment(config_file, torch_seed):
         # Create base model to generate data
 
         # training data for model initialization (e.g. 1 point with x=0, y=0) ; this makes initializing the model easier
-        prior_x = torch.linspace(0,1,1)
+        prior_x = torch.linspace(0, 1, 1)
         prior_y = prior_x
         # initialize likelihood and model
         data_likelihood = gpytorch.likelihoods.GaussianLikelihood()
         data_model = ExactGPModel(prior_x, prior_y, data_likelihood, kernel_text=data_kernel)
         observations_x = torch.linspace(eval_START, eval_END, eval_COUNT)
+        observations_x = (observations_x - torch.mean(observations_x)) / torch.std(observations_x)
         # Get into evaluation (predictive posterior) mode
         data_model.eval()
         data_likelihood.eval()
@@ -168,7 +169,7 @@ def run_experiment(config_file, torch_seed):
         X = observations_x  #[int((1-train_data_ratio)*0.5*eval_COUNT):int((1+train_data_ratio)*0.5*eval_COUNT)]
         Y = observations_y  #[int((1-train_data_ratio)*0.5*eval_COUNT):int((1+train_data_ratio)*0.5*eval_COUNT)]
 
-        noise_level = 0.4
+        noise_level = 0.1
         # Percentage noise
         Y = Y + torch.randn(Y.shape) * torch.tensor(noise_level)
         # Z-Score scaling
@@ -198,24 +199,49 @@ def run_experiment(config_file, torch_seed):
         # Calculate p_k(y* | X) for the found kernel
         # This is directly comparable for ALL metrics, even MAP-LApp
         
+
+
+        #def manual_log_like(model, likelihood):
+        #    with torch.no_grad():
+        #        observed_pred_prior = likelihood(model(model.train_inputs[0]))
+        #    ## Compare this to the likelihood of y given mean and covar (+ noise)
+        #    #like_mean = torch.zeros(len(model.train_inputs[0]))
+        #    #like_cov_matr = torch.eye(len(model.train_inputs[0].tolist())) * likelihood.noise + model.covar_module(model.train_inputs[0])
+        #    #like_cov_matr += torch.eye(len(model.train_inputs[0].tolist())) * 1e-4 # Jitter
+        #    like_cov_chol = torch.linalg.cholesky(observed_pred_prior.covariance_matrix)
+        #    like_dist = torch.distributions.multivariate_normal.MultivariateNormal(observed_pred_prior.mean, scale_tril=like_cov_chol)
+        #    return like_dist.log_prob(model.train_targets) / model.train_targets.numel()
+
+        #print("post KS")
+        #print(list(model.named_parameters()))
         # Do this without training
         model.eval()
         likelihood.eval()
         test_samples = f_preds.sample_n(10)
         test_samples = test_samples + torch.randn(test_samples.shape) * torch.tensor(noise_level)
         mll = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood, model)
+        #print("post mll init")
+        #print(list(model.named_parameters()))
         test_mll = list()
+        #manual_test_mll = list()
         try:
             for s in test_samples:
                 model.set_train_data(observations_x, s)
+                #print("post new data")
+                #print(list(model.named_parameters()))
                 test_mll.append(mll(model(observations_x), s))
+                #manual_test_mll.append(manual_log_like(model, likelihood))
+                #print("post mll calc")
+                #print(list(model.named_parameters()))
                 #test_mll = [mll(model(observations_x), s) * model.train_targets.numel() for test_sample in test_samples]
         except Exception as E:
             print(E)
             print("----")
             test_mll = [np.nan]
         experiment.store_result("test mll list", test_mll)
+        #experiment.store_result("manual test mll list", manual_test_mll)
         experiment.store_result("avg test mll", torch.mean(torch.Tensor(test_mll)))
+        #experiment.store_result("avg manual test mll", torch.mean(torch.Tensor(manual_test_mll)))
 
 
         try:
@@ -295,7 +321,7 @@ def run_experiment(config_file, torch_seed):
         experiment.write_results(os.path.join(experiment_path, f"{exp_num}.pickle"))
         print(f"END {metric} - {exp_num}/{EXPERIMENT_REPITITIONS} - {time.strftime('%Y-%m-%d %H:%M', time.localtime())}")
         # TODO write filename in FINISHED.log
-    with open("FINISHED.log", "a") as f:
+    with open("FINISHED_var.log", "a") as f:
         f.writelines(config_file + "\n")
 
     m, s = divmod(time.time() - total_time_start, 60)
@@ -312,7 +338,7 @@ if __name__ == "__main__":
     with open("FINISHED.log", "r") as f:
         finished_configs = [line.strip().split("/")[-1] for line in f.readlines()]
     curdir = os.getcwd()
-    keywords = ["MLL", "AIC", "BIC", "Laplace", "Laplace_prior"] # "MC" only when there's a lot of time
+    keywords = ["AIC", "BIC", "MLL",  "Laplace", "Laplace_prior"]#"MLL" sucks  # "MC" only when there's a lot of time
     configs = []
     for KEYWORD in keywords:
         configs.extend([os.path.join(curdir, "configs", KEYWORD, item) for item in os.listdir(os.path.join(curdir, "configs", KEYWORD))])

@@ -43,12 +43,12 @@ general_json = {
     'Kernel_search': ["CKS"],
     'train_data_ratio': [0.5],#50% of the eval data
     #'Data_kernel': ["SE", "PER", "MAT32", "PER*SE", "PER+SE", "MAT32*PER", "MAT32+PER", "MAT32+SE", "MAT32*SE"],
-    'Data_kernel': ["SE", "MAT32", "MAT32+SE", "MAT32*SE"],
+    'Data_kernel': ["PER", "SE", "MAT32", "MAT32+SE", "MAT32*SE", "MAT32*PER", "MAT32+PER", "PER*SE"],
     'weights': [[1., 1.]],
     'Variance_list': [4],
     'eval_START':[-5.0],
     'eval_END':[5.0],
-    'eval_COUNT':[10, 20, 50, 70, 100],#, 100, 250, 500],
+    'eval_COUNT':[5, 10, 20, 30, 40, 50, 70, 100, 150, 200],#, 250, 500],
     'optimizer':['Adam'],
     'train_iterations':[200],
     'LR': [0.1],
@@ -150,6 +150,9 @@ def generate_config(keys, configurations):
             config_file_name = "_".join([str(config_dict[k]) for k in config_dict]) 
             #config_file_name = f"{config_dict['Metric']}_{i}"
             conf_dir = config_dict['Metric']
+
+            if not os.path.exists(os.path.join("configs", conf_dir)):
+                os.makedirs(os.path.join("configs", conf_dir))
             with open(os.path.join("configs", f"{conf_dir}", f"{config_file_name}.json"), 'w') as configfile:
                 configfile.write(json.dumps(config_dict, indent=4))
     except Exception as e:

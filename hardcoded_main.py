@@ -354,9 +354,8 @@ def run_experiment(config):
 
     """
     torch.manual_seed(50)
-    metrics = ["MLL", "MAP", "AIC", "BIC", "MC", "Laplace", "Laplace_prior"]
-    #metrics = ["BIC", "MAP"]
-    #metrics = ["Laplace_prior"]
+    metrics = ["AIC", "BIC", "MC", "Laplace", "Laplace_prior"]
+    metrics = ["Laplace"]
     eval_START = -5
     eval_END = 5
     eval_COUNT = config["num_data"]
@@ -368,11 +367,11 @@ def run_experiment(config):
     data_scaling = True
     use_BFGS = True
     num_draws = 10000
-    parameter_punishment = 2.0
+    parameter_punishment = "BIC"
 
     # set training iterations to the correct config
     options["training"]["max_iter"] = int(train_iterations)
-
+    options["training"]["restarts"] = 2
 
     # training data for model initialization (e.g. 1 point with x=0, y=0) ; this makes initializing the model easier
     prior_x = torch.linspace(0, 1, 1)
@@ -411,8 +410,10 @@ def run_experiment(config):
 
     observations_x = (observations_x - torch.mean(observations_x)
                       ) / torch.std(observations_x)
-    observations_y = (observations_y - torch.mean(observations_y)
-                      ) / torch.std(observations_y)
+    noise_level = 0.4
+    observations_y = observations_y + torch.randn(observations_y.shape) * torch.tensor(noise_level)
+    #observations_y = (observations_y - torch.mean(observations_y)
+    #                  ) / torch.std(observations_y)
 
     f, ax = plt.subplots()
     ax.plot(observations_x, observations_y, 'k*')
@@ -442,7 +443,8 @@ def run_experiment(config):
     for exp_num in range(EXPERIMENT_REPITITIONS):
 
         #model_kernels = ["MAT32+PER"]
-        model_kernels = ["C*C*SE", "SE", "PER", "MAT32", "PER*SE", "PER+SE", "MAT32*PER", "MAT32+PER", "MAT32+SE", "MAT32*SE"]
+        model_kernels = ["C*C*SE", "PER", "PER*SE", "MAT32+PER", "SE", "MAT32", "MAT32+SE", "MAT32*SE"]
+        #model_kernels = ["C*C*SE", "SE", "PER", "MAT32", "MAT32+SE", "MAT32*SE"]#"PER*SE", "PER+SE", "MAT32*PER", "MAT32+PER",
         #model_kernels = ["MAT32*PER"]
 
         for model_kernel in model_kernels:
@@ -475,7 +477,7 @@ def run_experiment(config):
                         continue
                 if loss is np.nan:
                     raise ValueError("training fucked up")
-            train_time = train_end - train_start
+                train_time = train_end - train_start
             if "Laplace" in metrics:
                 laplace_approx, LApp_log = calculate_laplace(
                     model, (-loss)*len(*model.train_inputs), param_punish_term=parameter_punishment)
@@ -538,7 +540,7 @@ def run_experiment(config):
                 BIC_logs["details"] = BIC_log
                 logables["BIC"][model_kernel] = BIC_logs
 
-            if "MAP" in metrics:
+            if "MAP" in metrics or "Laplace_prior" in metrics:
                 loss = np.nan
                 print("\n###############")
                 print(model_kernel)
@@ -563,11 +565,12 @@ def run_experiment(config):
                         continue
                 if loss is np.nan:
                     raise ValueError("training fucked up")
-                MAP_logs = dict()
-                MAP_logs["loss"] = -loss * len(observations_x)
-                MAP_logs["Train time"] = train_end - train_start
-                MAP_logs["model parameters"] = list(model.named_parameters())
-                logables["MAP"][model_kernel] = MAP_logs
+                if "MAP" in metrics:
+                    MAP_logs = dict()
+                    MAP_logs["loss"] = -loss * len(observations_x)
+                    MAP_logs["Train time"] = train_end - train_start
+                    MAP_logs["model parameters"] = list(model.named_parameters())
+                    logables["MAP"][model_kernel] = MAP_logs
 
                 model.eval()
                 likelihood.eval()
@@ -586,7 +589,7 @@ def run_experiment(config):
 
             # Laplace approximation including prior requires different loss
             if "Laplace_prior" in metrics:
-                approx, Lapp_prior_log = calculate_laplace(model, (-loss)*len(*model.train_inputs), with_prior=True)
+                approx, Lapp_prior_log = calculate_laplace(model, (-loss)*len(*model.train_inputs), with_prior=True, param_punish_term = 0.0)
                 Lap_prior_logs = dict()
                 Lap_prior_logs["loss"] = approx
                 Lap_prior_logs["Train time"] = train_end - train_start
@@ -595,10 +598,8 @@ def run_experiment(config):
 
 
 
-
-
             # Perform MCMC
-            if "MC" in metrics and "MLL" in metrics:
+            if "MC" in metrics:
                 MCMC_approx, MC_log = calculate_mc_STAN(
                     model, likelihood, num_draws)
                 MC_logs = dict()
@@ -611,7 +612,7 @@ def run_experiment(config):
     experiment_path = os.path.join("results", "hardcoded",  f"{eval_COUNT}_{data_kernel}")
     if not os.path.exists(experiment_path):
         os.makedirs(experiment_path)
-    with open(os.path.join(experiment_path, f"other_datasizes.pickle"), 'wb') as fh:
+    with open(os.path.join(experiment_path, f"LLapCorBIC.pickle"), 'wb') as fh:
         pickle.dump(logables, fh)
 
     return 0
@@ -620,8 +621,9 @@ def run_experiment(config):
 with open("FINISHED.log", "r") as f:
     finished_configs = [line.strip().split("/")[-1] for line in f.readlines()]
 curdir = os.getcwd()
-num_data = [70, 30, 20]#[200, 150, 100, 50, 10]
-data_kernel = ["SE", "PER", "MAT32", "PER*SE", "PER+SE", "MAT32*PER", "MAT32+PER", "MAT32+SE", "MAT32*SE"]
+num_data =  [10, 20, 50, 70, 100, 150, 200] # TODO: 5, 30, 40 Datapoints    - Done: 10, 20, 50,
+data_kernel = ["SE", "MAT32", "MAT32+SE", "MAT32*SE"]#"PER", "PER*SE", "MAT32+PER", 
+# "PER", "PER*SE", "PER+SE", "MAT32*PER", "MAT32+PER" 
 #data_kernel = ["PER+SE"]
 temp = product(num_data, data_kernel)
 configs = [{"num_data": n, "data_kernel": dat} for n, dat in temp]

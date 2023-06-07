@@ -73,6 +73,7 @@ def log_prior(model, theta_mu=None, sigma=None):
     theta_mu = torch.tensor(theta_mu)
     theta_mu = theta_mu.unsqueeze(0).t()
     sigma = torch.diag(torch.Tensor(variances_list))
+    sigma = sigma@sigma
 
     prior = torch.distributions.MultivariateNormal(theta_mu.t(), sigma)
 

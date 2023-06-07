@@ -110,6 +110,7 @@ def calculate_laplace(model, loss_of_model, variances_list=None, with_prior=Fals
                 'MAT32': {'raw_lengthscale' :{"mean": 1.5711054238673443, "std":2.4453761235991216 } },
                 'RQ': {'raw_lengthscale' :{"mean": -0.049841950913676276, "std":1.9426354614713097 }, 
                         'raw_alpha' :{"mean": 1.882148553921053, "std":3.096431944989054 } },
+                'CosineKernel':{'raw_period_length':{"mean": 0.6485334993738499, "std":0.9930632050553377 }},
                 'PER':{'raw_lengthscale':{"mean": 0.7778461197268618, "std":2.288946656544974 },
                         'raw_period_length':{"mean": 0.6485334993738499, "std":0.9930632050553377 } },
                 'LIN':{'raw_variance' :{"mean": -0.8017903983055685, "std":0.9966569921354465 } },
@@ -161,6 +162,7 @@ def calculate_laplace(model, loss_of_model, variances_list=None, with_prior=Fals
 
     # sigma is a matrix of variance priors
     sigma = torch.diag(torch.Tensor(variances_list))
+    sigma = sigma@sigma
     params = torch.tensor(params_list).clone().reshape(-1, 1)
 
     end = time.time()
@@ -444,6 +446,7 @@ def calculate_mc_STAN(model, likelihood, num_draws):
 
     # sigma is a matrix of variance priors
     sigma = torch.diag(torch.Tensor(variances_list))
+    sigma = sigma@sigma
 
 
     STAN_code = generate_STAN_code(covar_string, debug_param_name_list, covar_string_list)
@@ -511,13 +514,17 @@ def calculate_mc_STAN(model, likelihood, num_draws):
 
 
         try:
+            with torch.no_grad():
+                observed_pred_prior = likelihood(model(model.train_inputs[0]))
             # Compare this to the likelihood of y given mean and covar (+ noise)
-            like_mean = torch.zeros(len(model.train_inputs[0]))
+            #like_mean = torch.zeros(len(model.train_inputs[0]))
 
-            like_cov_matr = torch.eye(len(model.train_inputs[0].tolist())) * likelihood.noise + model.covar_module(model.train_inputs[0])
-            like_cov_matr += torch.eye(len(model.train_inputs[0].tolist())) * 1e-4 # Jitter
-            like_cov_chol = torch.linalg.cholesky(like_cov_matr.evaluate())
-            like_dist = torch.distributions.multivariate_normal.MultivariateNormal(like_mean, scale_tril=like_cov_chol)
+            #like_cov_matr = torch.eye(len(model.train_inputs[0].tolist())) * likelihood.noise + model.covar_module(model.train_inputs[0])
+            #like_cov_matr += torch.eye(len(model.train_inputs[0].tolist())) * 1e-4 # Jitter
+            #like_cov_chol = torch.linalg.cholesky(like_cov_matr.evaluate())
+            #like_dist = torch.distributions.multivariate_normal.MultivariateNormal(like_mean, scale_tril=like_cov_chol)
+            like_cov_chol = torch.linalg.cholesky(observed_pred_prior.covariance_matrix)
+            like_dist = torch.distributions.multivariate_normal.MultivariateNormal(observed_pred_prior.mean, scale_tril=like_cov_chol)
             manual_lp_list.append(like_dist.log_prob(model.train_targets))
         except Exception as e:
             bad_entries += 1

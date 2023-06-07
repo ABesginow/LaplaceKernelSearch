@@ -175,7 +175,7 @@ def CKS(X, Y, likelihood, base_kernels, list_of_variances=None,  experiment=None
                     performance[gsr(k)] = np.NINF
             elif metric == "MLL":
                 try:
-                    performance[gsr(k)] = evaluate_performance_via_likelihood(models[gsr(k)]).detach().numpy()
+                    performance[gsr(k)] = evaluate_performance_via_likelihood(models[gsr(k)])#.detach().numpy()
                 except:
                     performance[gsr(k)] = np.NINF
             # Add variances list as parameter somehow
@@ -191,7 +191,12 @@ def CKS(X, Y, likelihood, base_kernels, list_of_variances=None,  experiment=None
         best_performance = {"model": (gsr(best_model.covar_module), best_model.state_dict()), "performance": max(performance.values())}
         model_steps.append(performance)
         performance_steps.append(best_performance)
-        loss_steps.append(best_model.get_current_loss())
+        try:
+            best_current_loss = best_model.get_current_loss()
+        except Exception as E:
+            print(E)
+            best_current_loss = np.NINF
+        loss_steps.append(best_current_loss)
         candidates = create_candidates_CKS(best_model.covar_module, base_kernels, operations)
     if options["kernel search"]["print"]:
         print(f"KERNEL SEARCH: kernel search concluded, optimal expression: {gsr(best_model.covar_module)}")
