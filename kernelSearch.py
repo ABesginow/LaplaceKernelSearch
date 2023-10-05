@@ -131,9 +131,9 @@ def CKS(X, Y, likelihood, base_kernels, list_of_variances=None,  experiment=None
                 try:
                     performance[gsr(k)], logs = calculate_laplace(models[gsr(k)], (-models[gsr(k)].get_current_loss())*len(
                         *models[gsr(k)].train_inputs), with_prior=True, param_punish_term=param_punish_term)
-                    print(gsr(k))
-                    print(logs["MLL"])
-                    print(logs["punish term"])
+                    #print(gsr(k))
+                    #print(logs["MLL"])
+                    #print(logs["punish term"])
                     logs["iteration"] = i
                     logs["Train time"] = train_end - train_start
                     logables.append(logs)

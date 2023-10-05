@@ -8,6 +8,7 @@ from helpFunctions import get_string_representation_of_kernel as gsr, clean_kern
 from helpFunctions import amount_of_base_kernels
 import json
 from kernelSearch import *
+from metrics import calculate_mc_STAN
 from matplotlib import pyplot as plt
 from multiprocessing import Pool
 import os
@@ -38,7 +39,7 @@ class ExactGPModel(gpytorch.models.ExactGP):
         elif kernel_text == "PER*LIN":
             self.covar_module = gpytorch.kernels.PeriodicKernel() * gpytorch.kernels.LinearKernel()
         elif kernel_text == "MAT32":
-            self.covar_module = gpytorch.kernels.MaternKernel(nu=1.5) 
+            self.covar_module = gpytorch.kernels.MaternKernel(nu=1.5)
         elif kernel_text == "MAT32*PER":
             self.covar_module =  gpytorch.kernels.MaternKernel(nu=1.5) * gpytorch.kernels.PeriodicKernel()
         elif kernel_text == "MAT32+PER":
@@ -48,13 +49,13 @@ class ExactGPModel(gpytorch.models.ExactGP):
         elif kernel_text == "MAT32+SE":
             self.covar_module =  gpytorch.kernels.MaternKernel(nu=1.5) + gpytorch.kernels.RBFKernel()
         elif kernel_text == "MAT52":
-            self.covar_module = gpytorch.kernels.MaternKernel() 
+            self.covar_module = gpytorch.kernels.MaternKernel()
         elif kernel_text == "MAT52*PER":
             self.covar_module =  gpytorch.kernels.MaternKernel() * gpytorch.kernels.PeriodicKernel()
         elif kernel_text == "RQ*PER":
             self.covar_module = gpytorch.kernels.RQKernel() * gpytorch.kernels.PeriodicKernel()
         elif kernel_text == "RQ*MAT32":
-            self.covar_module = gpytorch.kernels.RQKernel() * gpytorch.kernels.MaternKernel(nu=1.5) 
+            self.covar_module = gpytorch.kernels.RQKernel() * gpytorch.kernels.MaternKernel(nu=1.5)
         elif kernel_text == "RQ*SE":
             self.covar_module = gpytorch.kernels.RQKernel() * gpytorch.kernels.RBFKernel()
 
@@ -98,35 +99,35 @@ def run_experiment(config_file, torch_seed):
 
     """
     torch.manual_seed(torch_seed)
-    EXPERIMENT_REPITITIONS = 5
+    EXPERIMENT_REPITITIONS = 50 
     total_time_start = time.time()
     options["kernel search"]["print"] = False
-    options["training"]["restarts"] = 2 
+    options["training"]["restarts"] = 2
+    ### Initialization
+    var_dict = load_config(config_file)
+
+    metric = var_dict["Metric"]
+    kernel_search = var_dict["Kernel_search"]
+    train_data_ratio = var_dict["train_data_ratio"]
+    data_kernel = var_dict["Data_kernel"]
+    weights = var_dict["weights"]
+    variance_list_variance = var_dict["Variance_list"]
+    eval_START = var_dict["eval_START"]
+    eval_END = var_dict["eval_END"]
+    eval_COUNT = var_dict["eval_COUNT"]
+    optimizer = var_dict["optimizer"]
+    train_iterations = var_dict["train_iterations"]
+    LR = var_dict["LR"]
+    noise = var_dict["Noise"]
+    data_scaling = var_dict["Data_scaling"]
+    use_BFGS = var_dict["BFGS"]
+    num_draws = var_dict["num_draws"] if metric == "MC" else None
+    parameter_punishment = var_dict["parameter_punishment"] if metric == "Laplace" or metric == "Laplace_prior" else None
+
+    # set training iterations to the correct config
+    options["training"]["max_iter"] = int(train_iterations)
+
     for exp_num in range(0, EXPERIMENT_REPITITIONS, 1):
-        ### Initialization
-        var_dict = load_config(config_file)
-
-        metric = var_dict["Metric"]
-        kernel_search = var_dict["Kernel_search"]
-        train_data_ratio = var_dict["train_data_ratio"]
-        data_kernel = var_dict["Data_kernel"]
-        weights = var_dict["weights"]
-        variance_list_variance = var_dict["Variance_list"]
-        eval_START = var_dict["eval_START"]
-        eval_END = var_dict["eval_END"]
-        eval_COUNT = var_dict["eval_COUNT"]
-        optimizer = var_dict["optimizer"]
-        train_iterations = var_dict["train_iterations"]
-        LR = var_dict["LR"]
-        noise = var_dict["Noise"]
-        data_scaling = var_dict["Data_scaling"]
-        use_BFGS = var_dict["BFGS"]
-        num_draws = var_dict["num_draws"] if metric == "MC" else None
-        parameter_punishment = var_dict["parameter_punishment"] if metric == "Laplace" or metric == "Laplace_prior" else None
-
-        # set training iterations to the correct config
-        options["training"]["max_iter"] = int(train_iterations)
-
         print(f"{metric} - {exp_num}/{EXPERIMENT_REPITITIONS} - {time.strftime('%Y-%m-%d %H:%M', time.localtime())}")
 
         log_name = "..."
@@ -138,7 +139,7 @@ def run_experiment(config_file, torch_seed):
         experiment = Experiment(log_experiment_path, exp_num, attributes=var_dict)
 
 
-        
+
         ## Create train data
         # Create base model to generate data
 
@@ -177,12 +178,10 @@ def run_experiment(config_file, torch_seed):
             X = (X - torch.mean(X)) / torch.std(X)
             #Y = (Y - torch.mean(Y)) / torch.std(Y)
 
-
-
         # Run CKS
         list_of_kernels = [gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel()),
                            gpytorch.kernels.ScaleKernel(gpytorch.kernels.PeriodicKernel()),
-                           gpytorch.kernels.ScaleKernel(gpytorch.kernels.LinearKernel()), 
+                           gpytorch.kernels.ScaleKernel(gpytorch.kernels.LinearKernel()),
                            gpytorch.kernels.ScaleKernel(gpytorch.kernels.MaternKernel(nu=1.5))]
         likelihood = gpytorch.likelihoods.GaussianLikelihood()
         list_of_variances = [float(variance_list_variance) for i in range(28)] # ist das richtig so?? Kommt mir falsch vor...
@@ -196,9 +195,15 @@ def run_experiment(config_file, torch_seed):
         experiment.store_result("total count", total_counter)
         experiment.store_result("explosion count", explosion_counter)
 
+        # Do an MCMC evaluation of the resulting kernel and store the likelihood
+        # Perform MCMC
+        MCMC_approx, MC_log = calculate_mc_STAN(model, likelihood, 1000)
+        experiment.store_result("MCMC approx", MCMC_approx)
+        experiment.store_result("MCMC details", MC_log)
+
         # Calculate p_k(y* | X) for the found kernel
         # This is directly comparable for ALL metrics, even MAP-LApp
-        
+
 
 
         #def manual_log_like(model, likelihood):
@@ -321,7 +326,7 @@ def run_experiment(config_file, torch_seed):
         experiment.write_results(os.path.join(experiment_path, f"{exp_num}.pickle"))
         print(f"END {metric} - {exp_num}/{EXPERIMENT_REPITITIONS} - {time.strftime('%Y-%m-%d %H:%M', time.localtime())}")
         # TODO write filename in FINISHED.log
-    with open("FINISHED_var.log", "a") as f:
+    with open("FINISHED.log", "a") as f:
         f.writelines(config_file + "\n")
 
     m, s = divmod(time.time() - total_time_start, 60)
@@ -338,7 +343,7 @@ if __name__ == "__main__":
     with open("FINISHED.log", "r") as f:
         finished_configs = [line.strip().split("/")[-1] for line in f.readlines()]
     curdir = os.getcwd()
-    keywords = ["AIC", "BIC", "MLL",  "Laplace", "Laplace_prior"]#"MLL" sucks  # "MC" only when there's a lot of time
+    keywords = ["AIC", "BIC", "MLL",  "Laplace_prior"]# "MC" only when there's a lot of time
     configs = []
     for KEYWORD in keywords:
         configs.extend([os.path.join(curdir, "configs", KEYWORD, item) for item in os.listdir(os.path.join(curdir, "configs", KEYWORD))])
@@ -356,12 +361,5 @@ if __name__ == "__main__":
     for config in configs:
         run_experiment(config, torch_seed)
 
-    #with open("running.log", "r") as fin, open("running.log", "w+") as fout:
-    #    for line in fin:
-    #        line = line.replace(config.split("/")[-1], "")
-    #        fout.write(line)
-
-    #for config in configs:
-    #    run_experiment(config)
     #with Pool(processes=4) as pool: # multithreading will lead to problems with the training iterations
     #    pool.starmap(run_experiment, [(config, torch_seed) for config in configs])

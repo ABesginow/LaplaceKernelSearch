@@ -64,12 +64,12 @@ MC_json = {
 
 Laplace_json = {
     "Metric": ["Laplace"],
-    "parameter_punishment": [0.0, 2.0, "BIC"]
+    "parameter_punishment": [0.0, -1.0, "BIC"]
 }
 
 Laplace_prior_json = {
     "Metric": ["Laplace_prior"],
-    "parameter_punishment": [0.0, 2.0, "BIC"]
+    "parameter_punishment": [0.0, -1.0, "BIC"]
 }
 
 MLL_json = {
@@ -84,7 +84,7 @@ BIC_json = {
     "Metric" : ["BIC"]
 }
 
-specific_jsons = [MC_json, Laplace_json, MLL_json, AIC_json, BIC_json, Laplace_prior_json]
+specific_jsons = [MC_json, MLL_json, AIC_json, BIC_json, Laplace_prior_json] # , Laplace_json
 #general_json = {
 #                'Metric': ["Laplace", "MC", "MLL", "AIC"],
 #                'Kernel_search': ["CKS"],
