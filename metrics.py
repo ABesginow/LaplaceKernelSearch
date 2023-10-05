@@ -195,7 +195,7 @@ def calculate_laplace(model, loss_of_model, variances_list=None, with_prior=Fals
         #punish_term = 0.5*len(theta_mu)*torch.tensor(1.8378) + 0.5*torch.log(torch.det(hessian))
         punish_term = 0.5*len(theta_mu)*torch.tensor(1.8378) - 0.5*torch.sum(torch.log(constructed_eigvals_log))
         laplace = loss_of_model + punish_term
-        punish_without_replacement = 0.5*len(theta_mu)*torch.tensor(1.8378) - 0.5*torch.log(torch.det(oldHessian))
+        punish_without_replacement = 0.5*len(theta_mu)*torch.tensor(1.8378) - 0.5*torch.logdet(oldHessian)
         end = time.time()
         approximation_time = end - start
         if param_punish_term == -1.0:
