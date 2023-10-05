@@ -450,7 +450,7 @@ def run_experiment(config):
     f_var = f_preds.variance
     f_covar = f_preds.covariance_matrix
 
-    EXPERIMENT_REPITITIONS = 50
+    EXPERIMENT_REPITITIONS = 10
     for exp_num in tqdm(range(EXPERIMENT_REPITITIONS)):
         exp_num_result_dict = dict()
         for metric in metrics:
@@ -704,7 +704,7 @@ def run_experiment(config):
                 exp_num_result_dict["MC"][model_kernel] = MC_logs
         logables["results"].append(exp_num_result_dict)
 
-    experiment_path = os.path.join("results", "hardcoded",  f"{eval_COUNT}_{data_kernel}")
+    experiment_path = os.path.join("results_small_experiment", "hardcoded",  f"{eval_COUNT}_{data_kernel}")
     if not os.path.exists(experiment_path):
         os.makedirs(experiment_path)
     with open(os.path.join(experiment_path, f"results.pickle"), 'wb') as fh:
@@ -716,9 +716,8 @@ def run_experiment(config):
 with open("FINISHED.log", "r") as f:
     finished_configs = [line.strip().split("/")[-1] for line in f.readlines()]
 curdir = os.getcwd()
-num_data =  [5, 10, 20, 30, 50, 70, 100, 150, 200]
-num_data =  [200]
-#data_kernel = ["SE", "RQ", "MAT32", "MAT52", "SE * SE"]
+num_data =  [10]#[5, 10, 20, 30, 50, 70, 100, 150, 200]
+data_kernel = ["MAT52"]
 #data_kernel = ["SE", "RQ", "MAT32", "MAT52", "SE*SE",
 #               "SE+SE", "MAT32+SE", "MAT52+SE", "MAT32*SE", "PER",
 #               "PER*SE", "(SE+RQ)*PER", "SE+SE+SE", "MAT32+(MAT52*PER)"]
