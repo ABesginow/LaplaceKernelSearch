@@ -718,9 +718,10 @@ with open("FINISHED.log", "r") as f:
 curdir = os.getcwd()
 num_data =  [5, 10, 20, 30, 50, 70, 100, 150, 200]
 num_data =  [200]
-data_kernel = ["SE", "RQ", "MAT32", "MAT52", "SE*SE",
-               "SE+SE", "MAT32+SE", "MAT52+SE", "MAT32*SE", "PER",
-               "PER*SE", "(SE+RQ)*PER", "SE+SE+SE", "MAT32+(MAT52*PER)"]
+#data_kernel = ["SE", "RQ", "MAT32", "MAT52", "SE * SE"]
+#data_kernel = ["SE", "RQ", "MAT32", "MAT52", "SE*SE",
+#               "SE+SE", "MAT32+SE", "MAT52+SE", "MAT32*SE", "PER",
+#               "PER*SE", "(SE+RQ)*PER", "SE+SE+SE", "MAT32+(MAT52*PER)"]
 #data_kernel = ["SE", "RQ", "MAT32", "MAT52", "SE*SE",
 #               "SE+SE", "MAT32+SE", "MAT52+SE", "MAT32*SE", "PER",
 #               "PER*SE", "(SE+RQ)*PER", "SE+SE+SE", "MAT32+(MAT52*PER)"]
