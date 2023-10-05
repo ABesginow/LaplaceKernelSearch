@@ -16,6 +16,7 @@ import torch
 import threading
 
 
+# This is the NEGATIVE BIC
 def calculate_BIC(loss, num_params, num_data):
     start = time.time()
     BIC = -num_params*torch.log(num_data) + 2*loss
@@ -26,6 +27,7 @@ def calculate_BIC(loss, num_params, num_data):
     return BIC, logables
 
 
+# This is the NEGATIVE AIC
 def calculate_AIC(loss, num_params):
     start = time.time()
     AIC = -2*num_params + 2*loss
