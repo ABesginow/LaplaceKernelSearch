@@ -164,7 +164,7 @@ class ExactGPModel(gpytorch.models.ExactGP):
         elif kernel_text == "MAT32":
             self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.MaternKernel(nu=1.5))
         elif kernel_text == "MAT32+MAT52":
-            self.covar_module =  gpytorch.kernels.ScaleKernel(gpytorch.kernels.MaternKernel(nu=1.5)) * gpytorch.kernels.ScaleKernel(gpytorch.kernels.MaternKernel())
+            self.covar_module =  gpytorch.kernels.ScaleKernel(gpytorch.kernels.MaternKernel(nu=1.5)) + gpytorch.kernels.ScaleKernel(gpytorch.kernels.MaternKernel())
         #elif kernel_text == "MAT32*PER":
         #    self.covar_module =  gpytorch.kernels.ScaleKernel(gpytorch.kernels.MaternKernel(nu=1.5)) * gpytorch.kernels.ScaleKernel(gpytorch.kernels.PeriodicKernel())
         elif kernel_text == "MAT32+PER":
@@ -280,6 +280,7 @@ def log_prior(model, theta_mu=None, sigma=None):
     theta_mu = torch.tensor(theta_mu)
     theta_mu = theta_mu.unsqueeze(0).t()
     sigma = torch.diag(torch.Tensor(variances_list))
+    sigma = sigma@sigma
     prior = torch.distributions.MultivariateNormal(theta_mu.t(), sigma)
 
     # for convention reasons I'm diving by the number of datapoints
@@ -443,18 +444,13 @@ def run_experiment(config):
     with torch.no_grad(), gpytorch.settings.prior_mode(True):
         observed_pred_prior = data_likelihood(data_model(observations_x))
         f_preds = data_model(observations_x)
-        mean_prior = observed_pred_prior.mean
-        lower_prior, upper_prior = observed_pred_prior.confidence_region()
 
-    f_mean = f_preds.mean
-    f_var = f_preds.variance
-    f_covar = f_preds.covariance_matrix
 
     EXPERIMENT_REPITITIONS = 10
     for exp_num in tqdm(range(EXPERIMENT_REPITITIONS)):
         exp_num_result_dict = dict()
         for metric in metrics:
-             exp_num_result_dict[metric] = dict()
+            exp_num_result_dict[metric] = dict()
         observations_y = f_preds.sample()           # samples from the model
 
         # To store performance of kernels on a test dataset (i.e. more samples)
