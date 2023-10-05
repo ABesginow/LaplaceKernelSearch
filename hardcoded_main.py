@@ -395,7 +395,7 @@ def run_experiment(config):
     Returns nothing
 
     """
-    torch.manual_seed(43)
+    torch.manual_seed(44)
     metrics = ["AIC", "BIC", "MC", "Laplace_prior", "MLL", "MAP"]
     eval_START = -5
     eval_END = 5
