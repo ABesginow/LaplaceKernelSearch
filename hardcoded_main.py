@@ -618,7 +618,7 @@ def run_experiment(config):
                 model = None
                 model = ExactGPModel(
                     observations_x, observations_y, likelihood, model_kernel)
-                for i in range(1000):
+                for i in range(100):
                     try:
                         train_start = time.time()
                         loss = optimize_hyperparameters(model, likelihood, train_iterations, observations_x, observations_y, use_BFGS, MAP=True)
