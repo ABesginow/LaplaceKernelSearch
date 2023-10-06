@@ -395,7 +395,7 @@ def run_experiment(config):
     Returns nothing
 
     """
-    torch.manual_seed(46)
+    torch.manual_seed(45)
     metrics = ["AIC", "BIC", "MC", "Laplace_prior", "MLL", "MAP"]
     eval_START = -5
     eval_END = 5
@@ -446,7 +446,7 @@ def run_experiment(config):
         f_preds = data_model(observations_x)
 
 
-    EXPERIMENT_REPITITIONS = 20
+    EXPERIMENT_REPITITIONS = 50
     for exp_num in tqdm(range(EXPERIMENT_REPITITIONS)):
         exp_num_result_dict = dict()
         for metric in metrics:
@@ -470,18 +470,18 @@ def run_experiment(config):
         f, ax = plt.subplots()
         ax.plot(original_observations_x, observations_y, 'k*')
         #Store the plots as .png
-        f.savefig(os.path.join(experiment_path, f"DATA_{exp_num}.png"))
+        #f.savefig(os.path.join(experiment_path, f"DATA_{exp_num}.png"))
         #Store the plots as .tex
-        tikzplotlib.save(os.path.join(experiment_path, f"DATA_{exp_num}.tex"))
+        #tikzplotlib.save(os.path.join(experiment_path, f"DATA_{exp_num}.tex"))
         plt.close(f)
 
 
         f, ax = plt.subplots()
         ax.plot(original_observations_x, observations_y, 'k*')
         #Store the plots as .png
-        f.savefig(os.path.join(experiment_path, f"DATA_normalized_{exp_num}.png"))
+        #f.savefig(os.path.join(experiment_path, f"DATA_normalized_{exp_num}.png"))
         #Store the plots as .tex
-        tikzplotlib.save(os.path.join(experiment_path, f"DATA_normalized_{exp_num}.tex"))
+        #tikzplotlib.save(os.path.join(experiment_path, f"DATA_normalized_{exp_num}.tex"))
         plt.close(f)
 
         #model_kernels = ["MAT32+PER"]
@@ -548,9 +548,9 @@ def run_experiment(config):
                 ax.plot(original_observations_x, observations_y, 'k*')
                 image_time = time.time()
                 #Store the plots as .png
-                f.savefig(os.path.join(experiment_path, f"{experiment_keyword}_{exp_num}_MLL.png"))
+                #f.savefig(os.path.join(experiment_path, f"{experiment_keyword}_{exp_num}_MLL.png"))
                 #Store the plots as .tex
-                tikzplotlib.save(os.path.join(experiment_path, f"{experiment_keyword}_{exp_num}_MLL.tex"))
+                #tikzplotlib.save(os.path.join(experiment_path, f"{experiment_keyword}_{exp_num}_MLL.tex"))
                 plt.close(f)
 
             if "MLL" in metrics:
@@ -649,9 +649,9 @@ def run_experiment(config):
                 ax.plot(original_observations_x, observations_y, 'k*')
                 image_time = time.time()
                 #Store the plots as .png
-                f.savefig(os.path.join(experiment_path, f"{experiment_keyword}_{exp_num}_MAP.png"))
+                #f.savefig(os.path.join(experiment_path, f"{experiment_keyword}_{exp_num}_MAP.png"))
                 #Store the plots as .tex
-                tikzplotlib.save(os.path.join(experiment_path, f"{experiment_keyword}_{exp_num}_MAP.tex"))
+                #tikzplotlib.save(os.path.join(experiment_path, f"{experiment_keyword}_{exp_num}_MAP.tex"))
                 plt.close(f)
 
             # Laplace approximation including prior requires different loss
@@ -712,7 +712,7 @@ def run_experiment(config):
 with open("FINISHED.log", "r") as f:
     finished_configs = [line.strip().split("/")[-1] for line in f.readlines()]
 curdir = os.getcwd()
-num_data =  [5, 10, 20, 30, 50]#[5, 10, 20, 30, 50, 70, 100, 150, 200]
+num_data =  [5, 10, 20, 30, 50, 70, 100]#[5, 10, 20, 30, 50, 70, 100, 150, 200]
 data_kernel = ["MAT52", "RQ", "SE", "MAT32", "SE*SE"]
 #data_kernel = ["SE", "RQ", "MAT32", "MAT52", "SE*SE",
 #               "SE+SE", "MAT32+SE", "MAT52+SE", "MAT32*SE", "PER",
