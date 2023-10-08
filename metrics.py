@@ -559,6 +559,12 @@ def calculate_mc_STAN(model, likelihood, num_draws):
             print(list(model.named_parameters()))
             #print(torch.linalg.eig(like_cov_matr.evaluate()))
 
+
+    parameter_statistics = {
+        p: {"mu": np.mean(post_frame[list(fit.constrained_param_names)][p]), 
+            "var": np.var(post_frame[list(fit.constrained_param_names)][p])}
+                for p in post_frame[list(fit.constrained_param_names)]}
+
     end = time.time()
     likelihood_approximation_time = end - start
     total_time = end - total_start
@@ -570,6 +576,8 @@ def calculate_mc_STAN(model, likelihood, num_draws):
     logables["Sampling time"] = STAN_MCMC_sampling_time
     logables["Total time"] = total_time
     logables["Bad entries"] = bad_entries
+    logables["Parameter statistics"] = parameter_statistics
+    logables["Parameter prior"] = {"mu":theta_mu, "var": sigma} 
     logables["likelihood approximation"] = torch.mean(torch.Tensor(manual_lp_list))
     #logables["manual lp list"] = manual_lp_list
     #print(f"Num bad entries: {bad_entries}")
