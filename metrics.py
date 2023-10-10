@@ -588,6 +588,6 @@ def calculate_mc_STAN(model, likelihood, num_draws, **kwargs):
     if log_full_likelihood:
         logables["manual lp list"] = manual_lp_list
     if log_param_path:
-        logables["param draws dict"] = post_frame[fit.constrained_param_names]
+        logables["param draws dict"] = post_frame[list(fit.constrained_param_names)]
     #print(f"Num bad entries: {bad_entries}")
     return torch.mean(torch.Tensor(manual_lp_list)), logables
