@@ -405,7 +405,12 @@ def generate_STAN_code(kernel_representation : str,  parameter_list : list, cova
     return code
 
 
-def calculate_mc_STAN(model, likelihood, num_draws):
+def calculate_mc_STAN(model, likelihood, num_draws, **kwargs):
+    # Grab variables from kwargs
+    log_param_path = kwargs.get("log_param_path", False)    
+    log_full_likelihood = kwargs.get("log_full_likelihood", False)
+
+
     # Yes, this is code duplication from above.
     # No, I am not happy with this
     #prior_dict = {"SE": {"raw_lengthscale" : {"mean": 0.891, "std":2.195}},
@@ -529,6 +534,7 @@ def calculate_mc_STAN(model, likelihood, num_draws):
     manual_lp_list = list()
     bad_entries = 0
 
+
     start = time.time()
     # Iterate over chain
     for sample in post_frame[list(fit.constrained_param_names)].iterrows():
@@ -579,6 +585,9 @@ def calculate_mc_STAN(model, likelihood, num_draws):
     logables["Parameter statistics"] = parameter_statistics
     logables["Parameter prior"] = {"mu":theta_mu, "var": sigma} 
     logables["likelihood approximation"] = torch.mean(torch.Tensor(manual_lp_list))
-    #logables["manual lp list"] = manual_lp_list
+    if log_full_likelihood:
+        logables["manual lp list"] = manual_lp_list
+    if log_param_path:
+        logables["param draws dict"] = post_frame[fit.constrained_param_names]
     #print(f"Num bad entries: {bad_entries}")
     return torch.mean(torch.Tensor(manual_lp_list)), logables
