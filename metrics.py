@@ -550,13 +550,7 @@ def calculate_mc_STAN(model, likelihood, num_draws, **kwargs):
         try:
             with torch.no_grad():
                 observed_pred_prior = likelihood(model(model.train_inputs[0]))
-            # Compare this to the likelihood of y given mean and covar (+ noise)
-            #like_mean = torch.zeros(len(model.train_inputs[0]))
 
-            #like_cov_matr = torch.eye(len(model.train_inputs[0].tolist())) * likelihood.noise + model.covar_module(model.train_inputs[0])
-            #like_cov_matr += torch.eye(len(model.train_inputs[0].tolist())) * 1e-4 # Jitter
-            #like_cov_chol = torch.linalg.cholesky(like_cov_matr.evaluate())
-            #like_dist = torch.distributions.multivariate_normal.MultivariateNormal(like_mean, scale_tril=like_cov_chol)
             like_cov_chol = torch.linalg.cholesky(observed_pred_prior.covariance_matrix)
             like_dist = torch.distributions.multivariate_normal.MultivariateNormal(observed_pred_prior.mean, scale_tril=like_cov_chol)
             manual_lp_list.append(like_dist.log_prob(model.train_targets))
