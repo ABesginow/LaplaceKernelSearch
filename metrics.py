@@ -292,6 +292,7 @@ def calculate_laplace(model, loss_of_model, variances_list=None, with_prior=Fals
 
     logables["num_replaced"] = num_replaced
     logables["parameter list"] = debug_param_name_list
+    logables["Jacobian"] = env_grads
     logables["parameter values"] = params
     logables["corrected Hessian"] = hessian
     logables["diag(constructed eigvals)"] = constructed_eigvals_log
