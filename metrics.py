@@ -379,7 +379,7 @@ def generate_STAN_code(kernel_representation : str,  parameter_list : list, cova
     # Give it lower bound -3.0 for each parameter to ensure Softplus doesn't reach 0
     parameters = """
     parameters {
-        vector<lower=-16.0>[D] theta;
+        vector<lower=-10.0>[D] theta;
     }
     """
 
@@ -558,6 +558,7 @@ def calculate_mc_STAN(model, likelihood, num_draws, **kwargs):
             like_dist = torch.distributions.multivariate_normal.MultivariateNormal(observed_pred_prior.mean, scale_tril=like_cov_chol)
             manual_lp_list.append(like_dist.log_prob(model.train_targets))
         except Exception as e:
+            manual_lp_list.append(np.nan())
             bad_entries += 1
             print(e)
             print(list(model.named_parameters()))
