@@ -28,7 +28,7 @@ hyperparameter_limits = {"RBFKernel": {"lengthscale": [1e-3,1]},
                                             "period_length": [1e-3,3]},
                          "ScaleKernel": {"outputscale": [1e-3,10]},
                          "Noise": [1e-2,1e-1],
-                         "MyPeriodicKernel":{"period_length": [1e-3,3]}}
+                         "MyPeriodKernel":{"period_length": [1e-3,3]}}
 
 prior_dict = {"SE": {"raw_lengthscale" : {"mean": 0.891, "std":2.195}},
               "PER":{"raw_lengthscale": {"mean": 0.338, "std":2.636}, "raw_period_length":{"mean": 0.284, "std":0.902}},

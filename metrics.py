@@ -123,7 +123,7 @@ def calculate_laplace(model, loss_of_model, variances_list=None, with_prior=Fals
                 'LIN':{'raw_variance' :{"mean": -0.8017903983055685, "std":0.9966569921354465 } },
                 'c':{'raw_outputscale':{"mean": -1.6253091096349706, "std":2.2570021716661923 } },
                 'noise': {'raw_noise':{"mean": -3.51640656386717, "std":3.5831320474767407 }},
-                'MyPeriodicKernel':{'raw_period_length':{"mean": 0.6485334993738499, "std":0.9930632050553377 }}}
+                'MyPeriodKernel':{'raw_period_length':{"mean": 0.6485334993738499, "std":0.9930632050553377 }}}
 
     start = time.time()
     if theta_mu is None:
@@ -329,7 +329,8 @@ def generate_STAN_kernel(kernel_representation : str, parameter_list : list, cov
         "MAT52": "gp_matern52_cov(x, 1.0, softplus(theta[i]))",
         "MAT32": "gp_matern32_cov(x, 1.0, softplus(theta[i]))",
         "PER": "gp_periodic_cov(x, 1.0, sqrt(softplus(theta[i])), softplus(theta[i]))",
-        "LIN": "softplus(theta[i]) * gp_dot_prod_cov(x, 0.0)"
+        "LIN": "softplus(theta[i]) * gp_dot_prod_cov(x, 0.0)",
+        "MyPeriodKernel":"gp_periodic_cov(x, 1.0, 1.0, softplus(theta[i]))"
     }
     # Basically do text replacement
     # Take care of theta order!
@@ -432,7 +433,7 @@ def calculate_mc_STAN(model, likelihood, num_draws, **kwargs):
                 'LIN':{'raw_variance' :{"mean": -0.8017903983055685, "std":0.9966569921354465 } },
                 'c':{'raw_outputscale':{"mean": -1.6253091096349706, "std":2.2570021716661923 } },
                 'noise': {'raw_noise':{"mean": -3.51640656386717, "std":3.5831320474767407 }},
-                'MyPeriodicKernel':{'raw_period_length':{"mean": 0.6485334993738499, "std":0.9930632050553377 }}}
+                'MyPeriodKernel':{'raw_period_length':{"mean": 0.6485334993738499, "std":0.9930632050553377 }}}
     logables = {}
 
     total_start = time.time()
