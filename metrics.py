@@ -122,7 +122,8 @@ def calculate_laplace(model, loss_of_model, variances_list=None, with_prior=Fals
                         'raw_period_length':{"mean": 0.6485334993738499, "std":0.9930632050553377 } },
                 'LIN':{'raw_variance' :{"mean": -0.8017903983055685, "std":0.9966569921354465 } },
                 'c':{'raw_outputscale':{"mean": -1.6253091096349706, "std":2.2570021716661923 } },
-                'noise': {'raw_noise':{"mean": -3.51640656386717, "std":3.5831320474767407 }}}
+                'noise': {'raw_noise':{"mean": -3.51640656386717, "std":3.5831320474767407 }},
+                'MyPeriodicKernel':{'raw_period_length':{"mean": 0.6485334993738499, "std":0.9930632050553377 }}}
 
     start = time.time()
     if theta_mu is None:
@@ -430,7 +431,8 @@ def calculate_mc_STAN(model, likelihood, num_draws, **kwargs):
                         'raw_period_length':{"mean": 0.6485334993738499, "std":0.9930632050553377 } },
                 'LIN':{'raw_variance' :{"mean": -0.8017903983055685, "std":0.9966569921354465 } },
                 'c':{'raw_outputscale':{"mean": -1.6253091096349706, "std":2.2570021716661923 } },
-                'noise': {'raw_noise':{"mean": -3.51640656386717, "std":3.5831320474767407 }}}
+                'noise': {'raw_noise':{"mean": -3.51640656386717, "std":3.5831320474767407 }},
+                'MyPeriodicKernel':{'raw_period_length':{"mean": 0.6485334993738499, "std":0.9930632050553377 }}}
     logables = {}
 
     total_start = time.time()
