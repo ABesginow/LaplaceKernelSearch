@@ -379,7 +379,7 @@ def generate_STAN_code(kernel_representation : str,  parameter_list : list, cova
     # Give it lower bound -3.0 for each parameter to ensure Softplus doesn't reach 0
     parameters = """
     parameters {
-        vector<lower=-15.0>[D] theta;
+        vector<lower=-29.0>[D] theta;
     }
     """
 
@@ -583,7 +583,7 @@ def calculate_mc_STAN(model, likelihood, num_draws, **kwargs):
     logables["Bad entries"] = bad_entries
     logables["Parameter statistics"] = parameter_statistics
     logables["Parameter prior"] = {"mu":theta_mu, "var": sigma} 
-    logables["likelihood approximation"] = torch.mean(torch.Tensor(manual_lp_list))
+    logables["likelihood approximation"] = torch.nanmean(torch.Tensor(manual_lp_list))
     if log_full_likelihood:
         logables["manual lp list"] = manual_lp_list
     if log_param_path:
