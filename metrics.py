@@ -558,7 +558,7 @@ def calculate_mc_STAN(model, likelihood, num_draws, **kwargs):
             like_dist = torch.distributions.multivariate_normal.MultivariateNormal(observed_pred_prior.mean, scale_tril=like_cov_chol)
             manual_lp_list.append(like_dist.log_prob(model.train_targets))
         except Exception as e:
-            manual_lp_list.append(np.nan())
+            manual_lp_list.append(np.nan)
             bad_entries += 1
             print(e)
             print(list(model.named_parameters()))
