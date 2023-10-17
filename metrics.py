@@ -354,12 +354,12 @@ def generate_STAN_code(kernel_representation : str,  parameter_list : list, cova
         array[] real softplus(array[] real v){
             array[num_elements(v)] real r;
             for (d in 1:num_elements(v)){
-                r[d] = log(1.0 + exp(v[d]));
+                r[d] = log1p(exp(v[d]));
             }
             return r;
         }
         real softplus(real v){
-            return log(1.0 + exp(v));
+            return log1p(exp(v));
         }
     }
     """
