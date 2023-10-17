@@ -388,7 +388,9 @@ def generate_STAN_code(kernel_representation : str,  parameter_list : list, cova
         matrix[N, N] K;
         vector[N] mu;
         theta ~ multi_normal(t_mu, t_sigma);
+        print("theta= ", theta);
         K = {generate_STAN_kernel(kernel_representation, parameter_list, covar_string_list)};
+        print("K= ", K);
         mu = zeros_vector(N);
         y ~ multi_normal(mu, K);
     }}
