@@ -336,7 +336,7 @@ def generate_STAN_kernel(kernel_representation : str, parameter_list : list, cov
     # Take care of theta order!
     # Replace the matrix muliplications by elementwise operation to prevent issues
     kernel_representation = kernel_representation.replace("*", ".*")
-    STAN_str_kernel = f"(identity_matrix(dims(x)[1]).*softplus(theta[i])) + {kernel_representation}"
+    STAN_str_kernel = f"(identity_matrix(dims(x)[1]).*1e-10) + (identity_matrix(dims(x)[1]).*softplus(theta[i])) + {kernel_representation}"
     search_str = "[i]"
     # str.replace(old, new, count) replaces the leftmost entry
     # Thus by iterating over all occurences of search_str I can hack this
@@ -379,7 +379,7 @@ def generate_STAN_code(kernel_representation : str,  parameter_list : list, cova
     # Give it lower bound -3.0 for each parameter to ensure Softplus doesn't reach 0
     parameters = """
     parameters {
-        vector<lower=-29.0>[D] theta;
+        vector<lower=-9.210>[D] theta;
     }
     """
 
