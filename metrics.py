@@ -379,7 +379,7 @@ def generate_STAN_code(kernel_representation : str,  parameter_list : list, cova
     # Give it lower bound -3.0 for each parameter to ensure Softplus doesn't reach 0
     parameters = """
     parameters {
-        vector<lower=-9.210>[D] theta;
+        vector<lower=-9.2102>[D] theta;
     }
     """
 
