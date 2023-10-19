@@ -376,19 +376,33 @@ def generate_STAN_code(kernel_representation : str,  parameter_list : list, cova
     }
     """
 
+    # Old version:
+    #vector<lower=-9.2102>[D] theta_tilde;
     # Give it lower bound -3.0 for each parameter to ensure Softplus doesn't reach 0
     parameters = """
     parameters {
-        vector<lower=-9.2102>[D] theta;
+        vector[D] theta_tilde;
     }
     """
-
+    transformed_parameters = f"""
+        transformed parameters {{
+            vector[D] theta;
+            if(theta_tilde[1] < -9.2102){{
+                theta[1] = -9.2102;
+            }}else{{
+                theta[1] = theta_tilde[1];
+            }}
+            for(i in 2:D){{
+                theta[i] = theta_tilde[i];
+            }}
+            
+        }}
+    """
     model = f"""
     model {{
         matrix[N, N] K;
         vector[N] mu;
-        theta ~ multi_normal(t_mu, t_sigma);
-        
+        theta_tilde ~ multi_normal(t_mu, t_sigma);
         K = {generate_STAN_kernel(kernel_representation, parameter_list, covar_string_list)};
         mu = zeros_vector(N);
         y ~ multi_normal(mu, K);
@@ -405,7 +419,7 @@ def generate_STAN_code(kernel_representation : str,  parameter_list : list, cova
         lpd = multi_normal_lpdf(y | mu, K);
     }}
     """
-    code = functions + data + parameters + model #+ generated_quantities
+    code = functions + data + parameters +transformed_parameters+ model #+ generated_quantities
     return code
 
 
