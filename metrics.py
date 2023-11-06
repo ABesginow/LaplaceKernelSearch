@@ -387,8 +387,8 @@ def generate_STAN_code(kernel_representation : str,  parameter_list : list, cova
     transformed_parameters = f"""
         transformed parameters {{
             vector[D] theta;
-            if(theta_tilde[1] < -9.2102){{
-                theta[1] = -9.2102;
+            if(theta_tilde[1] < -30.2102){{
+                theta[1] = -30.2102;
             }}else{{
                 theta[1] = theta_tilde[1];
             }}
