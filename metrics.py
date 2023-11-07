@@ -324,19 +324,19 @@ def generate_STAN_kernel(kernel_representation : str, parameter_list : list, cov
     parameter_list : We assume it just contains strings of parameter names
     """
     replacement_dictionary = {
-        "c" : "softplus(theta[i])",
-        "SE": "gp_exp_quad_cov(x, 1.0, softplus(theta[i]))",
-        "MAT52": "gp_matern52_cov(x, 1.0, softplus(theta[i]))",
-        "MAT32": "gp_matern32_cov(x, 1.0, softplus(theta[i]))",
-        "PER": "gp_periodic_cov(x, 1.0, sqrt(softplus(theta[i])), softplus(theta[i]))",
-        "LIN": "softplus(theta[i]) * gp_dot_prod_cov(x, 0.0)",
-        "MyPeriodKernel":"gp_periodic_cov(x, 1.0, 1.0, softplus(theta[i]))"
+        "c" : "(theta[i])",
+        "SE": "gp_exp_quad_cov(x, 1.0, (theta[i]))",
+        "MAT52": "gp_matern52_cov(x, 1.0, (theta[i]))",
+        "MAT32": "gp_matern32_cov(x, 1.0, (theta[i]))",
+        "PER": "gp_periodic_cov(x, 1.0, sqrt((theta[i])), (theta[i]))",
+        "LIN": "(theta[i]) * gp_dot_prod_cov(x, 0.0)",
+        "MyPeriodKernel":"gp_periodic_cov(x, 1.0, 1.0, (theta[i]))"
     }
     # Basically do text replacement
     # Take care of theta order!
     # Replace the matrix muliplications by elementwise operation to prevent issues
     kernel_representation = kernel_representation.replace("*", ".*")
-    STAN_str_kernel = f"(identity_matrix(dims(x)[1]).*1e-10) + (identity_matrix(dims(x)[1]).*softplus(theta[i])) + {kernel_representation}"
+    STAN_str_kernel = f"(identity_matrix(dims(x)[1]).*1e-10) + (identity_matrix(dims(x)[1]).*(theta[i])) + {kernel_representation}"
     search_str = "[i]"
     # str.replace(old, new, count) replaces the leftmost entry
     # Thus by iterating over all occurences of search_str I can hack this
@@ -381,7 +381,7 @@ def generate_STAN_code(kernel_representation : str,  parameter_list : list, cova
     # Give it lower bound -3.0 for each parameter to ensure Softplus doesn't reach 0
     parameters = """
     parameters {
-        vector[D] theta_tilde;
+        vector<lower=1e-20>[D] theta;
     }
     """
     transformed_parameters = f"""
@@ -402,7 +402,7 @@ def generate_STAN_code(kernel_representation : str,  parameter_list : list, cova
     model {{
         matrix[N, N] K;
         vector[N] mu;
-        theta_tilde ~ multi_normal(t_mu, t_sigma);
+        theta ~ multi_normal(t_mu, t_sigma);
         K = {generate_STAN_kernel(kernel_representation, parameter_list, covar_string_list)};
         mu = zeros_vector(N);
         y ~ multi_normal(mu, K);
@@ -419,7 +419,7 @@ def generate_STAN_code(kernel_representation : str,  parameter_list : list, cova
         lpd = multi_normal_lpdf(y | mu, K);
     }}
     """
-    code = functions + data + parameters +transformed_parameters+ model #+ generated_quantities
+    code = functions + data + parameters +model#transformed_parameters+ model #+ generated_quantities
     return code
 
 
@@ -553,6 +553,8 @@ def calculate_mc_STAN(model, likelihood, num_draws, **kwargs):
     manual_lp_list = list()
     bad_entries = 0
 
+    def inv_softplus(x):
+        return x + torch.log(-torch.expm1(-x))
 
     start = time.time()
     # Iterate over chain
@@ -562,7 +564,7 @@ def calculate_mc_STAN(model, likelihood, num_draws, **kwargs):
         # appearance from left to right, just like in STAN
         # Each theta corresponds to exactly one model parameter
         for model_param, sampled_param in zip(model.parameters(), sample[1]):
-            model_param.data = torch.full_like(model_param.data, sampled_param)
+            model_param.data = torch.full_like(model_param.data, inv_softplus(torch.tensor(sampled_param)))
 
 
         try:
