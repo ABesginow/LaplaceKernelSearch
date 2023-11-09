@@ -18,6 +18,27 @@ def get_kernels_in_kernel_expression(kernel_expression):
     else:
         return [kernel_expression]
 
+
+def get_full_kernels_in_kernel_expression(kernel_expression):
+    """
+    returns list of all base kernels in a kernel expression
+    """
+    kernel_list = list()
+    if kernel_expression == None:
+        return kernel_list
+    if hasattr(kernel_expression, "kernels"):
+        for kernel in kernel_expression.kernels:
+            kernel_list.extend(get_full_kernels_in_kernel_expression(kernel))
+    elif kernel_expression._get_name() in ["ScaleKernel", "GridKernel"]:
+        kernel_list.extend([kernel_expression._get_name()])
+        kernel_list.extend(get_full_kernels_in_kernel_expression(
+            kernel_expression.base_kernel))
+    else:
+        kernel_list.append(kernel_expression._get_name())
+    return kernel_list
+
+
+
 def print_formatted_hyperparameters(kernel_expression):
     full_string = ""
     for kernel in get_kernels_in_kernel_expression(kernel_expression):
