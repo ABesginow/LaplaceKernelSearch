@@ -1,35 +1,33 @@
 import gpytorch as gpt
+
 import torch
 import matplotlib.pyplot as plt
 import copy
 from globalParams import options, hyperparameter_limits
-from helpFunctions import get_kernels_in_kernel_expression
-
-
+from helpFunctions import get_kernels_in_kernel_expression, get_string_representation_of_kernel as gsr, get_full_kernels_in_kernel_expression
 
 
 
 def log_prior(model, theta_mu=None, sigma=None):
-    # params - 
+    # params -
     # TODO de-spaghettize this once the priors are coded properly
+    prior_dict = {'SE': {'raw_lengthscale' : {"mean": -0.21221139138922668 , "std":1.8895426067756804}},
+                  'MAT52': {'raw_lengthscale' :{"mean": 0.7993038925994188, "std":2.145122566357853 } },
+                  'MAT32': {'raw_lengthscale' :{"mean": 1.5711054238673443, "std":2.4453761235991216 } },
+                  'RQ': {'raw_lengthscale' :{"mean": -0.049841950913676276, "std":1.9426354614713097 },
+                          'raw_alpha' :{"mean": 1.882148553921053, "std":3.096431944989054 } },
+                  'PER':{'raw_lengthscale':{"mean": 0.7778461197268618, "std":2.288946656544974 },
+                          'raw_period_length':{"mean": 0.6485334993738499, "std":0.9930632050553377 } },
+                  'LIN':{'raw_variance' :{"mean": -0.8017903983055685, "std":0.9966569921354465 } },
+                  'c':{'raw_outputscale':{"mean": -1.6253091096349706, "std":2.2570021716661923 } },
+                  'noise': {'raw_noise':{"mean": -3.51640656386717, "std":3.5831320474767407 }}}
     #prior_dict = {"SE": {"raw_lengthscale": {"mean": 0.891, "std": 2.195}},
     #              "MAT": {"raw_lengthscale": {"mean": 1.631, "std": 2.554}},
-    #              "PER": {"raw_lengthscale": {"mean": 0.338, "std": 2.636}, 
+    #              "PER": {"raw_lengthscale": {"mean": 0.338, "std": 2.636},
     #                      "raw_period_length": {"mean": 0.284, "std": 0.902}},
     #              "LIN": {"raw_variance": {"mean": -1.463, "std": 1.633}},
     #              "c": {"raw_outputscale": {"mean": -2.163, "std": 2.448}},
     #              "noise": {"raw_noise": {"mean": -1.792, "std": 3.266}}}
-
-    prior_dict = {  'SE': {'raw_lengthscale': {"mean": -0.21221139138922668, "std":1.8895426067756804}},
-                    'MAT52': {'raw_lengthscale':{"mean": 0.7993038925994188, "std":2.145122566357853 } },
-                    'MAT32': {'raw_lengthscale':{"mean": 1.5711054238673443, "std":2.4453761235991216 } },
-                    'RQ': {'raw_lengthscale':{"mean": -0.049841950913676276, "std":1.9426354614713097 }, 
-                            'raw_alpha':{"mean": 1.882148553921053, "std":3.096431944989054 } },
-                    'PER':{'raw_lengthscale':{"mean": 0.7778461197268618, "std":2.288946656544974 },
-                            'raw_period_length':{"mean": 0.6485334993738499, "std":0.9930632050553377 } },
-                    'LIN':{'raw_variance':{"mean": -0.8017903983055685, "std":0.9966569921354465 } },
-                    'c':{'raw_outputscale':{"mean": -1.6253091096349706, "std":2.2570021716661923 } },
-                    'noise': {'raw_noise':{"mean": -3.51640656386717, "std":3.5831320474767407 }}}
 
     variances_list = list()
     debug_param_name_list = list()
@@ -53,11 +51,11 @@ def log_prior(model, theta_mu=None, sigma=None):
             variances_list.append(prior_dict["noise"]["raw_noise"]["std"])
             continue
         else:
-            if cov_str == "PER" and not both_PER_params:
+            if (cov_str == "PER" or cov_str == "RQ") and not both_PER_params:
                 theta_mu.append(prior_dict[cov_str][param_name.split(".")[-1]]["mean"])
                 variances_list.append(prior_dict[cov_str][param_name.split(".")[-1]]["std"])
                 both_PER_params = True
-            elif cov_str == "PER" and both_PER_params:
+            elif (cov_str == "PER" or cov_str == "RQ") and both_PER_params:
                 theta_mu.append(prior_dict[cov_str][param_name.split(".")[-1]]["mean"])
                 variances_list.append(prior_dict[cov_str][param_name.split(".")[-1]]["std"])
                 both_PER_params = False
@@ -65,20 +63,19 @@ def log_prior(model, theta_mu=None, sigma=None):
                 try:
                     theta_mu.append(prior_dict[cov_str][param_name.split(".")[-1]]["mean"])
                     variances_list.append(prior_dict[cov_str][param_name.split(".")[-1]]["std"])
-                except:
+                except Exception as E:
                     import pdb
                     pdb.set_trace()
-        prev_cov = cov_str
-
+                    prev_cov = cov_str
     theta_mu = torch.tensor(theta_mu)
     theta_mu = theta_mu.unsqueeze(0).t()
     sigma = torch.diag(torch.Tensor(variances_list))
     sigma = sigma@sigma
-
     prior = torch.distributions.MultivariateNormal(theta_mu.t(), sigma)
 
     # for convention reasons I'm diving by the number of datapoints
     return prior.log_prob(torch.Tensor(params)).item() / len(*model.train_inputs)
+
 
 class ExactGPModel(gpt.models.ExactGP):
     """
@@ -167,42 +164,103 @@ class ExactGPModel(gpt.models.ExactGP):
         output = self.__call__(X)
         return torch.exp(mll(output, Y)).item()
 
-    def optimize_hyperparameters(self, with_BFGS=False, with_Adam=True, MAP=False):
+
+    def random_reinit(self, model):
+        for i, (param, limit) in enumerate(zip(model.parameters(), [{"Noise": hyperparameter_limits["Noise"]},*[hyperparameter_limits[kernel] for kernel in get_full_kernels_in_kernel_expression(model.covar_module)]])):
+            covar_text = self.gsr(model.covar_module)
+            param_name = list(limit.keys())[0]
+            new_param_value = torch.randn_like(param) * (limit[param_name][1] - limit[param_name][0]) + limit[param_name][0]
+            param.data = new_param_value
+
+    def optimize_hyperparameters(self, model, likelihood, **kwargs):
         """
         find optimal hyperparameters either by BO or by starting from random initial values multiple times, using an optimizer every time
         and then returning the best result
         """
-        # setup
-        best_loss = 1e400
-        optimal_parameters = dict()
-        limits = hyperparameter_limits
-        # start runs
-        for iteration in range(options["training"]["restarts"]+1):
-            # optimize and determine loss
-            self.train_model(with_BFGS=with_BFGS, with_Adam=with_Adam, MAP=MAP)
-            current_loss = self.get_current_loss()
-            # check if the current run is better than previous runs
-            if current_loss < best_loss:
-                # if it is the best, save all used parameters
-                best_loss = current_loss
-                for param_name, param in self.named_parameters():
-                    optimal_parameters[param_name] = copy.deepcopy(param)
+        log_param_path = kwargs.get("log_param_path", False)
+        log_likelihood = kwargs.get("log_likelihood", False)
+        random_restarts = kwargs.get("random_restarts", options["training"]["restarts"]+1)
+        line_search = kwargs.get("line_search", False)
+        BFGS_iter = kwargs.get("BFGS_iter", 50)
+        train_iterations = kwargs.get("train_iterations", 0)
+        X = kwargs.get("X", model.train_inputs)
+        Y = kwargs.get("Y", model.train_targets)
+        with_BFGS = kwargs.get("with_BFGS", True)
+        MAP = kwargs.get("MAP", True)
+        prior = kwargs.get("prior", False)
 
-            # set new random inital values
-            self.likelihood.noise_covar.noise = torch.rand(1) * (limits["Noise"][1] - limits["Noise"][0]) + limits["Noise"][0]
-            #self.mean_module.constant = torch.rand(1) * (limits["Mean"][1] - limits["Mean"][0]) + limits["Mean"][0]
-            for kernel in get_kernels_in_kernel_expression(self.covar_module):
-                hypers = limits[kernel._get_name()]
-                for hyperparameter in hypers:
-                    new_value = torch.rand(1) * (hypers[hyperparameter][1] - hypers[hyperparameter][0]) + hypers[hyperparameter][0]
-                    setattr(kernel, hyperparameter, new_value)
+        if log_likelihood:
+            likelihood_log = list()
+        if log_param_path:
+            param_log_dict = {param_name[0] : list() for param_name in model.named_parameters()}
 
+        best_loss = float('inf')
+        best_model_state_dict = None
+        best_likelihood_state_dict = None
+
+        mll = gpt.mlls.ExactMarginalLogLikelihood(likelihood, model)
+
+        for restart in range(random_restarts):
+            try:
+                optimizer = torch.optim.Adam(model.parameters(), lr=0.1)
+                mll = gpt.mlls.ExactMarginalLogLikelihood(likelihood, model)
+                # Train the ADAM part
+                for _ in range(train_iterations):
+                    optimizer.zero_grad()
+                    output = model(X)
+                    loss = -mll(output, Y)
+                    if MAP:
+                        log_p = log_prior(model)
+                        loss -= log_p
+                    loss.backward()
+                    optimizer.step()
+                    if log_param_path:
+                        for param_name in model.named_parameters():
+                            param_log_dict[param_name[0]].append(param_name[1].item())
+                    if log_likelihood:
+                        likelihood_log.append(loss.item())
+                # Train the L-BFGS part
+                optimizer = torch.optim.LBFGS(model.parameters(), max_iter=BFGS_iter, line_search_fn=None if line_search else "strong_wolfe")
+                def closure():
+                    optimizer.zero_grad()
+                    output = model(X)
+                    loss = -mll(output, Y)
+                    if MAP:
+                        log_p = log_prior(model)
+                        loss -= log_p
+                    loss.backward()
+                    if log_param_path:
+                        for param_name in model.named_parameters():
+                            param_log_dict[param_name[0]].append(param_name[1].item())
+                    if log_likelihood:
+                        likelihood_log.append(loss.item())
+                        
+                    return loss
+                loss = optimizer.step(closure)
+                if loss < best_loss:
+                    best_loss = loss
+                    best_model_state_dict = model.state_dict()
+                    best_likelihood_state_dict = likelihood.state_dict()
+            except Exception as E:
+                pass 
             # print output if enabled
             if options["training"]["print_optimizing_output"]:
-                print(f"HYPERPARAMETER OPTIMIZATION: Random Restart {iteration}: loss: {current_loss}, optimal loss: {best_loss}")
+                print(f"HYPERPARAMETER OPTIMIZATION: Random Restart {restart}: loss: {loss}, optimal loss: {best_loss}")
+            self.random_reinit(model)
+        model.load_state_dict(best_model_state_dict)
+        likelihood.load_state_dict(best_likelihood_state_dict)
 
-        # finally, set the hyperparameters those in the optimal run
-        self.initialize(**optimal_parameters)
+        # Zero gradients from previous iteration
+        optimizer.zero_grad()
+        # Output from model
+        output = model(X)
+        # Calc loss and backprop gradients
+        loss = -mll(output, Y)
+        if MAP:
+            log_p = log_prior(model)
+            loss -= log_p
+        return loss, model, likelihood
+
 
     def eval_model(self):
         pass
