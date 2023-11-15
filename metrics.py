@@ -325,18 +325,18 @@ def generate_STAN_kernel(kernel_representation : str, parameter_list : list, cov
     """
     replacement_dictionary = {
         "c" : "(theta[i])",
-        "SE": "gp_exp_quad_cov(x, 1.0, (theta[i]))",
-        "MAT52": "gp_matern52_cov(x, 1.0, (theta[i]))",
-        "MAT32": "gp_matern32_cov(x, 1.0, (theta[i]))",
-        "PER": "gp_periodic_cov(x, 1.0, sqrt((theta[i])), (theta[i]))",
-        "LIN": "(theta[i]) * gp_dot_prod_cov(x, 0.0)",
-        "MyPeriodKernel":"gp_periodic_cov(x, 1.0, 1.0, (theta[i]))"
+        "SE": "gp_exp_quad_cov(x, 1.0, softplus(theta[i]))",
+        "MAT52": "gp_matern52_cov(x, 1.0, softplus(theta[i]))",
+        "MAT32": "gp_matern32_cov(x, 1.0, softplus(theta[i]))",
+        "PER": "gp_periodic_cov(x, 1.0, sqrt(softplus(theta[i])), softplus(theta[i]))",
+        "LIN": "softplus(theta[i]) * gp_dot_prod_cov(x, 0.0)",
+        "MyPeriodKernel":"gp_periodic_cov(x, 1.0, 1.0, softplus(theta[i]))"
     }
     # Basically do text replacement
     # Take care of theta order!
     # Replace the matrix muliplications by elementwise operation to prevent issues
     kernel_representation = kernel_representation.replace("*", ".*")
-    STAN_str_kernel = f"(identity_matrix(dims(x)[1]).*1e-10) + (identity_matrix(dims(x)[1]).*(theta[i])) + {kernel_representation}"
+    STAN_str_kernel = f"(identity_matrix(dims(x)[1]).*1e-10) + (identity_matrix(dims(x)[1]).*softplus(theta[i])) + {kernel_representation}"
     search_str = "[i]"
     # str.replace(old, new, count) replaces the leftmost entry
     # Thus by iterating over all occurences of search_str I can hack this
@@ -564,7 +564,8 @@ def calculate_mc_STAN(model, likelihood, num_draws, **kwargs):
         # appearance from left to right, just like in STAN
         # Each theta corresponds to exactly one model parameter
         for model_param, sampled_param in zip(model.parameters(), sample[1]):
-            model_param.data = torch.full_like(model_param.data, inv_softplus(torch.tensor(sampled_param)))
+            #model_param.data = torch.full_like(model_param.data, inv_softplus(torch.tensor(sampled_param)))
+            model_param.data = torch.full_like(model_param.data, torch.tensor(sampled_param))
 
 
         try:
