@@ -422,21 +422,13 @@ def generate_STAN_code(kernel_representation : str,  parameter_list : list, cova
     code = functions + data + parameters +model#transformed_parameters+ model #+ generated_quantities
     return code
 
-
+ 
 def calculate_mc_STAN(model, likelihood, num_draws, **kwargs):
+    logables = dict()
     # Grab variables from kwargs
     log_param_path = kwargs.get("log_param_path", False)    
     log_full_likelihood = kwargs.get("log_full_likelihood", False)
-
-
-    # Yes, this is code duplication from above.
-    # No, I am not happy with this
-    #prior_dict = {"SE": {"raw_lengthscale" : {"mean": 0.891, "std":2.195}},
-    #              "MAT": {"raw_lengthscale": {"mean": 1.631, "std": 2.554}},
-    #              "PER":{"raw_lengthscale": {"mean": 0.338, "std":2.636}, "raw_period_length":{"mean": 0.284, "std":0.902}},
-    #              "LIN":{"raw_variance" : {"mean":-1.463, "std":1.633}},
-    #              "c":{"raw_outputscale": {"mean":-2.163, "std":2.448}},
-    #              "noise": {"raw_noise": {"mean":-1.792, "std":3.266}}}
+    log_full_posterior = kwargs.get("log_full_posterior", True)
 
     prior_dict = {'SE': {'raw_lengthscale' : {"mean": -0.21221139138922668 , "std":1.8895426067756804}},
                 'MAT52': {'raw_lengthscale' :{"mean": 0.7993038925994188, "std":2.145122566357853 } },
@@ -449,8 +441,7 @@ def calculate_mc_STAN(model, likelihood, num_draws, **kwargs):
                 'c':{'raw_outputscale':{"mean": -1.6253091096349706, "std":2.2570021716661923 } },
                 'noise': {'raw_noise':{"mean": -3.51640656386717, "std":3.5831320474767407 }},
                 'MyPeriodKernel':{'raw_period_length':{"mean": 0.6485334993738499, "std":0.9930632050553377 }}}
-    logables = {}
-
+ 
     total_start = time.time()
     theta_mu = list()
     variances_list = list()
@@ -499,17 +490,7 @@ def calculate_mc_STAN(model, likelihood, num_draws, **kwargs):
     sigma = torch.diag(torch.Tensor(variances_list))
     sigma = sigma@sigma
 
-
     STAN_code = generate_STAN_code(covar_string, debug_param_name_list, covar_string_list)
-    # Required data for the STAN model:
-    """
-    int N;
-    int D;
-    array[N] real x;
-    vector[N] y;
-    vector[D] t_mu;
-    cov_matrix[D, D] t_sigma;
-    """
     if type(model.train_inputs) == tuple:
         x = model.train_inputs[0].tolist()
         # Assuming I have [[x1], [x2], [x3], ...]
@@ -541,7 +522,7 @@ def calculate_mc_STAN(model, likelihood, num_draws, **kwargs):
        raise("Number of draws not specified")
     start = time.time()
 
-    fit = posterior.sample(num_chains=1, num_samples=num_draws)
+    fit = posterior.sample(num_chains=int(1), num_samples=num_draws)#, num_warmup=int(1))
     end = time.time()
     STAN_MCMC_sampling_time = end - start
     # Use the sampled parameters to reconstruct the mean and cov. matr.
@@ -551,14 +532,17 @@ def calculate_mc_STAN(model, likelihood, num_draws, **kwargs):
     #pdb.set_trace()
     #print(fit)
     manual_lp_list = list()
+    manual_post_list = list()
+    log_prior_list = list()
     bad_entries = 0
 
     def inv_softplus(x):
         return x + torch.log(-torch.expm1(-x))
 
     start = time.time()
+    STAN_like_approx = post_frame["lp__"]
     # Iterate over chain
-    for sample in post_frame[list(fit.constrained_param_names)].iterrows():
+    for row_num, sample in enumerate(post_frame[list(fit.constrained_param_names)].iterrows()):
         # Iterate over kernel parameters
         # Main assumption: Kernel parameters are stored in order of kernel
         # appearance from left to right, just like in STAN
@@ -571,10 +555,14 @@ def calculate_mc_STAN(model, likelihood, num_draws, **kwargs):
         try:
             with torch.no_grad():
                 observed_pred_prior = likelihood(model(model.train_inputs[0]))
+            #pdb.set_trace()
 
             like_cov_chol = torch.linalg.cholesky(observed_pred_prior.covariance_matrix)
-            like_dist = torch.distributions.multivariate_normal.MultivariateNormal(observed_pred_prior.mean, scale_tril=like_cov_chol)
+            like_dist = torch.distributions.multivariate_normal.MultivariateNormal(observed_pred_prior.mean.flatten(), scale_tril=like_cov_chol)
             manual_lp_list.append(like_dist.log_prob(model.train_targets))
+            manual_post_list.append(like_dist.log_prob(model.train_targets) + log_prior(model))
+            # TODO write log prior function
+            log_prior_list.append(log_prior(model))
         except Exception as e:
             manual_lp_list.append(np.nan)
             bad_entries += 1
@@ -602,9 +590,14 @@ def calculate_mc_STAN(model, likelihood, num_draws, **kwargs):
     logables["Parameter statistics"] = parameter_statistics
     logables["Parameter prior"] = {"mu":theta_mu, "var": sigma} 
     logables["likelihood approximation"] = torch.nanmean(torch.Tensor(manual_lp_list))
+    logables["posterior approximation"] = torch.nanmean(torch.Tensor(manual_post_list))
+    logables["STAN_like_approx"] = STAN_like_approx
+    logables["log prior list"] = log_prior_list
+    if log_full_posterior:
+        logables["manual post list"] = manual_post_list
     if log_full_likelihood:
         logables["manual lp list"] = manual_lp_list
     if log_param_path:
         logables["param draws dict"] = post_frame[list(fit.constrained_param_names)]
-    #print(f"Num bad entries: {bad_entries}")
+    ##print(f"Num bad entries: {bad_entries}")
     return torch.nanmean(torch.Tensor(manual_lp_list)), logables
