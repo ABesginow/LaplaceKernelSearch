@@ -497,7 +497,7 @@ def calculate_mc_STAN(model, likelihood, num_draws, **kwargs):
     # Grab variables from kwargs
     log_param_path = kwargs.get("log_param_path", False)    
     log_full_likelihood = kwargs.get("log_full_likelihood", False)
-    log_full_posterior = kwargs.get("log_full_posterior", True)
+    log_full_posterior = kwargs.get("log_full_posterior", False)
 
     prior_dict = {'SE': {'raw_lengthscale' : {"mean": -0.21221139138922668 , "std":1.8895426067756804}},
                 'MAT52': {'raw_lengthscale' :{"mean": 0.7993038925994188, "std":2.145122566357853 } },
@@ -588,7 +588,7 @@ def calculate_mc_STAN(model, likelihood, num_draws, **kwargs):
     end = time.time()
     STAN_model_generation_time = end - start
     if num_draws is None:
-       raise("Number of draws not specified")
+        raise ValueError("Number of draws not specified")
     start = time.time()
 
     fit = posterior.sample(num_chains=int(1), num_samples=num_draws)#, num_warmup=int(1))
