@@ -413,7 +413,7 @@ def generate_STAN_kernel(kernel_representation : str, parameter_list : list, cov
     return STAN_str_kernel
 
 
-def generate_STAN_code(kernel_representation : str,  parameter_list : list, covar_string_list : list):
+def generate_STAN_code(kernel_representation : str,  parameter_list : list, covar_string_list : list, lower_bound = -15):
     # Alternative: use 1:dims(v)[0] in the loop
     functions = """
     functions {
@@ -445,10 +445,10 @@ def generate_STAN_code(kernel_representation : str,  parameter_list : list, cova
     # Old version:
     #vector<lower=-9.2102>[D] theta_tilde;
     # Give it lower bound -3.0 for each parameter to ensure Softplus doesn't reach 0
-    parameters = """
-    parameters {
-        vector<lower=-30>[D] theta;
-    }
+    parameters = f"""
+    parameters {{
+        vector<lower={lower_bound}>[D] theta;
+    }}
     """
     transformed_parameters = f"""
         transformed parameters {{
@@ -495,6 +495,7 @@ def calculate_mc_STAN(model, likelihood, num_draws, **kwargs):
     log_param_path = kwargs.get("log_param_path", False)    
     log_full_likelihood = kwargs.get("log_full_likelihood", False)
     log_full_posterior = kwargs.get("log_full_posterior", False)
+    lower_bound = kwargs.get("lower_bound", -30)
 
     prior_dict = {'SE': {'raw_lengthscale' : {"mean": -0.21221139138922668 , "std":1.8895426067756804}},
                 'MAT52': {'raw_lengthscale' :{"mean": 0.7993038925994188, "std":2.145122566357853 } },
@@ -556,7 +557,7 @@ def calculate_mc_STAN(model, likelihood, num_draws, **kwargs):
     sigma = torch.diag(torch.Tensor(variances_list))
     sigma = sigma@sigma
 
-    STAN_code = generate_STAN_code(covar_string, debug_param_name_list, covar_string_list)
+    STAN_code = generate_STAN_code(covar_string, debug_param_name_list, covar_string_list, lower_bound=lower_bound)
     if type(model.train_inputs) == tuple:
         x = model.train_inputs[0].tolist()
         # Assuming I have [[x1], [x2], [x3], ...]

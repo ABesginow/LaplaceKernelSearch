@@ -6,7 +6,7 @@ from globalParams import options, hyperparameter_limits
 import gpytorch
 from helpFunctions import get_string_representation_of_kernel as gsr
 from helpFunctions import clean_kernel_expression
-from helpFunctions import get_kernels_in_kernel_expression
+from helpFunctions import get_full_kernels_in_kernel_expression
 from helpFunctions import amount_of_base_kernels
 from itertools import product
 import json
@@ -250,6 +250,7 @@ def optimize_hyperparameters(model, likelihood, **kwargs):
     MAP = kwargs.get("MAP", True)
     prior = kwargs.get("prior", False)
     granso = kwargs.get("granso", True)
+    double_precision = kwargs.get("double_precision", False)
 
     # Set up the likelihood and model
     #likelihood = gpytorch.likelihoods.GaussianLikelihood()
@@ -266,6 +267,7 @@ def optimize_hyperparameters(model, likelihood, **kwargs):
     opts.opt_tol = float(1e-10)
     opts.limited_mem_size = int(100)
     opts.globalAD = True
+    opts.double_precision = double_precision
     opts.quadprog_info_msg = False
     opts.print_level = int(0)
     opts.halt_on_linesearch_bracket = False
@@ -335,6 +337,9 @@ def run_experiment(config):
     use_BFGS = False
     num_draws = 1000
     param_punishments = [0.0, -1.0, "BIC"]
+    double_precision = False
+    if double_precision:
+        torch.set_default_dtype(torch.float64)
 
     # set training iterations to the correct config
     options["training"]["max_iter"] = int(train_iterations)
@@ -396,7 +401,7 @@ def run_experiment(config):
         f, ax = plt.subplots()
         ax.plot(original_observations_x, observations_y, 'k*')
         #Store the plots as .png
-        #f.savefig(os.path.join(experiment_path, f"DATA_{exp_num}.png"))
+        f.savefig(os.path.join(experiment_path, f"DATA_{exp_num}.png"))
         #Store the plots as .tex
         #tikzplotlib.save(os.path.join(experiment_path, f"DATA_{exp_num}.tex"))
         plt.close(f)
@@ -405,7 +410,7 @@ def run_experiment(config):
         f, ax = plt.subplots()
         ax.plot(original_observations_x, observations_y, 'k*')
         #Store the plots as .png
-        #f.savefig(os.path.join(experiment_path, f"DATA_normalized_{exp_num}.png"))
+        f.savefig(os.path.join(experiment_path, f"DATA_normalized_{exp_num}.png"))
         #Store the plots as .tex
         #tikzplotlib.save(os.path.join(experiment_path, f"DATA_normalized_{exp_num}.tex"))
         plt.close(f)
@@ -433,7 +438,11 @@ def run_experiment(config):
                 for i in range(100):
                     try:
                         train_start = time.time()
-                        loss, model, likelihood = optimize_hyperparameters(model, likelihood, train_iterations=train_iterations)
+                        loss, model, likelihood = optimize_hyperparameters(
+                            model, likelihood,
+                            train_iterations=train_iterations, MAP=False,
+                            X=observations_x, Y=observations_y,
+                            double_precision=double_precision)
                         train_end = time.time()
                         break
                     except Exception as E:
@@ -447,7 +456,7 @@ def run_experiment(config):
                 if loss is np.nan:
                     raise ValueError("training fucked up")
                 train_time = train_end - train_start
-            if "Laplace" in metrics:
+            if "Likelihood Laplace" in metrics:
                 Laplace_logs = {param_punish : {} for param_punish in param_punishments}
                 for parameter_punishment in param_punishments:
                     laplace_approx, LApp_log = calculate_laplace(
@@ -547,7 +556,11 @@ def run_experiment(config):
                 for i in range(100):
                     try:
                         train_start = time.time()
-                        loss, model, likelihood = optimize_hyperparameters(model, likelihood,  train_iterations=train_iterations)
+                        loss, model, likelihood = optimize_hyperparameters(
+                            model, likelihood,
+                            train_iterations=train_iterations, MAP=True,
+                            X=observations_x, Y=observations_y,
+                            double_precision=double_precision)
                         train_end = time.time()
                         break
                     except Exception as E:
@@ -589,7 +602,7 @@ def run_experiment(config):
                     Laps_log[parameter_punishment]["loss"] = approx
                     Laps_log[parameter_punishment]["Train time"] = train_end - train_start
                     Laps_log[parameter_punishment]["details"] = Lap_log
-                exp_num_result_dict["Laplace_prior"][model_kernel] = Laps_log
+                exp_num_result_dict["Laplace"][model_kernel] = Laps_log
 
 
 
@@ -617,12 +630,22 @@ def run_experiment(config):
 
             # Perform MCMC
             if "MC" in metrics:
-                MCMC_approx, MC_log = calculate_mc_STAN(
-                    model, likelihood, num_draws)
+                for lower_bound in [-30.0, -20.0, -10.0, 0.0]:
+                    try:
+                        MCMC_approx, MC_log = calculate_mc_STAN(
+                            model, likelihood, num_draws, log_param_path=True, 
+                            log_full_likelihood=True, log_full_posterior=True,
+                            lower_bound=lower_bound)
+                        break
+                    except Exception as E:
+                        print(E)
+                        print(f"failed at lower bound {lower_bound}")
+                        pass
                 MC_logs = dict()
                 MC_logs["loss"] = MCMC_approx
                 MC_logs["num_draws"] = num_draws
                 MC_logs["details"] = MC_log
+                MC_logs["lower_bound"] = lower_bound
                 exp_num_result_dict["MC"][model_kernel] = MC_logs
         logables["results"].append(exp_num_result_dict)
 
@@ -638,7 +661,7 @@ def run_experiment(config):
 with open("FINISHED.log", "r") as f:
     finished_configs = [line.strip().split("/")[-1] for line in f.readlines()]
 curdir = os.getcwd()
-num_data =  [5, 10, 20, 30, 50, 70, 100]
+num_data =  [100, 5, 10, 20, 30, 50, 70, 100]
 data_kernel = ["SE", "SE+SE", "LIN"]
 #data_kernel = ["SE", "RQ", "MAT32", "MAT52", "SE*SE",
 #               "SE+SE", "MAT32+SE", "MAT52+SE", "MAT32*SE", "PER",
