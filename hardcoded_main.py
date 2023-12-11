@@ -389,7 +389,7 @@ def run_experiment(config):
 
     """
     torch.manual_seed(45)
-    metrics = ["AIC", "BIC", "MC", "Laplace_prior", "MLL", "MAP"]
+    metrics = ["AIC", "BIC", "MC", "Laplace", "MLL", "MAP"]
     eval_START = -5
     eval_END = 5
     eval_COUNT = config["num_data"]
@@ -478,7 +478,7 @@ def run_experiment(config):
         plt.close(f)
 
         #model_kernels = ["MAT32+PER"]
-        model_kernels = ["PER", "PER*SE", "MAT32+MAT52", "SE", "MAT32", "MAT32+SE", "MAT32*SE"]
+        model_kernels = ["SE", "SE+SE", "LIN"]
         #model_kernels = ["C*C*SE", "SE", "PER", "MAT32", "MAT32+SE", "MAT32*SE"]#"PER*SE", "PER+SE", "MAT32*PER", "MAT32+PER",
         #model_kernels = ["MAT32*PER"]
 
@@ -486,7 +486,7 @@ def run_experiment(config):
             print(f"Data Kernel: {data_kernel}")
             experiment_keyword = f"{model_kernel}_{exp_num}"
 
-            if any([m in metrics for m in ["Laplace", "MLL", "AIC", "BIC"]]):
+            if any([m in metrics for m in ["MLL", "AIC", "BIC"]]):
                 loss = np.nan
                 print("\n###############")
                 print(model_kernel)
@@ -518,14 +518,14 @@ def run_experiment(config):
                 Laplace_logs = {param_punish : {} for param_punish in param_punishments}
                 for parameter_punishment in param_punishments:
                     laplace_approx, LApp_log = calculate_laplace(
-                        model, (-loss)*len(*model.train_inputs), param_punish_term=parameter_punishment)
+                        model, (-loss)*len(*model.train_inputs), likelihood_laplace=True, param_punish_term=parameter_punishment)
                     Laplace_logs[parameter_punishment]["parameter_punishment"] = parameter_punishment
                     Laplace_logs[parameter_punishment]["loss"] = laplace_approx
                     Laplace_logs[parameter_punishment]["Train time"] = train_time
                     Laplace_logs[parameter_punishment]["details"] = LApp_log
                 exp_num_result_dict["Laplace"][model_kernel] = Laplace_logs
 
-            if any([m in metrics for m in ["Laplace", "MLL", "AIC", "BIC"]]):
+            if any([m in metrics for m in ["MLL", "AIC", "BIC"]]):
                 model.eval()
                 likelihood.eval()
                 with torch.no_grad(), gpytorch.settings.prior_mode(True):
@@ -600,7 +600,7 @@ def run_experiment(config):
                 test_mll = [np.nan]
             exp_num_result_dict["test likelihood"][model_kernel] = test_mll
 
-            if "MAP" in metrics or "Laplace_prior" in metrics:
+            if "MAP" in metrics or "Laplace" in metrics:
                 loss = np.nan
                 print("\n###############")
                 print(model_kernel)
@@ -648,15 +648,15 @@ def run_experiment(config):
                 plt.close(f)
 
             # Laplace approximation including prior requires different loss
-            if "Laplace_prior" in metrics:
-                Lap_prior_logs = {param_punish : {} for param_punish in param_punishments}
+            if "Laplace" in metrics:
+                Laps_log = {param_punish : {} for param_punish in param_punishments}
                 for parameter_punishment in param_punishments:
-                    approx, Lapp_prior_log = calculate_laplace(model, (-loss)*len(*model.train_inputs), with_prior=True, param_punish_term = parameter_punishment)
-                    Lap_prior_logs[parameter_punishment]["parameter_punishment"] = parameter_punishment
-                    Lap_prior_logs[parameter_punishment]["loss"] = approx
-                    Lap_prior_logs[parameter_punishment]["Train time"] = train_end - train_start
-                    Lap_prior_logs[parameter_punishment]["details"] = Lapp_prior_log
-                exp_num_result_dict["Laplace_prior"][model_kernel] = Lap_prior_logs
+                    approx, Lap_log = calculate_laplace(model, (-loss)*len(*model.train_inputs), param_punish_term = parameter_punishment)
+                    Laps_log[parameter_punishment]["parameter_punishment"] = parameter_punishment
+                    Laps_log[parameter_punishment]["loss"] = approx
+                    Laps_log[parameter_punishment]["Train time"] = train_end - train_start
+                    Laps_log[parameter_punishment]["details"] = Lap_log
+                exp_num_result_dict["Laplace_prior"][model_kernel] = Laps_log
 
 
 
@@ -693,7 +693,7 @@ def run_experiment(config):
                 exp_num_result_dict["MC"][model_kernel] = MC_logs
         logables["results"].append(exp_num_result_dict)
 
-    experiment_path = os.path.join("results_small_experiment", "hardcoded45",  f"{eval_COUNT}_{data_kernel}")
+    experiment_path = os.path.join("results_small_experiment", "hardcoded",  f"{eval_COUNT}_{data_kernel}")
     if not os.path.exists(experiment_path):
         os.makedirs(experiment_path)
     with open(os.path.join(experiment_path, f"results.pickle"), 'wb') as fh:
@@ -705,8 +705,8 @@ def run_experiment(config):
 with open("FINISHED.log", "r") as f:
     finished_configs = [line.strip().split("/")[-1] for line in f.readlines()]
 curdir = os.getcwd()
-num_data =  [5, 10, 20, 30, 50, 70, 100]#[5, 10, 20, 30, 50, 70, 100, 150, 200]
-data_kernel = ["MAT52", "RQ", "SE", "MAT32", "SE*SE"]
+num_data =  [5, 10, 20, 30, 50, 70, 100]
+data_kernel = ["SE", "SE+SE", "LIN"]
 #data_kernel = ["SE", "RQ", "MAT32", "MAT52", "SE*SE",
 #               "SE+SE", "MAT32+SE", "MAT52+SE", "MAT32*SE", "PER",
 #               "PER*SE", "(SE+RQ)*PER", "SE+SE+SE", "MAT32+(MAT52*PER)"]
