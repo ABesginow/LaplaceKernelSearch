@@ -4,7 +4,6 @@ from globalParams import options
 import gpytorch as gpt
 from gpytorch.kernels import ScaleKernel
 from helpFunctions import get_string_representation_of_kernel as gsr, clean_kernel_expression, print_formatted_hyperparameters
-from helpFunctions import amount_of_base_kernels, get_kernels_in_kernel_expression
 from itertools import chain
 import numpy as np
 import random
