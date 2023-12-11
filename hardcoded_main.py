@@ -626,7 +626,7 @@ def run_experiment(config):
                 exp_num_result_dict["MC"][model_kernel] = MC_logs
         logables["results"].append(exp_num_result_dict)
 
-    experiment_path = os.path.join("results_small_experiment", "hardcoded",  f"{eval_COUNT}_{data_kernel}")
+    experiment_path = os.path.join("results", "hardcoded",  f"{eval_COUNT}_{data_kernel}")
     if not os.path.exists(experiment_path):
         os.makedirs(experiment_path)
     with open(os.path.join(experiment_path, f"results.pickle"), 'wb') as fh:
