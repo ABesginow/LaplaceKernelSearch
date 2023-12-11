@@ -342,6 +342,7 @@ def optimize_hyperparameters(model, likelihood, **kwargs):
         output = model(train_x)
         loss = -mll(output, train_y)
         if MAP:
+            # log_normalized_prior is in metrics.py 
             log_p = log_normalized_prior(model)
             loss -= log_p
         return [loss, None, None]
@@ -366,13 +367,14 @@ def optimize_hyperparameters(model, likelihood, **kwargs):
     likelihood.load_state_dict(best_likelihood_state_dict)
 
     loss = -mll(model(train_x), train_y)
-    log_p = log_normalized_prior(model)
-    loss -= log_p
+    if MAP:
+        log_p = log_normalized_prior(model)
+        loss -= log_p
 
-    print(f"post training (best): {list(model.named_parameters())} w. loss: {soln.best.f}")
-    print(f"post training (final): {list(model.named_parameters())} w. loss: {soln.final.f}")
+    #print(f"post training (best): {list(model.named_parameters())} w. loss: {soln.best.f}")
+    #print(f"post training (final): {list(model.named_parameters())} w. loss: {soln.final.f}")
     
-    print(torch.autograd.grad(loss, [p for p in model.parameters()], retain_graph=True, create_graph=True, allow_unused=True))
+    #print(torch.autograd.grad(loss, [p for p in model.parameters()], retain_graph=True, create_graph=True, allow_unused=True))
     # Return the trained model
     return loss, model, likelihood
 
@@ -498,7 +500,7 @@ def run_experiment(config):
                 for i in range(100):
                     try:
                         train_start = time.time()
-                        loss = optimize_hyperparameters(model, likelihood, train_iterations=train_iterations)
+                        loss, model, likelihood = optimize_hyperparameters(model, likelihood, train_iterations=train_iterations)
                         train_end = time.time()
                         break
                     except Exception as E:
@@ -612,7 +614,7 @@ def run_experiment(config):
                 for i in range(100):
                     try:
                         train_start = time.time()
-                        loss = optimize_hyperparameters(model, likelihood,  train_iterations=train_iterations)
+                        loss, model, likelihood = optimize_hyperparameters(model, likelihood,  train_iterations=train_iterations)
                         train_end = time.time()
                         break
                     except Exception as E:
