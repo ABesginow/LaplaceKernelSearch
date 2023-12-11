@@ -341,8 +341,9 @@ def optimize_hyperparameters(model, likelihood, **kwargs):
     def objective_function(model):
         output = model(train_x)
         loss = -mll(output, train_y)
-        log_p = log_normalized_prior(model)
-        loss -= log_p
+        if MAP:
+            log_p = log_normalized_prior(model)
+            loss -= log_p
         return [loss, None, None]
 
     best_model_state_dict = model.state_dict()
@@ -497,7 +498,7 @@ def run_experiment(config):
                 for i in range(100):
                     try:
                         train_start = time.time()
-                        loss = optimize_hyperparameters(model, likelihood, train_iterations, observations_x, observations_y, use_BFGS)
+                        loss = optimize_hyperparameters(model, likelihood, train_iterations=train_iterations)
                         train_end = time.time()
                         break
                     except Exception as E:
@@ -611,7 +612,7 @@ def run_experiment(config):
                 for i in range(100):
                     try:
                         train_start = time.time()
-                        loss = optimize_hyperparameters(model, likelihood, train_iterations, observations_x, observations_y, use_BFGS, MAP=True)
+                        loss = optimize_hyperparameters(model, likelihood,  train_iterations=train_iterations)
                         train_end = time.time()
                         break
                     except Exception as E:
