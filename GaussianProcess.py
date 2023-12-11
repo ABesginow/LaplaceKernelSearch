@@ -1,14 +1,17 @@
-import gpytorch as gpt
-
-import torch
-import matplotlib.pyplot as plt
 import copy
 from globalParams import options, hyperparameter_limits
+import gpytorch as gpt
 from helpFunctions import get_kernels_in_kernel_expression, get_string_representation_of_kernel as gsr, get_full_kernels_in_kernel_expression
+import matplotlib.pyplot as plt
+import numpy as np
+from pygranso.pygranso import pygranso
+from pygranso.pygransoStruct import pygransoStruct
+from pygranso.private.getNvar import getNvarTorch
+import torch
 
 
 
-def log_prior(model, theta_mu=None, sigma=None):
+def log_normalized_prior(model, theta_mu=None, sigma=None):
     # params -
     # TODO de-spaghettize this once the priors are coded properly
     prior_dict = {'SE': {'raw_lengthscale' : {"mean": -0.21221139138922668 , "std":1.8895426067756804}},
@@ -76,7 +79,6 @@ def log_prior(model, theta_mu=None, sigma=None):
     # for convention reasons I'm diving by the number of datapoints
     return prior.log_prob(torch.Tensor(params)).item() / len(*model.train_inputs)
 
-
 class ExactGPModel(gpt.models.ExactGP):
     """
     A Gaussian Process class.
@@ -87,6 +89,7 @@ class ExactGPModel(gpt.models.ExactGP):
         super(ExactGPModel, self).__init__(X, Y, likelihood)
         self.mean_module = gpt.means.ZeroMean()
         self.covar_module = kernel
+        self.curr_loss = np.inf
 
     def forward(self, x):
         mean_x = self.mean_module(x)
@@ -103,58 +106,20 @@ class ExactGPModel(gpt.models.ExactGP):
     def train_model(self, with_BFGS=False, with_Adam=True, MAP=False):
         self.train()
         self.likelihood.train()
-        optimizer = torch.optim.Adam([{"params": self.parameters()}], lr=options["training"]["learning_rate"])
-        mll = gpt.mlls.ExactMarginalLogLikelihood(self.likelihood, self)
-
-        if with_Adam:
-            for i in range(options["training"]["max_iter"]):
-                optimizer.zero_grad()
-                output = self.__call__(self.train_inputs[0])
-                loss = -mll(output, self.train_targets)
-                if MAP:
-                    log_p = log_prior(self)
-                    loss -= log_p 
-                loss.backward()
-                if options["training"]["print_training_output"]:
-                    parameter_string = ""
-                    for param_name, param in self.covar_module.named_parameters():
-                        parameter_string += f"{param_name:20}: raw: {param.item():10}, transformed: {self.covar_module.constraint_for_parameter_name(param_name).transform(param).item():10}\n"
-                    parameter_string += f"{'noise':20}: raw: {self.likelihood.raw_noise.item():10}, transformed: {self.likelihood.noise.item():10}"
-                    print(
-                    f"HYPERPARAMETER TRAINING: Iteration {i} - Loss: {loss.item()}  \n{parameter_string}")
-                optimizer.step()
-
-        if with_BFGS:
-            # Additional BFGS optimization to better ensure optimal parameters
-            LBFGS_optimizer = torch.optim.LBFGS(self.parameters(), line_search_fn='strong_wolfe')
-            # define closure
-            def closure():
-                LBFGS_optimizer.zero_grad()
-                output = self.__call__(self.train_inputs[0])
-                loss = -mll(output, self.train_targets)
-                if MAP:
-                    log_p = log_prior(self)
-                    loss -= log_p 
-                LBFGS_optimizer.zero_grad()
-                loss.backward()
-                return loss
-
-            #loss = closure()
-            #loss.backward()
-
-            #for i in range(training_iter):
-                # perform step and update curvature
-                #LBFGS_opts = {'closure': closure, 'current_loss': loss, 'max_ls': 10}
-            LBFGS_optimizer.step(closure)
+        optimize_hyperparameters(self, self.likelihood, with_BFGS=with_BFGS, with_Adam=with_Adam, MAP=MAP)
 
 
-
-    def get_current_loss(self):
+    def get_current_loss(self, **kwargs):
+        MAP = kwargs.get("MAP", False)
         self.train()
         self.likelihood.train()
         mll = gpt.mlls.ExactMarginalLogLikelihood(self.likelihood, self)
         output = self.__call__(self.train_inputs[0])
-        loss = -mll(output, self.train_targets)
+        loss -= mll(output, self.train_targets)
+        if MAP:
+            # log_normalized_prior is in metrics.py 
+            log_p = log_normalized_prior(self)
+            loss -= log_p
         return loss
 
     def get_ll(self, X = None, Y = None):
@@ -164,6 +129,15 @@ class ExactGPModel(gpt.models.ExactGP):
         output = self.__call__(X)
         return torch.exp(mll(output, Y)).item()
 
+    def get_log_posterior(self, X = None, Y = None):
+        self.train()
+        self.likelihood.train()
+        mll = gpt.mlls.ExactMarginalLogLikelihood(self.likelihood, self)
+        output = self.__call__(X)
+        return mll(output, Y) + log_normalized_prior(self)
+
+
+
 
     def random_reinit(self, model):
         for i, (param, limit) in enumerate(zip(model.parameters(), [{"Noise": hyperparameter_limits["Noise"]},*[hyperparameter_limits[kernel] for kernel in get_full_kernels_in_kernel_expression(model.covar_module)]])):
@@ -172,7 +146,8 @@ class ExactGPModel(gpt.models.ExactGP):
             new_param_value = torch.randn_like(param) * (limit[param_name][1] - limit[param_name][0]) + limit[param_name][0]
             param.data = new_param_value
 
-    def optimize_hyperparameters(self, model, likelihood, **kwargs):
+    # Define the training loop
+    def optimize_hyperparameters(self, **kwargs):
         """
         find optimal hyperparameters either by BO or by starting from random initial values multiple times, using an optimizer every time
         and then returning the best result
@@ -183,84 +158,76 @@ class ExactGPModel(gpt.models.ExactGP):
         line_search = kwargs.get("line_search", False)
         BFGS_iter = kwargs.get("BFGS_iter", 50)
         train_iterations = kwargs.get("train_iterations", 0)
-        X = kwargs.get("X", model.train_inputs)
-        Y = kwargs.get("Y", model.train_targets)
-        with_BFGS = kwargs.get("with_BFGS", True)
+        train_x = kwargs.get("X", model.train_inputs)
+        train_y = kwargs.get("Y", model.train_targets)
+        with_BFGS = kwargs.get("with_BFGS", False)
+        history_size = kwargs.get("history_size", 100)
         MAP = kwargs.get("MAP", True)
         prior = kwargs.get("prior", False)
+        granso = kwargs.get("granso", True)
 
-        if log_likelihood:
-            likelihood_log = list()
-        if log_param_path:
-            param_log_dict = {param_name[0] : list() for param_name in model.named_parameters()}
+        # Set up the likelihood and model
+        #likelihood = gpytorch.likelihoods.GaussianLikelihood()
+        #model = GPModel(train_x, train_y, likelihood)
 
-        best_loss = float('inf')
-        best_model_state_dict = None
-        best_likelihood_state_dict = None
+        model = self
+        likelihood = self.likelihood
 
+        # Define the negative log likelihood
         mll = gpt.mlls.ExactMarginalLogLikelihood(likelihood, model)
 
+        # Set up the PyGRANSO optimizer
+        opts = pygransoStruct()
+        opts.torch_device = torch.device('cpu')
+        nvar = getNvarTorch(model.parameters())
+        opts.x0 = torch.nn.utils.parameters_to_vector(model.parameters()).detach().reshape(nvar,1)
+        opts.opt_tol = float(1e-10)
+        opts.limited_mem_size = int(100)
+        opts.globalAD = True
+        opts.quadprog_info_msg = False
+        opts.print_level = int(0)
+        opts.halt_on_linesearch_bracket = False
+
+        # Define the objective function
+        def objective_function(model):
+            output = model(train_x)
+            loss = -mll(output, train_y)
+            if MAP:
+                # log_normalized_prior is in metrics.py 
+                log_p = log_normalized_prior(model)
+                loss -= log_p
+            return [loss, None, None]
+
+        best_model_state_dict = model.state_dict()
+        best_likelihood_state_dict = likelihood.state_dict()
+
+        random_restarts = int(5)
+        best_f = np.inf
         for restart in range(random_restarts):
-            try:
-                optimizer = torch.optim.Adam(model.parameters(), lr=0.1)
-                mll = gpt.mlls.ExactMarginalLogLikelihood(likelihood, model)
-                # Train the ADAM part
-                for _ in range(train_iterations):
-                    optimizer.zero_grad()
-                    output = model(X)
-                    loss = -mll(output, Y)
-                    if MAP:
-                        log_p = log_prior(model)
-                        loss -= log_p
-                    loss.backward()
-                    optimizer.step()
-                    if log_param_path:
-                        for param_name in model.named_parameters():
-                            param_log_dict[param_name[0]].append(param_name[1].item())
-                    if log_likelihood:
-                        likelihood_log.append(loss.item())
-                # Train the L-BFGS part
-                optimizer = torch.optim.LBFGS(model.parameters(), max_iter=BFGS_iter, line_search_fn=None if line_search else "strong_wolfe")
-                def closure():
-                    optimizer.zero_grad()
-                    output = model(X)
-                    loss = -mll(output, Y)
-                    if MAP:
-                        log_p = log_prior(model)
-                        loss -= log_p
-                    loss.backward()
-                    if log_param_path:
-                        for param_name in model.named_parameters():
-                            param_log_dict[param_name[0]].append(param_name[1].item())
-                    if log_likelihood:
-                        likelihood_log.append(loss.item())
-                        
-                    return loss
-                loss = optimizer.step(closure)
-                if loss < best_loss:
-                    best_loss = loss
-                    best_model_state_dict = model.state_dict()
-                    best_likelihood_state_dict = likelihood.state_dict()
-            except Exception as E:
-                pass 
-            # print output if enabled
-            if options["training"]["print_optimizing_output"]:
-                print(f"HYPERPARAMETER OPTIMIZATION: Random Restart {restart}: loss: {loss}, optimal loss: {best_loss}")
+            print(f"pre training parameters: {list(model.named_parameters())}")
+            # Train the model using PyGRANSO
+            soln = pygranso(var_spec=model, combined_fn=objective_function, user_opts=opts)
+            if soln.final.f < best_f:
+                best_f = soln.final.f
+                best_model_state_dict = model.state_dict()
+                best_likelihood_state_dict = likelihood.state_dict()
+            print(f"post training (final): {list(model.named_parameters())} w. loss: {soln.final.f} (smaller=better)")
             self.random_reinit(model)
+
         model.load_state_dict(best_model_state_dict)
         likelihood.load_state_dict(best_likelihood_state_dict)
 
-        # Zero gradients from previous iteration
-        optimizer.zero_grad()
-        # Output from model
-        output = model(X)
-        # Calc loss and backprop gradients
-        loss = -mll(output, Y)
+        loss = -mll(model(train_x), train_y)
         if MAP:
-            log_p = log_prior(model)
+            log_p = log_normalized_prior(model)
             loss -= log_p
-        return loss, model, likelihood
 
+        #print(f"post training (best): {list(model.named_parameters())} w. loss: {soln.best.f}")
+        #print(f"post training (final): {list(model.named_parameters())} w. loss: {soln.final.f}")
+        
+        #print(torch.autograd.grad(loss, [p for p in model.parameters()], retain_graph=True, create_graph=True, allow_unused=True))
+        # Return the trained model
+        self.curr_loss = loss
 
     def eval_model(self):
         pass
