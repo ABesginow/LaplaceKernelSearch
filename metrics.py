@@ -105,7 +105,7 @@ def calculate_AIC(loss, num_params):
     return AIC, logables
 
 
-def Eigenvalue_correction_prior(hessian, param_punish_term):
+def Eigenvalue_correction(hessian, param_punish_term):
     # Appendix E.2
     vals, vecs = torch.linalg.eigh(hessian)
     constructed_eigvals = torch.diag(torch.Tensor(
@@ -117,7 +117,7 @@ def Eigenvalue_correction_prior(hessian, param_punish_term):
     return corrected_hessian, torch.diag(constructed_eigvals), num_replaced
         
 
-def Eigenvalue_correction(hessian, theta_mu, params, sigma, param_punish_term):
+def Eigenvalue_correction_likelihood_laplace(hessian, theta_mu, params, sigma, param_punish_term):
     # Appendix E.4
     vals, vecs = torch.linalg.eigh(hessian)
     #vecs = vecs.real
@@ -151,12 +151,11 @@ def Eigenvalue_correction(hessian, theta_mu, params, sigma, param_punish_term):
     return corrected_hessian, torch.diag(constructed_eigvals), num_replaced
 
 
-def calculate_laplace(model, loss_of_model, variances_list=None, with_prior=False, param_punish_term = -1.0, **kwargs):
+def calculate_laplace(model, loss_of_model, variances_list=None, likelihood_laplace=False, param_punish_term = -1.0, **kwargs):
     torch.set_default_tensor_type(torch.DoubleTensor)
     """
-        with_prior    - Decides whether the version of the Laplace approx WITH the
-                        prior is used or the one where the prior is not part of
-                        the approx.
+        likelihood_laplace - Decides whether the original Laplace or the 
+                             likelihood Laplace approximation is used
         loss_of_model - The positive optimal log likelihood from PyTorch 
     """
     theta_mu = kwargs["theta_mu"] if "theta_mu" in kwargs else None
@@ -253,11 +252,11 @@ def calculate_laplace(model, loss_of_model, variances_list=None, with_prior=Fals
     oldHessian = hessian.clone()
     if param_punish_term == "BIC":
         param_punish_term = -torch.log(torch.tensor(model.train_targets.numel()))
-    if with_prior:
+    if not likelihood_laplace:
         # Appendix E.1
         # it says mll, but it's actually the MAP here
         start = time.time()
-        hessian, constructed_eigvals_log, num_replaced = Eigenvalue_correction_prior(hessian, param_punish_term)
+        hessian, constructed_eigvals_log, num_replaced = Eigenvalue_correction(hessian, param_punish_term)
         end = time.time()
         hessian_correction_time = end - start
         # 1.8378 = log(2pi)
@@ -280,12 +279,11 @@ def calculate_laplace(model, loss_of_model, variances_list=None, with_prior=Fals
                 import pdb
                 pdb.set_trace()
                 print(constructed_eigvals_log)
-
     else:
         # Appendix E.3
         # Hessian correcting part (for Eigenvalues < 0 < c(i)  )
         start = time.time()
-        hessian, constructed_eigvals_log, num_replaced = Eigenvalue_correction(
+        hessian, constructed_eigvals_log, num_replaced = Eigenvalue_correction_likelihood_laplace(
             hessian, theta_mu, params, sigma, param_punish_term)
         end = time.time()
         #print(f"{num_replaced}")
