@@ -18,6 +18,9 @@ import numpy as np
 import os
 import pdb
 import pickle
+from pygranso.pygranso import pygranso
+from pygranso.pygransoStruct import pygransoStruct
+from pygranso.private.getNvar import getNvarTorch
 import random
 import tikzplotlib
 import time
@@ -286,106 +289,93 @@ def log_prior(model, theta_mu=None, sigma=None):
     # for convention reasons I'm diving by the number of datapoints
     return prior.log_prob(torch.Tensor(params)).item() / len(*model.train_inputs)
 
-def optimize_hyperparameters(model, likelihood, train_iterations, X, Y, with_BFGS=False, MAP=False, prior=None):
+def random_reinit(model):
+    for i, (param, limit) in enumerate(zip(model.parameters(), [{"Noise": hyperparameter_limits["Noise"]},*[hyperparameter_limits[kernel] for kernel in get_full_kernels_in_kernel_expression(model.covar_module)]])):
+        covar_text = gsr(model.covar_module)
+        param_name = list(limit.keys())[0]
+        new_param_value = torch.randn_like(param) * (limit[param_name][1] - limit[param_name][0]) + limit[param_name][0]
+        param.data = new_param_value
+
+
+
+# Define the training loop
+def optimize_hyperparameters(model, likelihood, **kwargs):
     """
     find optimal hyperparameters either by BO or by starting from random initial values multiple times, using an optimizer every time
     and then returning the best result
     """
-    # setup
-    best_loss = 1e400
-    optimal_parameters = dict()
-    limits = hyperparameter_limits
-    # start runs
-    for iteration in range(options["training"]["restarts"]+1):
-    #for iteration in range(2):
-        # optimize and determine loss
-        # Perform a training for AIC and Laplace
-        model.train()
-        likelihood.train()
+    log_param_path = kwargs.get("log_param_path", False)
+    log_likelihood = kwargs.get("log_likelihood", False)
+    random_restarts = kwargs.get("random_restarts", options["training"]["restarts"]+1)
+    line_search = kwargs.get("line_search", False)
+    BFGS_iter = kwargs.get("BFGS_iter", 50)
+    train_iterations = kwargs.get("train_iterations", 0)
+    train_x = kwargs.get("X", model.train_inputs)
+    train_y = kwargs.get("Y", model.train_targets)
+    with_BFGS = kwargs.get("with_BFGS", False)
+    history_size = kwargs.get("history_size", 100)
+    MAP = kwargs.get("MAP", True)
+    prior = kwargs.get("prior", False)
+    granso = kwargs.get("granso", True)
 
-        optimizer = torch.optim.Adam(model.parameters(), lr=0.1)
+    # Set up the likelihood and model
+    #likelihood = gpytorch.likelihoods.GaussianLikelihood()
+    #model = GPModel(train_x, train_y, likelihood)
 
-        mll = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood, model)
-
-        for i in range(train_iterations):
-            # Zero gradients from previous iteration
-            optimizer.zero_grad()
-            # Output from model
-            output = model(X)
-            # Calc loss and backprop gradients
-            loss = -mll(output, Y)
-            if MAP:
-                log_p = log_prior(model)
-                loss -= log_p
-            loss.backward()
-            optimizer.step()
-
-        if with_BFGS:
-            # Additional BFGS optimization to better ensure optimal parameters
-            # LBFGS_optimizer = torch.optim.LBFGS(model.parameters(), max_iter=50, line_search_fn='strong_wolfe')
-            LBFGS_optimizer = torch.optim.LBFGS(
-                model.parameters(), max_iter=50,
-                line_search_fn='strong_wolfe')
-            # define closure
-
-            def closure():
-                LBFGS_optimizer.zero_grad()
-                output = model(X)
-                loss = -mll(output, Y)
-                if MAP:
-                    log_p = log_prior(model)
-                    loss -= log_p
-                LBFGS_optimizer.zero_grad()
-                loss.backward()
-                return loss
-            LBFGS_optimizer.step(closure)
-
-        # Zero gradients from previous iteration
-        optimizer.zero_grad()
-        # Output from model
-        output = model(X)
-        # Calc loss and backprop gradients
-        loss = -mll(output, Y)
-        if MAP:
-            log_p = log_prior(model)
-            loss -= log_p
-
-#        model.train_model(with_BFGS=with_BFGS)
-        current_loss = loss
-        # check if the current run is better than previous runs
-        if current_loss < best_loss:
-            # if it is the best, save all used parameters
-            best_loss = current_loss
-            for param_name, param in model.named_parameters():
-                optimal_parameters[param_name] = copy.deepcopy(param)
-
-        # set new random inital values
-        model.likelihood.noise_covar.noise = torch.rand(1) * (limits["Noise"][1] - limits["Noise"][0]) + limits["Noise"][0]
-        #self.mean_module.constant = torch.rand(1) * (limits["Mean"][1] - limits["Mean"][0]) + limits["Mean"][0]
-        for kernel in get_kernels_in_kernel_expression(model.covar_module):
-            hypers = limits[kernel._get_name()]
-            for hyperparameter in hypers:
-                new_value = torch.rand(1) * (hypers[hyperparameter][1] - hypers[hyperparameter][0]) + hypers[hyperparameter][0]
-                setattr(kernel, hyperparameter, new_value)
-
-        # print output if enabled
-        if options["training"]["print_optimizing_output"]:
-            print(f"HYPERPARAMETER OPTIMIZATION: Random Restart {iteration}: loss: {current_loss}, optimal loss: {best_loss}")
-
-    # finally, set the hyperparameters those in the optimal run
-    model.initialize(**optimal_parameters)
-    output = model(X)
+    # Define the negative log likelihood
     mll = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood, model)
-    loss = -mll(output, Y)
-    if MAP:
-        log_p = log_prior(model)
+
+    # Set up the PyGRANSO optimizer
+    opts = pygransoStruct()
+    opts.torch_device = torch.device('cpu')
+    nvar = getNvarTorch(model.parameters())
+    opts.x0 = torch.nn.utils.parameters_to_vector(model.parameters()).detach().reshape(nvar,1)
+    opts.opt_tol = float(1e-10)
+    opts.limited_mem_size = int(100)
+    opts.globalAD = True
+    opts.quadprog_info_msg = False
+    opts.print_level = int(0)
+    opts.halt_on_linesearch_bracket = False
+
+    # Define the objective function
+    def objective_function(model):
+        output = model(train_x)
+        loss = -mll(output, train_y)
+        log_p = log_normalized_prior(model)
         loss -= log_p
-    if not loss == best_loss:
-        import pdb
-        pdb.set_trace()
-        print(loss)
-        print(best_loss)
-    return loss
+        return [loss, None, None]
+
+    best_model_state_dict = model.state_dict()
+    best_likelihood_state_dict = likelihood.state_dict()
+
+    random_restarts = int(5)
+    best_f = np.inf
+    for restart in range(random_restarts):
+        print(f"pre training parameters: {list(model.named_parameters())}")
+        # Train the model using PyGRANSO
+        soln = pygranso(var_spec=model, combined_fn=objective_function, user_opts=opts)
+        if soln.final.f < best_f:
+            best_f = soln.final.f
+            best_model_state_dict = model.state_dict()
+            best_likelihood_state_dict = likelihood.state_dict()
+        print(f"post training (final): {list(model.named_parameters())} w. loss: {soln.final.f} (smaller=better)")
+        random_reinit(model)
+
+    model.load_state_dict(best_model_state_dict)
+    likelihood.load_state_dict(best_likelihood_state_dict)
+
+    loss = -mll(model(train_x), train_y)
+    log_p = log_normalized_prior(model)
+    loss -= log_p
+
+    print(f"post training (best): {list(model.named_parameters())} w. loss: {soln.best.f}")
+    print(f"post training (final): {list(model.named_parameters())} w. loss: {soln.final.f}")
+    
+    print(torch.autograd.grad(loss, [p for p in model.parameters()], retain_graph=True, create_graph=True, allow_unused=True))
+    # Return the trained model
+    return loss, model, likelihood
+
+
 
 
 def run_experiment(config):
@@ -406,7 +396,7 @@ def run_experiment(config):
     LR = 0.1
     # noise =
     data_scaling = True
-    use_BFGS = True
+    use_BFGS = False
     num_draws = 1000
     param_punishments = [0.0, -1.0, "BIC"]
 
