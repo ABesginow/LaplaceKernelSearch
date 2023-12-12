@@ -151,6 +151,8 @@ class ExactGPModel(gpytorch.models.ExactGP):
                 gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel()))
         elif kernel_text == "SE":
             self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel())
+        elif kernel_text == "LIN":
+            self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.LinearKernel())
         elif kernel_text == "RQ":
             self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.RQKernel())
         elif kernel_text == "PER":
@@ -630,17 +632,9 @@ def run_experiment(config):
 
             # Perform MCMC
             if "MC" in metrics:
-                for lower_bound in [-30.0, -20.0, -10.0, 0.0]:
-                    try:
-                        MCMC_approx, MC_log = calculate_mc_STAN(
-                            model, likelihood, num_draws, log_param_path=True, 
-                            log_full_likelihood=True, log_full_posterior=True,
-                            lower_bound=lower_bound)
-                        break
-                    except Exception as E:
-                        print(E)
-                        print(f"failed at lower bound {lower_bound}")
-                        pass
+                MCMC_approx, MC_log = calculate_mc_STAN(
+                    model, likelihood, num_draws, log_param_path=True, 
+                    log_full_likelihood=True, log_full_posterior=True)
                 MC_logs = dict()
                 MC_logs["loss"] = MCMC_approx
                 MC_logs["num_draws"] = num_draws
