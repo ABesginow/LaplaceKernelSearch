@@ -390,7 +390,7 @@ def generate_STAN_kernel(kernel_representation : str, parameter_list : list, cov
     parameter_list : We assume it just contains strings of parameter names
     """
     replacement_dictionary = {
-        "c" : "(theta[i])",
+        "c" : "softplus(theta[i])",
         "SE": "gp_exp_quad_cov(x, 1.0, softplus(theta[i]))",
         "MAT52": "gp_matern52_cov(x, 1.0, softplus(theta[i]))",
         "MAT32": "gp_matern32_cov(x, 1.0, softplus(theta[i]))",
@@ -659,6 +659,7 @@ def calculate_mc_STAN(model, likelihood, num_draws, **kwargs):
     logables["likelihood approximation"] = torch.nanmean(torch.Tensor(manual_lp_list))
     logables["posterior approximation"] = torch.nanmean(torch.Tensor(manual_post_list))
     logables["STAN_like_approx"] = STAN_like_approx
+    logables["lower_bound"] = lower_bound
     logables["log prior list"] = log_prior_list
     if log_full_posterior:
         logables["manual post list"] = manual_post_list
