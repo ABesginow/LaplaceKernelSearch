@@ -80,6 +80,8 @@ class DataGPModel(gpytorch.models.ExactGP):
             self.covar_module = gpytorch.kernels.RBFKernel()
         elif kernel_text == "RQ":
             self.covar_module = gpytorch.kernels.RQKernel()
+        elif kernel_text == "LIN":
+            self.covar_module = gpytorch.kernels.LinearKernel()
         elif kernel_text == "PER":
             self.covar_module = gpytorch.kernels.PeriodicKernel()
         elif kernel_text == "SE+SE":
@@ -150,9 +152,11 @@ class ExactGPModel(gpytorch.models.ExactGP):
             self.covar_module = gpytorch.kernels.ScaleKernel(
                 gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel()))
         elif kernel_text == "SE":
-            self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel())
+            self.covar_module = gpytorch.kernels.RBFKernel()
         elif kernel_text == "LIN":
-            self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.LinearKernel())
+            self.covar_module = gpytorch.kernels.LinearKernel()
+        elif kernel_text == "SE+SE":
+            self.covar_module =  gpytorch.kernels.RBFKernel() + gpytorch.kernels.RBFKernel()
         elif kernel_text == "RQ":
             self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.RQKernel())
         elif kernel_text == "PER":
@@ -186,8 +190,6 @@ class ExactGPModel(gpytorch.models.ExactGP):
             self.covar_module =  gpytorch.kernels.ScaleKernel(gpytorch.kernels.MaternKernel()) + gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel())
         elif kernel_text == "SE*SE":
             self.covar_module =  gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel()) * gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel())
-        elif kernel_text == "SE+SE":
-            self.covar_module =  gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel()) + gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel())
         elif kernel_text == "(SE+RQ)*PER":
             self.covar_module =  (gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel()) + gpytorch.kernels.ScaleKernel(gpytorch.kernels.RQKernel())) * gpytorch.kernels.ScaleKernel(gpytorch.kernels.PeriodicKernel())
         elif kernel_text == "SE+SE+SE":
@@ -378,6 +380,7 @@ def run_experiment(config):
         observed_pred_prior = data_likelihood(data_model(observations_x))
         f_preds = data_model(observations_x)
 
+    original_observations_x = copy.deepcopy(observations_x)
 
     EXPERIMENT_REPITITIONS = 50
     for exp_num in tqdm(range(EXPERIMENT_REPITITIONS)):
@@ -389,10 +392,10 @@ def run_experiment(config):
         # To store performance of kernels on a test dataset (i.e. more samples)
         exp_num_result_dict["test likelihood"] = dict()
         exp_num_result_dict["test likelihood(MAP)"] = dict()
-        original_observations_x = copy.deepcopy(observations_x)
         observations_x = (observations_x - torch.mean(observations_x)
                         ) / torch.std(observations_x)
         noise_level = 0.4
+        original_observations_y = copy.deepcopy(observations_y)
         observations_y = observations_y + torch.randn(observations_y.shape) * torch.tensor(noise_level)
         #observations_y = (observations_y - torch.mean(observations_y)
         #                  ) / torch.std(observations_y)
@@ -401,7 +404,8 @@ def run_experiment(config):
         if not os.path.exists(experiment_path):
             os.makedirs(experiment_path)
         f, ax = plt.subplots()
-        ax.plot(original_observations_x, observations_y, 'k*')
+        ax.plot(original_observations_x, original_observations_y, 'k*')
+        ax.plot(original_observations_x, original_observations_y, '-', color="blue")
         #Store the plots as .png
         f.savefig(os.path.join(experiment_path, f"DATA_{exp_num}.png"))
         #Store the plots as .tex
@@ -410,7 +414,8 @@ def run_experiment(config):
 
 
         f, ax = plt.subplots()
-        ax.plot(original_observations_x, observations_y, 'k*')
+        ax.plot(observations_x, observations_y, 'k*')
+        ax.plot(observations_x, observations_y, '-', color="blue")
         #Store the plots as .png
         f.savefig(os.path.join(experiment_path, f"DATA_normalized_{exp_num}.png"))
         #Store the plots as .tex
@@ -418,7 +423,7 @@ def run_experiment(config):
         plt.close(f)
 
         #model_kernels = ["MAT32+PER"]
-        model_kernels = ["SE", "SE+SE", "LIN"]
+        model_kernels = ["SE", "SE+SE", "MAT32"]
         #model_kernels = ["C*C*SE", "SE", "PER", "MAT32", "MAT32+SE", "MAT32*SE"]#"PER*SE", "PER+SE", "MAT32*PER", "MAT32+PER",
         #model_kernels = ["MAT32*PER"]
 
@@ -639,7 +644,6 @@ def run_experiment(config):
                 MC_logs["loss"] = MCMC_approx
                 MC_logs["num_draws"] = num_draws
                 MC_logs["details"] = MC_log
-                MC_logs["lower_bound"] = lower_bound
                 exp_num_result_dict["MC"][model_kernel] = MC_logs
         logables["results"].append(exp_num_result_dict)
 
@@ -655,7 +659,7 @@ def run_experiment(config):
 with open("FINISHED.log", "r") as f:
     finished_configs = [line.strip().split("/")[-1] for line in f.readlines()]
 curdir = os.getcwd()
-num_data =  [100, 5, 10, 20, 30, 50, 70, 100]
+num_data =  [5, 10, 20, 30, 50, 70, 100]
 data_kernel = ["SE", "SE+SE", "LIN"]
 #data_kernel = ["SE", "RQ", "MAT32", "MAT52", "SE*SE",
 #               "SE+SE", "MAT32+SE", "MAT52+SE", "MAT32*SE", "PER",
