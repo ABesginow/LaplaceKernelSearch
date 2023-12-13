@@ -43,23 +43,24 @@ general_json = {
     'Kernel_search': ["CKS"],
     'train_data_ratio': [0.5],#50% of the eval data
     #'Data_kernel': ["SE", "PER", "MAT32", "PER*SE", "PER+SE", "MAT32*PER", "MAT32+PER", "MAT32+SE", "MAT32*SE"],
-    'Data_kernel': ["PER", "SE", "MAT32", "MAT32+SE", "MAT32*SE", "MAT32*PER", "MAT32+PER", "PER*SE"],
+    #'Data_kernel': ["PER", "SE", "MAT32", "MAT32+SE", "MAT32*SE", "MAT32*PER", "MAT32+PER", "PER*SE"],
+    'Data_kernel': ["SE", "SE+SE", "LIN", "MAT32"],
     'weights': [[1., 1.]],
     'Variance_list': [4],
     'eval_START':[-5.0],
     'eval_END':[5.0],
     'eval_COUNT':[5, 10, 20, 30, 40, 50, 70, 100, 150, 200],#, 250, 500],
-    'optimizer':['Adam'],
-    'train_iterations':[200],
+    'optimizer':['GRANSO'],
+    'train_iterations':[100],
     'LR': [0.1],
     'Noise': [0.0],#1%, 5%, 10% of max
     'Data_scaling': [True],
-    'BFGS' : [True]
+    'BFGS' : [False]
 }
 
 MC_json = {
     "Metric": ["MC"],
-    "num_draws": [10, 100, 1000, 10000]
+    "num_draws": [1000]
 }
 
 Laplace_json = {
@@ -67,10 +68,10 @@ Laplace_json = {
     "parameter_punishment": [0.0, -1.0, "BIC"]
 }
 
-Laplace_prior_json = {
-    "Metric": ["Laplace_prior"],
-    "parameter_punishment": [0.0, -1.0, "BIC"]
-}
+#Laplace_prior_json = {
+#    "Metric": ["Laplace_prior"],
+#    "parameter_punishment": [0.0, -1.0, "BIC"]
+#}
 
 MLL_json = {
     "Metric": ["MLL"]
@@ -84,7 +85,7 @@ BIC_json = {
     "Metric" : ["BIC"]
 }
 
-specific_jsons = [MC_json, MLL_json, AIC_json, BIC_json, Laplace_prior_json] # , Laplace_json
+specific_jsons = [MC_json, MLL_json, AIC_json, BIC_json, Laplace_json] # , Laplace_json
 #general_json = {
 #                'Metric': ["Laplace", "MC", "MLL", "AIC"],
 #                'Kernel_search': ["CKS"],
