@@ -327,7 +327,7 @@ def run_experiment(config):
     Returns nothing
 
     """
-    torch.manual_seed(42)
+    torch.manual_seed(43)
     metrics = ["AIC", "BIC", "MC", "Laplace", "MLL", "MAP"]
     eval_START = -5
     eval_END = 5
@@ -383,11 +383,11 @@ def run_experiment(config):
     original_observations_x = copy.deepcopy(observations_x)
 
     EXPERIMENT_REPITITIONS = 50
-    for exp_num in tqdm(range(EXPERIMENT_REPITITIONS)):
+    all_observations_y = f_preds.sample_n(EXPERIMENT_REPITITIONS)
+    for (observations_y, exp_num) in tqdm(zip(all_observations_y, range(EXPERIMENT_REPITITIONS))):
         exp_num_result_dict = dict()
         for metric in metrics:
             exp_num_result_dict[metric] = dict()
-        observations_y = f_preds.sample()           # samples from the model
 
         # To store performance of kernels on a test dataset (i.e. more samples)
         exp_num_result_dict["test likelihood"] = dict()
@@ -660,7 +660,7 @@ with open("FINISHED.log", "r") as f:
     finished_configs = [line.strip().split("/")[-1] for line in f.readlines()]
 curdir = os.getcwd()
 num_data =  [5, 10, 20, 30, 50, 70, 100]
-data_kernel = ["SE", "SE+SE", "LIN"]
+data_kernel = ["LIN", "SE", "SE+SE"]
 #data_kernel = ["SE", "RQ", "MAT32", "MAT52", "SE*SE",
 #               "SE+SE", "MAT32+SE", "MAT52+SE", "MAT32*SE", "PER",
 #               "PER*SE", "(SE+RQ)*PER", "SE+SE+SE", "MAT32+(MAT52*PER)"]
