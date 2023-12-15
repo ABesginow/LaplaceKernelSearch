@@ -35,11 +35,11 @@ def log_normalized_prior(model, theta_mu=None, sigma=None):
     #              "LIN": {"raw_variance": {"mean": -1.463, "std": 1.633}},
     #              "c": {"raw_outputscale": {"mean": -2.163, "std": 2.448}},
     #              "noise": {"raw_noise": {"mean": -1.792, "std": 3.266}}}
-
+    total_log_prob = torch.tensor(0.0)
     variances_list = list()
     debug_param_name_list = list()
     theta_mu = list()
-    params = list()
+    params = None 
     covar_string = gsr(model.covar_module)
     covar_string = covar_string.replace("(", "")
     covar_string = covar_string.replace(")", "")
@@ -50,30 +50,41 @@ def log_normalized_prior(model, theta_mu=None, sigma=None):
     covar_string_list = list(chain.from_iterable(covar_string_list))
     both_PER_params = False
     for (param_name, param), cov_str in zip(model.named_parameters(), covar_string_list):
-        params.append(param.item())
+        if params == None:
+            params = param
+        else:
+            if len(param.shape)==0:
+                params = torch.cat((params,param.unsqueeze(0)))
+            elif len(param.shape)==1:
+                params = torch.cat((params,param))
+            else:
+                params = torch.cat((params,param.squeeze(0)))
         debug_param_name_list.append(param_name)
+        curr_mu = None
+        curr_var = None
         # First param is (always?) noise and is always with the likelihood
         if "likelihood" in param_name:
-            theta_mu.append(prior_dict["noise"]["raw_noise"]["mean"])
-            variances_list.append(prior_dict["noise"]["raw_noise"]["std"])
-            continue
+            curr_mu = prior_dict["noise"]["raw_noise"]["mean"]
+            curr_var = prior_dict["noise"]["raw_noise"]["std"]
         else:
             if (cov_str == "PER" or cov_str == "RQ") and not both_PER_params:
-                theta_mu.append(prior_dict[cov_str][param_name.split(".")[-1]]["mean"])
-                variances_list.append(prior_dict[cov_str][param_name.split(".")[-1]]["std"])
+                curr_mu = prior_dict[cov_str][param_name.split(".")[-1]]["mean"]
+                curr_var = prior_dict[cov_str][param_name.split(".")[-1]]["std"]
                 both_PER_params = True
             elif (cov_str == "PER" or cov_str == "RQ") and both_PER_params:
-                theta_mu.append(prior_dict[cov_str][param_name.split(".")[-1]]["mean"])
-                variances_list.append(prior_dict[cov_str][param_name.split(".")[-1]]["std"])
+                curr_mu = prior_dict[cov_str][param_name.split(".")[-1]]["mean"]
+                curr_var = prior_dict[cov_str][param_name.split(".")[-1]]["std"]
                 both_PER_params = False
             else:
                 try:
-                    theta_mu.append(prior_dict[cov_str][param_name.split(".")[-1]]["mean"])
-                    variances_list.append(prior_dict[cov_str][param_name.split(".")[-1]]["std"])
+                    curr_mu = prior_dict[cov_str][param_name.split(".")[-1]]["mean"]
+                    curr_var = prior_dict[cov_str][param_name.split(".")[-1]]["std"]
                 except Exception as E:
                     import pdb
                     pdb.set_trace()
                     prev_cov = cov_str
+        theta_mu.append(curr_mu)
+        variances_list.append(curr_var)
     theta_mu = torch.tensor(theta_mu)
     theta_mu = theta_mu.unsqueeze(0).t()
     sigma = torch.diag(torch.Tensor(variances_list))
@@ -81,7 +92,8 @@ def log_normalized_prior(model, theta_mu=None, sigma=None):
     prior = torch.distributions.MultivariateNormal(theta_mu.t(), sigma)
 
     # for convention reasons I'm diving by the number of datapoints
-    return prior.log_prob(torch.Tensor(params)).item() / len(*model.train_inputs)
+    log_prob = prior.log_prob(params) / len(*model.train_inputs)
+    return log_prob.squeeze(0)
 
 # This is the NEGATIVE BIC
 def calculate_BIC(loss, num_params, num_data):
@@ -496,6 +508,7 @@ def calculate_mc_STAN(model, likelihood, num_draws, **kwargs):
     log_full_likelihood = kwargs.get("log_full_likelihood", False)
     log_full_posterior = kwargs.get("log_full_posterior", False)
     lower_bound = kwargs.get("lower_bound", -30)
+    manual_seed = kwargs.get("manual_seed", None)
 
     prior_dict = {'SE': {'raw_lengthscale' : {"mean": -0.21221139138922668 , "std":1.8895426067756804}},
                 'MAT52': {'raw_lengthscale' :{"mean": 0.7993038925994188, "std":2.145122566357853 } },
@@ -579,7 +592,11 @@ def calculate_mc_STAN(model, likelihood, num_draws, **kwargs):
     #print(STAN_code)
     #print("========================")
     start = time.time()
-    seed = random.randint(0, 1000000)
+    if manual_seed is None:
+        seed = random.randint(0, 1000000)
+    else:
+        seed = manual_seed
+        
     #print(STAN_data)
     #print(STAN_code)
     posterior = stan.build(STAN_code, data=STAN_data, random_seed=seed)
