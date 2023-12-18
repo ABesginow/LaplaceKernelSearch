@@ -477,25 +477,29 @@ def run_experiment(config):
                 exp_num_result_dict["Laplace"][model_kernel] = Laplace_logs
 
             if any([m in metrics for m in ["MLL", "AIC", "BIC"]]):
-                model.eval()
-                likelihood.eval()
-                with torch.no_grad(), gpytorch.settings.prior_mode(True):
-                    observed_pred_prior = likelihood(model(observations_x))
-                    f_preds = model(observations_x)
-                    mean_posterior = observed_pred_prior.mean
-                    lower_posterior, upper_posterior = observed_pred_prior.confidence_region()
+                try:
+                    model.eval()
+                    likelihood.eval()
+                    with torch.no_grad(), gpytorch.settings.prior_mode(True):
+                        observed_pred_prior = likelihood(model(observations_x))
+                        f_preds = model(observations_x)
+                        mean_posterior = observed_pred_prior.mean
+                        lower_posterior, upper_posterior = observed_pred_prior.confidence_region()
 
-                mean_y = model(observations_x).mean
+                    mean_y = model(observations_x).mean
 
-                f, ax = plt.subplots()
-                f, ax = plot_model(model, likelihood, observations_x, observations_y, True, f, ax)
-                ax.plot(original_observations_x, observations_y, 'k*')
-                image_time = time.time()
-                #Store the plots as .png
-                #f.savefig(os.path.join(experiment_path, f"{experiment_keyword}_{exp_num}_MLL.png"))
-                #Store the plots as .tex
-                #tikzplotlib.save(os.path.join(experiment_path, f"{experiment_keyword}_{exp_num}_MLL.tex"))
-                plt.close(f)
+                    f, ax = plt.subplots()
+                    f, ax = plot_model(model, likelihood, observations_x, observations_y, True, f, ax)
+                    ax.plot(original_observations_x, observations_y, 'k*')
+                    image_time = time.time()
+                    #Store the plots as .png
+                    #f.savefig(os.path.join(experiment_path, f"{experiment_keyword}_{exp_num}_MLL.png"))
+                    #Store the plots as .tex
+                    #tikzplotlib.save(os.path.join(experiment_path, f"{experiment_keyword}_{exp_num}_MLL.tex"))
+                    plt.close(f)
+                except:
+                    pass
+
 
             if "MLL" in metrics:
                 MLL_logs = dict()
@@ -587,20 +591,23 @@ def run_experiment(config):
                     MAP_logs["model parameters"] = list(model.named_parameters())
                     exp_num_result_dict["MAP"][model_kernel] = MAP_logs
 
-                model.eval()
-                likelihood.eval()
-                with torch.no_grad(), gpytorch.settings.prior_mode(True):
-                    observed_pred_prior = likelihood(model(observations_x))
-                    f_preds = model(observations_x)
-                f, ax = plt.subplots()
-                f, ax = plot_model(model, likelihood, original_observations_x, observations_y, True, f, ax)
-                ax.plot(original_observations_x, observations_y, 'k*')
-                image_time = time.time()
-                #Store the plots as .png
-                #f.savefig(os.path.join(experiment_path, f"{experiment_keyword}_{exp_num}_MAP.png"))
-                #Store the plots as .tex
-                #tikzplotlib.save(os.path.join(experiment_path, f"{experiment_keyword}_{exp_num}_MAP.tex"))
-                plt.close(f)
+                try:
+                    model.eval()
+                    likelihood.eval()
+                    with torch.no_grad(), gpytorch.settings.prior_mode(True):
+                        observed_pred_prior = likelihood(model(observations_x))
+                        f_preds = model(observations_x)
+                    f, ax = plt.subplots()
+                    f, ax = plot_model(model, likelihood, original_observations_x, observations_y, True, f, ax)
+                    ax.plot(original_observations_x, observations_y, 'k*')
+                    image_time = time.time()
+                    #Store the plots as .png
+                    #f.savefig(os.path.join(experiment_path, f"{experiment_keyword}_{exp_num}_MAP.png"))
+                    #Store the plots as .tex
+                    #tikzplotlib.save(os.path.join(experiment_path, f"{experiment_keyword}_{exp_num}_MAP.tex"))
+                    plt.close(f)
+                except:
+                    pass
 
             # Laplace approximation including prior requires different loss
             if "Laplace" in metrics:
