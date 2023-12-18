@@ -509,6 +509,8 @@ def calculate_mc_STAN(model, likelihood, num_draws, **kwargs):
     log_full_posterior = kwargs.get("log_full_posterior", False)
     lower_bound = kwargs.get("lower_bound", -30)
     manual_seed = kwargs.get("manual_seed", None)
+    log_kernel_data = kwargs.get("log_kernel_data", False)
+
 
     prior_dict = {'SE': {'raw_lengthscale' : {"mean": -0.21221139138922668 , "std":1.8895426067756804}},
                 'MAT52': {'raw_lengthscale' :{"mean": 0.7993038925994188, "std":2.145122566357853 } },
@@ -644,9 +646,9 @@ def calculate_mc_STAN(model, likelihood, num_draws, **kwargs):
             like_cov_chol = torch.linalg.cholesky(observed_pred_prior.covariance_matrix)
             like_dist = torch.distributions.multivariate_normal.MultivariateNormal(observed_pred_prior.mean.flatten(), scale_tril=like_cov_chol)
             manual_lp_list.append(like_dist.log_prob(model.train_targets))
-            manual_post_list.append(like_dist.log_prob(model.train_targets) + log_normalized_prior(model))
+            manual_post_list.append(like_dist.log_prob(model.train_targets).item() + log_normalized_prior(model).item())
             # TODO write log prior function
-            log_prior_list.append(log_normalized_prior(model))
+            log_prior_list.append(log_normalized_prior(model).item())
         except Exception as e:
             manual_lp_list.append(np.nan)
             bad_entries += 1
@@ -678,6 +680,8 @@ def calculate_mc_STAN(model, likelihood, num_draws, **kwargs):
     logables["STAN_like_approx"] = STAN_like_approx
     logables["lower_bound"] = lower_bound
     logables["log prior list"] = log_prior_list
+    if log_kernel_data:
+        logables["Kernel data"] = STAN_data
     if log_full_posterior:
         logables["manual post list"] = manual_post_list
     if log_full_likelihood:
