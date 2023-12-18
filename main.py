@@ -122,7 +122,7 @@ def run_experiment(config_file, torch_seed):
     data_scaling = var_dict["Data_scaling"]
     use_BFGS = var_dict["BFGS"]
     num_draws = var_dict["num_draws"] if metric == "MC" else None
-    parameter_punishment = var_dict["parameter_punishment"] if metric == "Laplace" or metric == "Laplace_prior" else None
+    parameter_punishment = var_dict["parameter_punishment"] if metric == "Laplace" else None
 
     # set training iterations to the correct config
     options["training"]["max_iter"] = int(train_iterations)
@@ -179,10 +179,14 @@ def run_experiment(config_file, torch_seed):
             #Y = (Y - torch.mean(Y)) / torch.std(Y)
 
         # Run CKS
-        list_of_kernels = [gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel()),
-                           gpytorch.kernels.ScaleKernel(gpytorch.kernels.PeriodicKernel()),
-                           gpytorch.kernels.ScaleKernel(gpytorch.kernels.LinearKernel()),
-                           gpytorch.kernels.ScaleKernel(gpytorch.kernels.MaternKernel(nu=1.5))]
+        list_of_kernels = [gpytorch.kernels.RBFKernel(),
+                           gpytorch.kernels.PeriodicKernel(),
+                           gpytorch.kernels.LinearKernel(),
+                           gpytorch.kernels.MaternKernel(nu=1.5)]
+        #list_of_kernels = [gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel()),
+        #                   gpytorch.kernels.ScaleKernel(gpytorch.kernels.PeriodicKernel()),
+        #                   gpytorch.kernels.ScaleKernel(gpytorch.kernels.LinearKernel()),
+        #                   gpytorch.kernels.ScaleKernel(gpytorch.kernels.MaternKernel(nu=1.5))]
         likelihood = gpytorch.likelihoods.GaussianLikelihood()
         list_of_variances = [float(variance_list_variance) for i in range(28)] # ist das richtig so?? Kommt mir falsch vor...
         #try:
@@ -343,7 +347,7 @@ if __name__ == "__main__":
     with open("FINISHED.log", "r") as f:
         finished_configs = [line.strip().split("/")[-1] for line in f.readlines()]
     curdir = os.getcwd()
-    keywords = ["AIC", "BIC", "MLL",  "Laplace_prior"]# "MC" only when there's a lot of time
+    keywords = ["AIC", "BIC", "MLL",  "Laplace"]# "MC" only when there's a lot of time
     configs = []
     for KEYWORD in keywords:
         configs.extend([os.path.join(curdir, "configs", KEYWORD, item) for item in os.listdir(os.path.join(curdir, "configs", KEYWORD))])
