@@ -334,7 +334,7 @@ def run_experiment(config):
     eval_COUNT = config["num_data"]
     optimizer = "PyGRANSO"
     data_kernel = config["data_kernel"]
-    train_iterations = 200
+    train_iterations = 100
     LR = 0.1
     # noise =
     data_scaling = True
@@ -382,21 +382,23 @@ def run_experiment(config):
 
     original_observations_x = copy.deepcopy(observations_x)
 
-    EXPERIMENT_REPITITIONS = 50
+    EXPERIMENT_REPITITIONS = 50 
+    
     all_observations_y = f_preds.sample_n(EXPERIMENT_REPITITIONS)
     for (observations_y, exp_num) in tqdm(zip(all_observations_y, range(EXPERIMENT_REPITITIONS))):
         exp_num_result_dict = dict()
         for metric in metrics:
             exp_num_result_dict[metric] = dict()
+        observations_y = torch.round(observations_y, decimals=4)
 
         # To store performance of kernels on a test dataset (i.e. more samples)
         exp_num_result_dict["test likelihood"] = dict()
         exp_num_result_dict["test likelihood(MAP)"] = dict()
         observations_x = (observations_x - torch.mean(observations_x)
                         ) / torch.std(observations_x)
-        noise_level = 0.4
+        noise_level = torch.sqrt(torch.tensor(0.1))
         original_observations_y = copy.deepcopy(observations_y)
-        observations_y = observations_y + torch.randn(observations_y.shape) * torch.tensor(noise_level)
+        observations_y = observations_y + torch.randn(observations_y.shape) * noise_level
         #observations_y = (observations_y - torch.mean(observations_y)
         #                  ) / torch.std(observations_y)
 
@@ -637,8 +639,10 @@ def run_experiment(config):
 
             # Perform MCMC
             if "MC" in metrics:
+                model.train()
+                likelihood.train()
                 MCMC_approx, MC_log = calculate_mc_STAN(
-                    model, likelihood, num_draws, log_param_path=True, 
+                    model, likelihood, 1000, log_param_path=True, 
                     log_full_likelihood=True, log_full_posterior=True)
                 MC_logs = dict()
                 MC_logs["loss"] = MCMC_approx
@@ -659,7 +663,7 @@ def run_experiment(config):
 with open("FINISHED.log", "r") as f:
     finished_configs = [line.strip().split("/")[-1] for line in f.readlines()]
 curdir = os.getcwd()
-num_data =  [5, 10, 20, 30, 50, 70, 100]
+num_data =  [30, 50]#5, 10, 20]#, 30, 50, 70, 100]
 data_kernel = ["LIN", "SE", "SE+SE"]
 #data_kernel = ["SE", "RQ", "MAT32", "MAT52", "SE*SE",
 #               "SE+SE", "MAT32+SE", "MAT52+SE", "MAT32*SE", "PER",
