@@ -141,7 +141,7 @@ class ExactGPModel(gpt.models.ExactGP):
 
     def random_reinit(self, model):
         for i, (param, limit) in enumerate(zip(model.parameters(), [{"Noise": hyperparameter_limits["Noise"]},*[hyperparameter_limits[kernel] for kernel in get_full_kernels_in_kernel_expression(model.covar_module)]])):
-            covar_text = self.gsr(model.covar_module)
+            covar_text = gsr(self.covar_module)
             param_name = list(limit.keys())[0]
             new_param_value = torch.randn_like(param) * (limit[param_name][1] - limit[param_name][0]) + limit[param_name][0]
             param.data = new_param_value
@@ -158,13 +158,14 @@ class ExactGPModel(gpt.models.ExactGP):
         line_search = kwargs.get("line_search", False)
         BFGS_iter = kwargs.get("BFGS_iter", 50)
         train_iterations = kwargs.get("train_iterations", 0)
-        train_x = kwargs.get("X", model.train_inputs)
-        train_y = kwargs.get("Y", model.train_targets)
+        train_x = kwargs.get("X", self.train_inputs)
+        train_y = kwargs.get("Y", self.train_targets)
         with_BFGS = kwargs.get("with_BFGS", False)
         history_size = kwargs.get("history_size", 100)
-        MAP = kwargs.get("MAP", True)
+        MAP = kwargs.get("MAP", False)
         prior = kwargs.get("prior", False)
         granso = kwargs.get("granso", True)
+        double_precision = kwargs.get("double_precision", False)
 
         # Set up the likelihood and model
         #likelihood = gpytorch.likelihoods.GaussianLikelihood()
@@ -182,6 +183,7 @@ class ExactGPModel(gpt.models.ExactGP):
         nvar = getNvarTorch(model.parameters())
         opts.x0 = torch.nn.utils.parameters_to_vector(model.parameters()).detach().reshape(nvar,1)
         opts.opt_tol = float(1e-10)
+        opts.double_precision = double_precision
         opts.limited_mem_size = int(100)
         opts.globalAD = True
         opts.quadprog_info_msg = False
@@ -204,14 +206,14 @@ class ExactGPModel(gpt.models.ExactGP):
         random_restarts = int(5)
         best_f = np.inf
         for restart in range(random_restarts):
-            print(f"pre training parameters: {list(model.named_parameters())}")
+            #print(f"pre training parameters: {list(model.named_parameters())}")
             # Train the model using PyGRANSO
             soln = pygranso(var_spec=model, combined_fn=objective_function, user_opts=opts)
             if soln.final.f < best_f:
                 best_f = soln.final.f
                 best_model_state_dict = model.state_dict()
                 best_likelihood_state_dict = likelihood.state_dict()
-            print(f"post training (final): {list(model.named_parameters())} w. loss: {soln.final.f} (smaller=better)")
+            #print(f"post training (final): {list(model.named_parameters())} w. loss: {soln.final.f} (smaller=better)")
             self.random_reinit(model)
 
         model.load_state_dict(best_model_state_dict)

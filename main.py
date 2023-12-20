@@ -22,9 +22,12 @@ class ExactGPModel(gpytorch.models.ExactGP):
     def __init__(self, train_x, train_y, likelihood, kernel_text="RBF", weights=None):
         super(ExactGPModel, self).__init__(train_x, train_y, likelihood)
         self.mean_module = gpytorch.means.ZeroMean()
-
         if kernel_text == "SE":
             self.covar_module = gpytorch.kernels.RBFKernel()
+        elif kernel_text == "SE+SE":
+            self.covar_module = gpytorch.kernels.RBFKernel() + gpytorch.kernels.RBFKernel()
+        elif kernel_text == "LIN":
+            self.covar_module = gpytorch.kernels.LinearKernel()
         elif kernel_text == "RQ":
             self.covar_module = gpytorch.kernels.RQKernel()
         elif kernel_text == "PER":
@@ -124,6 +127,9 @@ def run_experiment(config_file, torch_seed):
     num_draws = var_dict["num_draws"] if metric == "MC" else None
     parameter_punishment = var_dict["parameter_punishment"] if metric == "Laplace" else None
 
+    double_precision = True
+    if double_precision:
+        torch.set_default_dtype(torch.float64)
     # set training iterations to the correct config
     options["training"]["max_iter"] = int(train_iterations)
 
@@ -180,7 +186,6 @@ def run_experiment(config_file, torch_seed):
 
         # Run CKS
         list_of_kernels = [gpytorch.kernels.RBFKernel(),
-                           gpytorch.kernels.PeriodicKernel(),
                            gpytorch.kernels.LinearKernel(),
                            gpytorch.kernels.MaternKernel(nu=1.5)]
         #list_of_kernels = [gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel()),
@@ -201,6 +206,8 @@ def run_experiment(config_file, torch_seed):
 
         # Do an MCMC evaluation of the resulting kernel and store the likelihood
         # Perform MCMC
+        model.train()
+        likelihood.train()
         MCMC_approx, MC_log = calculate_mc_STAN(model, likelihood, 1000)
         experiment.store_result("MCMC approx", MCMC_approx)
         experiment.store_result("MCMC details", MC_log)
@@ -224,8 +231,8 @@ def run_experiment(config_file, torch_seed):
         #print("post KS")
         #print(list(model.named_parameters()))
         # Do this without training
-        model.eval()
-        likelihood.eval()
+        model.train()
+        likelihood.train()
         test_samples = f_preds.sample_n(10)
         test_samples = test_samples + torch.randn(test_samples.shape) * torch.tensor(noise_level)
         mll = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood, model)
@@ -235,10 +242,10 @@ def run_experiment(config_file, torch_seed):
         #manual_test_mll = list()
         try:
             for s in test_samples:
-                model.set_train_data(observations_x, s)
+                #model.set_train_data(observations_x, s)
                 #print("post new data")
                 #print(list(model.named_parameters()))
-                test_mll.append(mll(model(observations_x), s))
+                test_mll.append(mll(model(X), s))
                 #manual_test_mll.append(manual_log_like(model, likelihood))
                 #print("post mll calc")
                 #print(list(model.named_parameters()))
@@ -254,7 +261,7 @@ def run_experiment(config_file, torch_seed):
 
 
         try:
-            model.set_train_data(observations_x, test_samples[test_mll.index(max(test_mll))])
+            model.set_train_data(X, test_samples[test_mll.index(max(test_mll))])
             f, ax = plt.subplots()
             f, ax = model.plot_model(return_figure=True, figure = f, ax=ax, posterior=True, test_y = test_samples[test_mll.index(max(test_mll))])
             #ax.plot(X, Y, 'k*')
@@ -265,7 +272,7 @@ def run_experiment(config_file, torch_seed):
             # Store the plots as .tex
             tikzplotlib.save(os.path.join(experiment_path, f"{experiment_keyword}_{exp_num}_best_eval.tex"))
             plt.close(f)
-            model.set_train_data(observations_x, test_samples[test_mll.index(min(test_mll))])
+            model.set_train_data(X, test_samples[test_mll.index(min(test_mll))])
             f, ax = plt.subplots()
             f, ax = model.plot_model(return_figure=True, figure = f, ax=ax, posterior=True, test_y = test_samples[test_mll.index(min(test_mll))])
             ax.set_title(gsr(model.covar_module))
@@ -347,7 +354,7 @@ if __name__ == "__main__":
     with open("FINISHED.log", "r") as f:
         finished_configs = [line.strip().split("/")[-1] for line in f.readlines()]
     curdir = os.getcwd()
-    keywords = ["AIC", "BIC", "MLL",  "Laplace"]# "MC" only when there's a lot of time
+    keywords = ["AIC", "BIC", "MLL",  "Laplace", "MAP"]# "MC" only when there's a lot of time
     configs = []
     for KEYWORD in keywords:
         configs.extend([os.path.join(curdir, "configs", KEYWORD, item) for item in os.listdir(os.path.join(curdir, "configs", KEYWORD))])

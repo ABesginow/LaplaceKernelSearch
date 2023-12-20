@@ -50,7 +50,7 @@ general_json = {
     'eval_START':[-5.0],
     'eval_END':[5.0],
     'eval_COUNT':[5, 10, 20, 30, 40, 50, 70, 100, 150, 200],#, 250, 500],
-    'optimizer':['GRANSO'],
+    'optimizer':['PyGRANSO'],
     'train_iterations':[100],
     'LR': [0.1],
     'Noise': [0.0],#1%, 5%, 10% of max
@@ -71,7 +71,10 @@ Laplace_json = {
 #Laplace_prior_json = {
 #    "Metric": ["Laplace_prior"],
 #    "parameter_punishment": [0.0, -1.0, "BIC"]
-#}
+#
+MAP_json = {
+    "Metric": ["MAP"]
+}
 
 MLL_json = {
     "Metric": ["MLL"]
@@ -85,7 +88,7 @@ BIC_json = {
     "Metric" : ["BIC"]
 }
 
-specific_jsons = [MC_json, MLL_json, AIC_json, BIC_json, Laplace_json] # , Laplace_json
+specific_jsons = [MC_json, MLL_json, MAP_json,  AIC_json, BIC_json, Laplace_json] # , Laplace_json
 #general_json = {
 #                'Metric': ["Laplace", "MC", "MLL", "AIC"],
 #                'Kernel_search': ["CKS"],

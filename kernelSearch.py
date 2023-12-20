@@ -114,34 +114,30 @@ def CKS(X, Y, likelihood, base_kernels, list_of_variances=None,  experiment=None
                     try:
                         total_counter += 1
                         train_start = time.time()
-                        if BFGS:
-                            models[gsr(k)].optimize_hyperparameters(with_Adam=False, with_BFGS=True)
-                        elif metric == "Laplace_prior":
-                            models[gsr(k)].optimize_hyperparameters(with_Adam=True, with_BFGS=True, MAP=True)
+                        if metric in ["Laplace", "MAP"]:
+                            models[gsr(k)].optimize_hyperparameters(X=X, Y=Y, MAP=True)
                         else:
-                            models[gsr(k)].optimize_hyperparameters()
+                            models[gsr(k)].optimize_hyperparameters(X = X, Y = Y)
                         train_end = time.time()
-                    except:
+                    except Exception as E:
+                        print(E)
                         explosion_counter += 1
                         continue
         for t in threads:
             t.join()
         for k in candidates:
             if metric == "Laplace_prior":
-                try:
-                    performance[gsr(k)], logs = calculate_laplace(models[gsr(k)], (-models[gsr(k)].get_current_loss())*len(
-                        *models[gsr(k)].train_inputs), with_prior=True, param_punish_term=param_punish_term)
-                    #print(gsr(k))
-                    #print(logs["MLL"])
-                    #print(logs["punish term"])
-                    logs["iteration"] = i
-                    logs["Train time"] = train_end - train_start
-                    logables.append(logs)
-                except:
-                    performance[gsr(k)] = np.NINF
+                performance[gsr(k)], logs = calculate_laplace(models[gsr(k)], (-models[gsr(k)].get_current_loss())*len(
+                    *models[gsr(k)].train_inputs), with_prior=True, param_punish_term=param_punish_term)
+                #print(gsr(k))
+                #print(logs["MLL"])
+                #print(logs["punish term"])
+                logs["iteration"] = i
+                logs["Train time"] = train_end - train_start
+                logables.append(logs)
             if metric == "Laplace":
                 try:
-                    performance[gsr(k)], logs = calculate_laplace(models[gsr(k)], (-models[gsr(k)].get_current_loss())*len(
+                    performance[gsr(k)], logs = calculate_laplace(models[gsr(k)], (-models[gsr(k)].curr_loss)*len(
                         *models[gsr(k)].train_inputs), with_prior=False, param_punish_term=param_punish_term)
                     logs["iteration"] = i
                     logs["Train time"] = train_end - train_start
@@ -159,23 +155,22 @@ def CKS(X, Y, likelihood, base_kernels, list_of_variances=None,  experiment=None
                 #    pdb.post_mortem()
                 #    performance[gsr(k)] = np.NINF
             if metric == "AIC":
-                try:
-                    performance[gsr(k)], logs = calculate_AIC(-models[gsr(k)].get_current_loss()* models[gsr(k)].train_inputs[0].numel(), sum(p.numel() for p in models[gsr(k)].parameters() if p.requires_grad))
-                    logables.append(logs)
-                except:
-                    performance[gsr(k)] = np.NINF
+                performance[gsr(k)], logs = calculate_AIC(-models[gsr(k)].curr_loss* models[gsr(k)].train_inputs[0].numel(), sum(p.numel() for p in models[gsr(k)].parameters() if p.requires_grad))
+                performance[gsr(k)] = -performance[gsr(k)]
+                logables.append(logs)
             if metric == "BIC":
                 try:
-                    bic_loss = -models[gsr(k)].get_current_loss()* models[gsr(k)].train_inputs[0].numel()
+                    bic_loss = -models[gsr(k)].curr_loss* models[gsr(k)].train_inputs[0].numel()
                     bic_params = sum(p.numel() for p in models[gsr(k)].parameters() if p.requires_grad)
                     bic_data_count =  torch.tensor(models[gsr(k)].train_inputs[0].numel())
                     performance[gsr(k)], logs = calculate_BIC(bic_loss, bic_params, bic_data_count)
+                    performance[gsr(k)] = -performance[gsr(k)]
                     logables.append(logs)
                 except Exception as E:
                     performance[gsr(k)] = np.NINF
             elif metric == "MLL":
                 try:
-                    performance[gsr(k)] = evaluate_performance_via_likelihood(models[gsr(k)])#.detach().numpy()
+                    performance[gsr(k)] = models[gsr(k)].curr_loss
                 except:
                     performance[gsr(k)] = np.NINF
             # Add variances list as parameter somehow
@@ -192,7 +187,7 @@ def CKS(X, Y, likelihood, base_kernels, list_of_variances=None,  experiment=None
         model_steps.append(performance)
         performance_steps.append(best_performance)
         try:
-            best_current_loss = best_model.get_current_loss()
+            best_current_loss = best_model.curr_loss
         except Exception as E:
             print(E)
             best_current_loss = np.NINF
