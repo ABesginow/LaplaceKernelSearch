@@ -279,7 +279,13 @@ def optimize_hyperparameters(model, likelihood, **kwargs):
     # Define the objective function
     def objective_function(model):
         output = model(train_x)
-        loss = -mll(output, train_y)
+        try:
+            # TODO PyGRANSO dying is a severe problem. as it literally exits the program instead of raising an error
+            loss = -mll(output, train_y)
+        except Exception as E:
+            print(E)
+            import pdb
+            pdb.set_trace()
         if MAP:
             # log_normalized_prior is in metrics.py 
             log_p = log_normalized_prior(model)
@@ -294,7 +300,16 @@ def optimize_hyperparameters(model, likelihood, **kwargs):
     for restart in range(random_restarts):
         print(f"pre training parameters: {list(model.named_parameters())}")
         # Train the model using PyGRANSO
-        soln = pygranso(var_spec=model, combined_fn=objective_function, user_opts=opts)
+        # TODO write a try/except block around here and watch the stacktrace in case it explodes
+        try:
+            soln = pygranso(var_spec=model, combined_fn=objective_function, user_opts=opts)
+        except Exception as e:
+            print(e)
+            import pdb
+            pdb.set_trace()
+            # TODO You want the stacktrace here!
+            pass
+
         if soln.final.f < best_f:
             best_f = soln.final.f
             best_model_state_dict = model.state_dict()
@@ -670,7 +685,7 @@ def run_experiment(config):
 with open("FINISHED.log", "r") as f:
     finished_configs = [line.strip().split("/")[-1] for line in f.readlines()]
 curdir = os.getcwd()
-num_data =  [30, 50]#5, 10, 20]#, 30, 50, 70, 100]
+num_data =  [55]#[5, 10, 20, 30, 50, 70, 100]
 data_kernel = ["LIN", "SE", "SE+SE"]
 #data_kernel = ["SE", "RQ", "MAT32", "MAT52", "SE*SE",
 #               "SE+SE", "MAT32+SE", "MAT52+SE", "MAT32*SE", "PER",
