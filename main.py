@@ -127,7 +127,7 @@ def run_experiment(config_file, torch_seed):
     num_draws = var_dict["num_draws"] if metric == "MC" else None
     parameter_punishment = var_dict["parameter_punishment"] if metric == "Laplace" else None
 
-    double_precision = True
+    double_precision = False
     if double_precision:
         torch.set_default_dtype(torch.float64)
     # set training iterations to the correct config
