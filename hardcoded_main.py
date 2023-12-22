@@ -171,7 +171,7 @@ class ExactGPModel(gpytorch.models.ExactGP):
         #elif kernel_text == "PER*LIN":
         #    self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.PeriodicKernel()) * gpytorch.kernels.ScaleKernel(gpytorch.kernels.LinearKernel())
         elif kernel_text == "MAT32":
-            self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.MaternKernel(nu=1.5))
+            self.covar_module = gpytorch.kernels.MaternKernel(nu=1.5)
         elif kernel_text == "MAT32+MAT52":
             self.covar_module =  gpytorch.kernels.ScaleKernel(gpytorch.kernels.MaternKernel(nu=1.5)) + gpytorch.kernels.ScaleKernel(gpytorch.kernels.MaternKernel())
         #elif kernel_text == "MAT32*PER":
@@ -685,7 +685,7 @@ def run_experiment(config):
 with open("FINISHED.log", "r") as f:
     finished_configs = [line.strip().split("/")[-1] for line in f.readlines()]
 curdir = os.getcwd()
-num_data =  [55]#[5, 10, 20, 30, 50, 70, 100]
+num_data =  [50]#[5, 10, 20, 30, 55, 70, 100]
 data_kernel = ["LIN", "SE", "SE+SE"]
 #data_kernel = ["SE", "RQ", "MAT32", "MAT52", "SE*SE",
 #               "SE+SE", "MAT32+SE", "MAT52+SE", "MAT32*SE", "PER",
