@@ -208,7 +208,11 @@ class ExactGPModel(gpt.models.ExactGP):
         for restart in range(random_restarts):
             #print(f"pre training parameters: {list(model.named_parameters())}")
             # Train the model using PyGRANSO
-            soln = pygranso(var_spec=model, combined_fn=objective_function, user_opts=opts)
+            try:
+                soln = pygranso(var_spec=model, combined_fn=objective_function, user_opts=opts)
+            except:
+                self.random_reinit(model)
+                continue
             if soln.final.f < best_f:
                 best_f = soln.final.f
                 best_model_state_dict = model.state_dict()
