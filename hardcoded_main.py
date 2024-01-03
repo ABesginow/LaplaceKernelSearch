@@ -155,6 +155,8 @@ class ExactGPModel(gpytorch.models.ExactGP):
             self.covar_module = gpytorch.kernels.RBFKernel()
         elif kernel_text == "LIN":
             self.covar_module = gpytorch.kernels.LinearKernel()
+        elif kernel_text == "LIN*SE":
+            self.covar_module = gpytorch.kernels.LinearKernel() * gpytorch.kernels.RBFKernel()
         elif kernel_text == "SE+SE":
             self.covar_module =  gpytorch.kernels.RBFKernel() + gpytorch.kernels.RBFKernel()
         elif kernel_text == "RQ":
@@ -440,7 +442,7 @@ def run_experiment(config):
         plt.close(f)
 
         #model_kernels = ["MAT32+PER"]
-        model_kernels = ["SE", "SE+SE", "MAT32"]
+        model_kernels = ["SE", "SE+SE", "MAT32", "LIN", "LIN*SE"]
         #model_kernels = ["C*C*SE", "SE", "PER", "MAT32", "MAT32+SE", "MAT32*SE"]#"PER*SE", "PER+SE", "MAT32*PER", "MAT32+PER",
         #model_kernels = ["MAT32*PER"]
 

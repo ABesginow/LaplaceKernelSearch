@@ -126,19 +126,10 @@ def CKS(X, Y, likelihood, base_kernels, list_of_variances=None,  experiment=None
         for t in threads:
             t.join()
         for k in candidates:
-            if metric == "Laplace_prior":
-                performance[gsr(k)], logs = calculate_laplace(models[gsr(k)], (-models[gsr(k)].get_current_loss())*len(
-                    *models[gsr(k)].train_inputs), with_prior=True, param_punish_term=param_punish_term)
-                #print(gsr(k))
-                #print(logs["MLL"])
-                #print(logs["punish term"])
-                logs["iteration"] = i
-                logs["Train time"] = train_end - train_start
-                logables.append(logs)
             if metric == "Laplace":
                 try:
                     performance[gsr(k)], logs = calculate_laplace(models[gsr(k)], (-models[gsr(k)].curr_loss)*len(
-                        *models[gsr(k)].train_inputs), with_prior=False, param_punish_term=param_punish_term)
+                        *models[gsr(k)].train_inputs), param_punish_term=param_punish_term)
                     logs["iteration"] = i
                     logs["Train time"] = train_end - train_start
                     logables.append(logs)
@@ -182,8 +173,13 @@ def CKS(X, Y, likelihood, base_kernels, list_of_variances=None,  experiment=None
                 if options["kernel search"]["print"]:
                     print("KERNEL SEARCH: no gain through additional kernel length, stopping search")
                 break
-        best_model = models[max(performance, key=performance.__getitem__)]
-        best_performance = {"model": (gsr(best_model.covar_module), best_model.state_dict()), "performance": max(performance.values())}
+        if metric in ["AIC", "BIC"]:
+            best_model = models[min(performance, key=performance.__getitem__)]
+            best_performance = {"model": (gsr(best_model.covar_module), best_model.state_dict()), "performance": min(performance.values())}
+        else:
+            best_model = models[max(performance, key=performance.__getitem__)]
+            best_performance = {"model": (gsr(best_model.covar_module), best_model.state_dict()), "performance": max(performance.values())}
+
         model_steps.append(performance)
         performance_steps.append(best_performance)
         try:
