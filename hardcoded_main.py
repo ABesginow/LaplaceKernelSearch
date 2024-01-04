@@ -402,6 +402,7 @@ def run_experiment(config):
     EXPERIMENT_REPITITIONS = 50 
     
     all_observations_y = f_preds.sample_n(EXPERIMENT_REPITITIONS)
+    test_observations_y = f_preds.sample_n(10)
     for (observations_y, exp_num) in tqdm(zip(all_observations_y, range(EXPERIMENT_REPITITIONS))):
         exp_num_result_dict = dict()
         for metric in metrics:
@@ -510,9 +511,9 @@ def run_experiment(config):
                     ax.plot(original_observations_x, observations_y, 'k*')
                     image_time = time.time()
                     #Store the plots as .png
-                    #f.savefig(os.path.join(experiment_path, f"{experiment_keyword}_{exp_num}_MLL.png"))
+                    f.savefig(os.path.join(experiment_path, f"{experiment_keyword}_{exp_num}_MLL.png"))
                     #Store the plots as .tex
-                    #tikzplotlib.save(os.path.join(experiment_path, f"{experiment_keyword}_{exp_num}_MLL.tex"))
+                    tikzplotlib.save(os.path.join(experiment_path, f"{experiment_keyword}_{exp_num}_MLL.tex"))
                     plt.close(f)
                 except:
                     pass
@@ -549,21 +550,15 @@ def run_experiment(config):
                 BIC_logs["details"] = BIC_log
                 exp_num_result_dict["BIC"][model_kernel] = BIC_logs
 
-            # TODO This has to be done once for MLL and once for MAP!!!!
             data_model.eval()
             data_likelihood.eval()
 
             mll = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood, model)
             test_mll = list()
             try:
-                for s in range(10):
+                for test_sample in test_observations_y:
                     with torch.no_grad(), gpytorch.settings.prior_mode(True):
-                        f_preds = model(torch.linspace(eval_START, eval_END, eval_COUNT))
-                        test_sample = f_preds.sample()
-                        observations_x = (torch.linspace(eval_START, eval_END, eval_COUNT) - torch.mean(torch.linspace(eval_START, eval_END, eval_COUNT))
-                                        ) / torch.std(torch.linspace(eval_START, eval_END, eval_COUNT))
-                        noise_level = 0.4
-                        test_sample = test_sample + torch.randn(test_sample.shape) * torch.tensor(noise_level)
+                        test_sample = test_sample + torch.randn(test_sample.shape) * noise_level
                     model.set_train_data(observations_x, test_sample)
                     test_mll.append(mll(model(observations_x), test_sample))
             except Exception as E:
@@ -619,9 +614,9 @@ def run_experiment(config):
                     ax.plot(original_observations_x, observations_y, 'k*')
                     image_time = time.time()
                     #Store the plots as .png
-                    #f.savefig(os.path.join(experiment_path, f"{experiment_keyword}_{exp_num}_MAP.png"))
+                    f.savefig(os.path.join(experiment_path, f"{experiment_keyword}_{exp_num}_MAP.png"))
                     #Store the plots as .tex
-                    #tikzplotlib.save(os.path.join(experiment_path, f"{experiment_keyword}_{exp_num}_MAP.tex"))
+                    tikzplotlib.save(os.path.join(experiment_path, f"{experiment_keyword}_{exp_num}_MAP.tex"))
                     plt.close(f)
                 except:
                     pass
@@ -645,17 +640,12 @@ def run_experiment(config):
             mll = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood, model)
             test_mll = list()
             try:
-                for s in range(10):
+                for test_sample in test_observations_y:
                     with torch.no_grad(), gpytorch.settings.prior_mode(True):
-                        f_preds = model(torch.linspace(eval_START, eval_END, eval_COUNT))
-                        test_sample = f_preds.sample()
-                        observations_x = (torch.linspace(eval_START, eval_END, eval_COUNT) - torch.mean(torch.linspace(eval_START, eval_END, eval_COUNT))
-                                        ) / torch.std(torch.linspace(eval_START, eval_END, eval_COUNT))
-                        noise_level = 0.4
-                        test_sample = test_sample + torch.randn(test_sample.shape) * torch.tensor(noise_level)
+                        test_sample = test_sample + torch.randn(test_sample.shape) * noise_level
                     model.set_train_data(observations_x, test_sample)
                     test_mll.append(mll(model(observations_x), test_sample))
-            except Exception as E:
+           except Exception as E:
                 print(E)
                 print("----")
                 test_mll = [np.nan]
