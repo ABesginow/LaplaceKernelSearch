@@ -8,6 +8,7 @@ from pygranso.pygranso import pygranso
 from pygranso.pygransoStruct import pygransoStruct
 from pygranso.private.getNvar import getNvarTorch
 import torch
+from itertools import chain
 
 
 
@@ -41,6 +42,7 @@ def log_normalized_prior(model, theta_mu=None, sigma=None):
     covar_string = covar_string.replace(")", "")
     covar_string = covar_string.replace(" ", "")
     covar_string = covar_string.replace("PER", "PER+PER")
+    covar_string = covar_string.replace("RQ", "RQ+RQ")
     covar_string_list = [s.split("*") for s in covar_string.split("+")]
     covar_string_list.insert(0, ["LIKELIHOOD"])
     covar_string_list = list(chain.from_iterable(covar_string_list))

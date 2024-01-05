@@ -414,7 +414,7 @@ def calculate_laplace(model, loss_of_model, variances_list=None, likelihood_lapl
 
 
 
-def generate_STAN_kernel(kernel_representation : str, parameter_list : list, covar_string_list : list):
+def generate_STAN_kernel(kernel_representation : str):
     """
     parameter_list : We assume it just contains strings of parameter names
     """
@@ -442,7 +442,7 @@ def generate_STAN_kernel(kernel_representation : str, parameter_list : list, cov
     return STAN_str_kernel
 
 
-def generate_STAN_code(kernel_representation : str,  parameter_list : list, covar_string_list : list, lower_bound = -15):
+def generate_STAN_code(kernel_representation : str, lower_bound = -15):
     # Alternative: use 1:dims(v)[0] in the loop
     functions = """
     functions {
@@ -498,7 +498,7 @@ def generate_STAN_code(kernel_representation : str,  parameter_list : list, cova
         matrix[N, N] K;
         vector[N] mu;
         theta ~ multi_normal(t_mu, t_sigma);
-        K = {generate_STAN_kernel(kernel_representation, parameter_list, covar_string_list)};
+        K = {generate_STAN_kernel(kernel_representation)};
         mu = zeros_vector(N);
         y ~ multi_normal(mu, K);
     }}
@@ -509,7 +509,7 @@ def generate_STAN_code(kernel_representation : str,  parameter_list : list, cova
         real lpd;
         matrix[N, N] K;
         vector[N] mu;
-        K = {generate_STAN_kernel(kernel_representation, parameter_list, covar_string_list)};
+        K = {generate_STAN_kernel(kernel_representation)};
         mu = zeros_vector(N);
         lpd = multi_normal_lpdf(y | mu, K);
     }}
@@ -527,71 +527,12 @@ def calculate_mc_STAN(model, likelihood, num_draws, **kwargs):
     lower_bound = kwargs.get("lower_bound", -30)
     manual_seed = kwargs.get("manual_seed", None)
     log_kernel_data = kwargs.get("log_kernel_data", False)
+    total_start = time.time()
+    covar_string = gsr(model.covar_module)
 
+    theta_mu, sigma = prior_distribution(model) 
 
-    #prior_dict = {'SE': {'raw_lengthscale' : {"mean": -0.21221139138922668 , "std":1.8895426067756804}},
-    #            'MAT52': {'raw_lengthscale' :{"mean": 0.7993038925994188, "std":2.145122566357853 } },
-    #            'MAT32': {'raw_lengthscale' :{"mean": 1.5711054238673443, "std":2.4453761235991216 } },
-    #            'RQ': {'raw_lengthscale' :{"mean": -0.049841950913676276, "std":1.9426354614713097 }, 
-    #                    'raw_alpha' :{"mean": 1.882148553921053, "std":3.096431944989054 } },
-    #            'PER':{'raw_lengthscale':{"mean": 0.7778461197268618, "std":2.288946656544974 },
-    #                    'raw_period_length':{"mean": 0.6485334993738499, "std":0.9930632050553377 } },
-    #            'LIN':{'raw_variance' :{"mean": -0.8017903983055685, "std":0.9966569921354465 } },
-    #            'c':{'raw_outputscale':{"mean": -1.6253091096349706, "std":2.2570021716661923 } },
-    #            'noise': {'raw_noise':{"mean": -3.51640656386717, "std":3.5831320474767407 }},
-    #            'MyPeriodKernel':{'raw_period_length':{"mean": 0.6485334993738499, "std":0.9930632050553377 }}}
- 
-    #total_start = time.time()
-    #theta_mu = list()
-    #variances_list = list()
-    #covar_string = gsr(model.covar_module)
-    #covar_string_clone = copy.deepcopy(covar_string)
-    #covar_string_clone = covar_string_clone.replace("(", "")
-    #covar_string_clone = covar_string_clone.replace(")", "")
-    #covar_string_clone = covar_string_clone.replace(" ", "")
-    #covar_string_clone = covar_string_clone.replace("PER", "PER+PER")
-    #covar_string_list = [s.split("*") for s in covar_string_clone.split("+")]
-    #covar_string_list.insert(0, ["LIKELIHOOD"])
-    #covar_string_list = list(chain.from_iterable(covar_string_list))
-    #both_PER_params = False
-    #debug_param_name_list = list()
-    #for (param_name, param), cov_str in zip(model.named_parameters(), covar_string_list):
-    #    debug_param_name_list.append(param_name)
-    #    # First param is (always?) noise and is always with the likelihood
-    #    if "likelihood" in param_name:
-    #        theta_mu.append(prior_dict["noise"]["raw_noise"]["mean"])
-    #        variances_list.append(prior_dict["noise"]["raw_noise"]["std"])
-    #        continue
-    #    else:
-    #        if cov_str == "PER" and not both_PER_params:
-    #            theta_mu.append(prior_dict[cov_str][param_name.split(".")[-1]]["mean"])
-    #            variances_list.append(prior_dict[cov_str][param_name.split(".")[-1]]["std"])
-    #            both_PER_params = True
-    #        elif cov_str == "PER" and both_PER_params:
-    #            theta_mu.append(prior_dict[cov_str][param_name.split(".")[-1]]["mean"])
-    #            variances_list.append(prior_dict[cov_str][param_name.split(".")[-1]]["std"])
-    #            both_PER_params = False
-    #        else:
-    #            try:
-    #                theta_mu.append(prior_dict[cov_str][param_name.split(".")[-1]]["mean"])
-    #                variances_list.append(prior_dict[cov_str][param_name.split(".")[-1]]["std"])
-    #            except:
-    #                import pdb
-    #                pdb.set_trace()
-    #    prev_cov = cov_str
-    #theta_mu = torch.tensor(theta_mu)
-    #theta_mu = theta_mu.unsqueeze(0).t()
-
-    ## theta_mu is a vector of parameter priors
-    ##theta_mu = torch.tensor([1 for p in range(len(params_list))]).reshape(-1,1)
-
-    ## sigma is a matrix of variance priors
-    #sigma = torch.diag(torch.Tensor(variances_list))
-    #sigma = sigma@sigma
-
-    theta_mu, sigma = prior_distribution(model) if theta_mu is None or sigma is None else (theta_mu, sigma)
-
-    STAN_code = generate_STAN_code(covar_string, debug_param_name_list, covar_string_list, lower_bound=lower_bound)
+    STAN_code = generate_STAN_code(covar_string, lower_bound=lower_bound)
     if type(model.train_inputs) == tuple:
         x = model.train_inputs[0].tolist()
         # Assuming I have [[x1], [x2], [x3], ...]
