@@ -1,7 +1,9 @@
 import copy
+import dynesty
+from dynesty import plotting as dyplot
 from GaussianProcess import ExactGPModel
 from globalParams import options
-import gpytorch as gpt
+import gpytorch
 from gpytorch.kernels import ScaleKernel
 from helpFunctions import get_string_representation_of_kernel as gsr, clean_kernel_expression, print_formatted_hyperparameters
 from itertools import chain
@@ -13,6 +15,7 @@ import stan
 import time
 import torch
 import threading
+import scipy
 
 
 def prior_distribution(model):
@@ -89,8 +92,8 @@ def prior_distribution(model):
     theta_mu = torch.tensor(theta_mu)
     theta_mu = theta_mu.unsqueeze(0).t()
     sigma = torch.diag(torch.Tensor(variances_list))
-    sigma = sigma@sigma
-    return theta_mu, sigma
+    variance = sigma@sigma
+    return theta_mu, variance
  
 def log_normalized_prior(model, theta_mu=None, sigma=None):
     theta_mu, sigma = prior_distribution(model) if theta_mu is None or sigma is None else (theta_mu, sigma)
@@ -587,6 +590,7 @@ def calculate_mc_STAN(model, likelihood, num_draws, **kwargs):
 
     start = time.time()
     STAN_like_approx = post_frame["lp__"]
+   
     # Iterate over chain
     for row_num, sample in enumerate(post_frame[list(fit.constrained_param_names)].iterrows()):
         # Iterate over kernel parameters
@@ -607,6 +611,7 @@ def calculate_mc_STAN(model, likelihood, num_draws, **kwargs):
             like_dist = torch.distributions.multivariate_normal.MultivariateNormal(observed_pred_prior.mean.flatten(), scale_tril=like_cov_chol)
             manual_lp_list.append(like_dist.log_prob(model.train_targets))
             manual_post_list.append(like_dist.log_prob(model.train_targets).item() + log_normalized_prior(model).item())
+
             # TODO write log prior function
             log_prior_list.append(log_normalized_prior(model).item())
         except Exception as e:
@@ -650,3 +655,65 @@ def calculate_mc_STAN(model, likelihood, num_draws, **kwargs):
         logables["param draws dict"] = post_frame[list(fit.constrained_param_names)]
     ##print(f"Num bad entries: {bad_entries}")
     return torch.nanmean(torch.Tensor(manual_lp_list)), logables
+
+
+
+
+
+
+
+
+
+def reparameterize_model(model, theta):
+    for model_param, sampled_param in zip(model.parameters(), theta):
+        model_param.data = torch.full_like(model_param.data, float(sampled_param))
+
+def reparameterize_and_mll(model, likelihood, theta, train_x, train_y):
+    reparameterize_model(model, theta)
+    mll = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood, model)
+    mll_val = mll(model(train_x), train_y)
+    return mll_val
+
+
+def NestedSampling(model):
+
+    prior_theta_mean, prior_theta_cov = prior_distribution(model)
+
+    # Define the dimensionality of our problem.
+    ndim = len(list(model.parameters()))
+
+    def loglike(theta_i):
+        return (reparameterize_and_mll(model, model.likelihood, theta_i, model.train_inputs[0], model.train_targets)*len(*model.train_inputs)).detach().numpy()
+
+    # Define our prior via the prior transform.
+    def prior_transform(u):
+        """Transforms the uniform random variables `u ~ Unif[0., 1.)`
+        to the parameters of interest."""
+
+        x = np.array(u)  # copy u
+
+        # Bivariate Normal
+        t = scipy.stats.norm.ppf(u)  # convert to standard normal
+        Csqrt = np.linalg.cholesky(prior_theta_cov.numpy())  
+        x = np.dot(Csqrt, t)  # correlate with appropriate covariance
+        mu = prior_theta_mean.flatten().numpy()  # mean
+        x += mu  # add mean
+        return x
+
+    # Trying out dynamic sampler
+    dsampler = dynesty.DynamicNestedSampler(loglike, prior_transform, ndim, bound='multi')
+    dsampler.run_nested(dlogz_init=0.01, nlive_init=500, nlive_batch=100)
+    res = dsampler.results
+
+    # Sample from our distribution.
+    #sampler = dynesty.NestedSampler(loglike,
+    #                                prior_transform,
+    #                                ndim,
+    #                                bound='multi',
+    #                                sample='auto',
+    #                                nlive=100,
+    #                                first_update={"min_eff": 3.0})
+    #sampler.run_nested(dlogz=0.01)
+    #res = sampler.results
+
+    return res
