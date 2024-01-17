@@ -136,6 +136,12 @@ def CKS(X, Y, likelihood, base_kernels, list_of_variances=None,  experiment=None
                 except Exception as E:
                     print(E)
                     performance[gsr(k)] = np.NINF
+            if metric == "MAP":
+                try:
+                    performance[gsr(k)] = models[gsr(k)].curr_loss + metrics.log_normalized_prior(models[gsr(k)])
+                except:
+                    performance[gsr(k)] = np.NINF
+
             if metric == "MC":
                 #try:
                 performance[gsr(k)], logs = calculate_mc_STAN(models[gsr(k)], models[gsr(k)].likelihood, num_draws=num_draws)

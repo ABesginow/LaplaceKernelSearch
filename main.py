@@ -8,7 +8,7 @@ from helpFunctions import get_string_representation_of_kernel as gsr, clean_kern
 from helpFunctions import amount_of_base_kernels
 import json
 from kernelSearch import *
-from metrics import calculate_mc_STAN
+from metrics import NestedSampling
 from matplotlib import pyplot as plt
 from multiprocessing import Pool
 import os
@@ -102,7 +102,7 @@ def run_experiment(config_file, torch_seed):
 
     """
     torch.manual_seed(torch_seed)
-    EXPERIMENT_REPITITIONS = 50 
+    EXPERIMENT_REPITITIONS = 5 
     total_time_start = time.time()
     options["kernel search"]["print"] = False
     options["training"]["restarts"] = 2
@@ -134,6 +134,7 @@ def run_experiment(config_file, torch_seed):
     options["training"]["max_iter"] = int(train_iterations)
 
     for exp_num in range(0, EXPERIMENT_REPITITIONS, 1):
+        print(config_file)
         print(f"{metric} - {exp_num}/{EXPERIMENT_REPITITIONS} - {time.strftime('%Y-%m-%d %H:%M', time.localtime())}")
 
         log_name = "..."
@@ -208,29 +209,18 @@ def run_experiment(config_file, torch_seed):
         # Perform MCMC
         model.train()
         likelihood.train()
-        MCMC_approx, MC_log = calculate_mc_STAN(model, likelihood, 1000)
-        experiment.store_result("MCMC approx", MCMC_approx)
-        experiment.store_result("MCMC details", MC_log)
+        # Necessary since the sampling will directly modify the model
+        model_state_dict = copy.deepcopy(model.state_dict())
 
-        # Calculate p_k(y* | X) for the found kernel
+        Nested_approx, Nested_log = NestedSampling(model, store_full=True, pickle_directory=experiment_path)
+        experiment.store_result("Nested approx", Nested_approx)
+        experiment.store_result("Nested details", Nested_log)
+
+        # Basically reverting back to the model found using CKS including its parameters
+        model.load_state_dict(model_state_dict)
+
+        # Calculate p_k(y_n | X) for the found kernel for new datasets y_n from the same kernel
         # This is directly comparable for ALL metrics, even MAP-LApp
-
-
-
-        #def manual_log_like(model, likelihood):
-        #    with torch.no_grad():
-        #        observed_pred_prior = likelihood(model(model.train_inputs[0]))
-        #    ## Compare this to the likelihood of y given mean and covar (+ noise)
-        #    #like_mean = torch.zeros(len(model.train_inputs[0]))
-        #    #like_cov_matr = torch.eye(len(model.train_inputs[0].tolist())) * likelihood.noise + model.covar_module(model.train_inputs[0])
-        #    #like_cov_matr += torch.eye(len(model.train_inputs[0].tolist())) * 1e-4 # Jitter
-        #    like_cov_chol = torch.linalg.cholesky(observed_pred_prior.covariance_matrix)
-        #    like_dist = torch.distributions.multivariate_normal.MultivariateNormal(observed_pred_prior.mean, scale_tril=like_cov_chol)
-        #    return like_dist.log_prob(model.train_targets) / model.train_targets.numel()
-
-        #print("post KS")
-        #print(list(model.named_parameters()))
-        # Do this without training
         model.train()
         likelihood.train()
         test_samples = f_preds.sample_n(10)

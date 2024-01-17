@@ -7,15 +7,18 @@ import gpytorch
 from gpytorch.kernels import ScaleKernel
 from helpFunctions import get_string_representation_of_kernel as gsr, clean_kernel_expression, print_formatted_hyperparameters
 from itertools import chain
+import matplotlib.pyplot as plt
 import numpy as np
+import pickle
 import random
 import re
 from scipy.special import lambertw
 import stan
+import scipy
 import time
 import torch
 import threading
-import scipy
+import os
 
 
 def prior_distribution(model):
@@ -584,7 +587,7 @@ def calculate_mc_STAN(model, likelihood, num_draws, **kwargs):
     manual_post_list = list()
     log_prior_list = list()
     bad_entries = 0
-
+    mll = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood, model)
     def inv_softplus(x):
         return x + torch.log(-torch.expm1(-x))
 
@@ -603,14 +606,16 @@ def calculate_mc_STAN(model, likelihood, num_draws, **kwargs):
 
 
         try:
-            with torch.no_grad():
-                observed_pred_prior = likelihood(model(model.train_inputs[0]))
+            #with torch.no_grad():
+            #    observed_pred_prior = likelihood(model(model.train_inputs[0]))
             #pdb.set_trace()
 
-            like_cov_chol = torch.linalg.cholesky(observed_pred_prior.covariance_matrix)
-            like_dist = torch.distributions.multivariate_normal.MultivariateNormal(observed_pred_prior.mean.flatten(), scale_tril=like_cov_chol)
-            manual_lp_list.append(like_dist.log_prob(model.train_targets))
-            manual_post_list.append(like_dist.log_prob(model.train_targets).item() + log_normalized_prior(model).item())
+            #like_cov_chol = torch.linalg.cholesky(observed_pred_prior.covariance_matrix)
+            #like_dist = torch.distributions.multivariate_normal.MultivariateNormal(observed_pred_prior.mean.flatten(), scale_tril=like_cov_chol)
+            #manual_lp_list.append(like_dist.log_prob(model.train_targets))
+            mll_val = (mll(model(model.train_inputs[0]), model.train_targets)*len(*model.train_inputs)).detach()
+            manual_lp_list.append(mll_val)
+            manual_post_list.append(mll_val.item() + log_normalized_prior(model).item())
 
             # TODO write log prior function
             log_prior_list.append(log_normalized_prior(model).item())
@@ -675,7 +680,13 @@ def reparameterize_and_mll(model, likelihood, theta, train_x, train_y):
     return mll_val
 
 
-def NestedSampling(model):
+def NestedSampling(model, **kwargs):
+    print_progress = kwargs.get("print_progress", False)
+    dynamic_sampling = kwargs.get("dynamic_sampling", True)
+    store_samples = kwargs.get("store_samples", False)
+    store_likelihoods = kwargs.get("store_likelihoods", False)
+    store_full = kwargs.get("store_full", False)
+    pickle_directory = kwargs.get("pickle_directory", "")
 
     prior_theta_mean, prior_theta_cov = prior_distribution(model)
 
@@ -683,7 +694,10 @@ def NestedSampling(model):
     ndim = len(list(model.parameters()))
 
     def loglike(theta_i):
-        return (reparameterize_and_mll(model, model.likelihood, theta_i, model.train_inputs[0], model.train_targets)*len(*model.train_inputs)).detach().numpy()
+        log_like = (reparameterize_and_mll(model, model.likelihood, theta_i, 
+                                           model.train_inputs[0], 
+                                           model.train_targets)*len(*model.train_inputs)).detach().numpy()
+        return log_like
 
     # Define our prior via the prior transform.
     def prior_transform(u):
@@ -694,26 +708,50 @@ def NestedSampling(model):
 
         # Bivariate Normal
         t = scipy.stats.norm.ppf(u)  # convert to standard normal
-        Csqrt = np.linalg.cholesky(prior_theta_cov.numpy())  
+        Csqrt = np.linalg.cholesky(prior_theta_cov.numpy())
         x = np.dot(Csqrt, t)  # correlate with appropriate covariance
         mu = prior_theta_mean.flatten().numpy()  # mean
         x += mu  # add mean
         return x
 
-    # Trying out dynamic sampler
-    dsampler = dynesty.DynamicNestedSampler(loglike, prior_transform, ndim, bound='multi')
-    dsampler.run_nested(dlogz_init=0.01, nlive_init=500, nlive_batch=100)
-    res = dsampler.results
+    if dynamic_sampling:
+        # Trying out dynamic sampler
+        dsampler = dynesty.DynamicNestedSampler(loglike, prior_transform, 
+                                                ndim, bound='multi')
+        start_time = time.time()
+        dsampler.run_nested(dlogz_init=0.01, nlive_init=500, nlive_batch=100,
+                            print_progress=print_progress)
+        end_time = time.time()
+        res = dsampler.results
 
-    # Sample from our distribution.
-    #sampler = dynesty.NestedSampler(loglike,
-    #                                prior_transform,
-    #                                ndim,
-    #                                bound='multi',
-    #                                sample='auto',
-    #                                nlive=100,
-    #                                first_update={"min_eff": 3.0})
-    #sampler.run_nested(dlogz=0.01)
-    #res = sampler.results
-
-    return res
+    else:
+        # Sample from our distribution.
+        sampler = dynesty.NestedSampler(loglike,
+                                        prior_transform,
+                                        ndim,
+                                        bound='multi',
+                                        sample='auto',
+                                        nlive=500)
+        sampler.run_nested(dlogz=0.01, print_progress=print_progress)
+        res = sampler.results
+    logables = dict()
+    logables["Sample time"] = end_time - start_time
+    logables["log Z"] = res["logz"][-1]
+    logables["log Z err"] = res["logzerr"][-1]
+    logables["prior mean"] = prior_theta_mean
+    logables["prior cov"] = prior_theta_cov
+    logables["dynamic"] = dynamic_sampling
+    logables["num sampled"] = res.niter
+    logables["parameter statistics"] = {"mu": np.mean(res.samples, axis=0),
+                                        "std": np.std(res.samples, axis=0)}
+    if store_likelihoods and not store_full:
+        logables["log likelihoods"] = res["logl"]
+    if store_samples and not store_full:
+        logables["samples"] = res["samples"]
+    if store_full:
+        if not os.path.exists(os.path.join(pickle_directory, "Nested_results")):
+            os.makedirs(os.path.join(pickle_directory, "Nested_results"))
+        pickle_filename = os.path.join(pickle_directory, "Nested_results", f"res_{time.time()}.pkl")
+        pickle.dump(res, open(pickle_filename, "wb"))
+        logables["res file"] = pickle_filename
+    return res.logz[-1], logables
