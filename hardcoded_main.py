@@ -157,6 +157,8 @@ class ExactGPModel(gpytorch.models.ExactGP):
             self.covar_module = gpytorch.kernels.LinearKernel()
         elif kernel_text == "LIN*SE":
             self.covar_module = gpytorch.kernels.LinearKernel() * gpytorch.kernels.RBFKernel()
+        elif kernel_text == "LIN*PER":
+            self.covar_module = gpytorch.kernels.LinearKernel() * gpytorch.kernels.PeriodicKernel()
         elif kernel_text == "SE+SE":
             self.covar_module =  gpytorch.kernels.RBFKernel() + gpytorch.kernels.RBFKernel()
         elif kernel_text == "RQ":
@@ -285,9 +287,7 @@ def optimize_hyperparameters(model, likelihood, **kwargs):
             # TODO PyGRANSO dying is a severe problem. as it literally exits the program instead of raising an error
             loss = -mll(output, train_y)
         except Exception as E:
-            print(E)
-            import pdb
-            pdb.set_trace()
+            loss = torch.tensor(np.inf, requires_grad=True) + torch.tensor(0)
         if MAP:
             # log_normalized_prior is in metrics.py 
             log_p = log_normalized_prior(model)
@@ -345,7 +345,7 @@ def run_experiment(config):
 
     """
     torch.manual_seed(43)
-    metrics = ["AIC", "BIC", "MC", "Laplace", "MLL", "MAP"]
+    metrics = ["AIC", "BIC", "Laplace", "MLL", "MAP", "Nested"] #"MC",
     eval_START = -5
     eval_END = 5
     eval_COUNT = config["num_data"]
@@ -399,7 +399,7 @@ def run_experiment(config):
 
     original_observations_x = copy.deepcopy(observations_x)
 
-    EXPERIMENT_REPITITIONS = 50 
+    EXPERIMENT_REPITITIONS = 5 
     
     all_observations_y = f_preds.sample_n(EXPERIMENT_REPITITIONS)
     test_observations_y = f_preds.sample_n(10)
@@ -442,8 +442,16 @@ def run_experiment(config):
         #tikzplotlib.save(os.path.join(experiment_path, f"DATA_normalized_{exp_num}.tex"))
         plt.close(f)
 
+        # store the first, middle and last test samples
+        for test_data_num in [0, 5, 9]:
+            f, ax = plt.subplots()
+            ax.plot(observations_x, test_observations_y[test_data_num], "k*")
+            ax.plot(observations_x, test_observations_y[test_data_num], "-", color="blue")
+            f.savefig(os.path.join(experiment_path, f"Test_data_{test_data_num}.png"))
+
+
         #model_kernels = ["MAT32+PER"]
-        model_kernels = ["SE", "SE+SE", "MAT32", "LIN", "LIN*SE"]
+        model_kernels = ["LIN*SE", "LIN*PER", "SE", "SE+SE", "MAT32", "LIN"]
         #model_kernels = ["C*C*SE", "SE", "PER", "MAT32", "MAT32+SE", "MAT32*SE"]#"PER*SE", "PER+SE", "MAT32*PER", "MAT32+PER",
         #model_kernels = ["MAT32*PER"]
 
@@ -498,24 +506,20 @@ def run_experiment(config):
                 try:
                     model.eval()
                     likelihood.eval()
-                    with torch.no_grad(), gpytorch.settings.prior_mode(True):
-                        observed_pred_prior = likelihood(model(observations_x))
-                        f_preds = model(observations_x)
-                        mean_posterior = observed_pred_prior.mean
-                        lower_posterior, upper_posterior = observed_pred_prior.confidence_region()
-
-                    mean_y = model(observations_x).mean
-
                     f, ax = plt.subplots()
                     f, ax = plot_model(model, likelihood, observations_x, observations_y, True, f, ax)
-                    ax.plot(original_observations_x, observations_y, 'k*')
+                    ax.plot(observations_x, observations_y, 'k*')
                     image_time = time.time()
                     #Store the plots as .png
-                    f.savefig(os.path.join(experiment_path, f"{experiment_keyword}_{exp_num}_MLL.png"))
+                    f.savefig(os.path.join(experiment_path, f"{experiment_keyword}_MLL.png"))
                     #Store the plots as .tex
-                    tikzplotlib.save(os.path.join(experiment_path, f"{experiment_keyword}_{exp_num}_MLL.tex"))
+                    tikzplotlib.save(os.path.join(experiment_path, f"{experiment_keyword}_MLL.tex"))
                     plt.close(f)
+                    model.train()
+                    likelihood.train()
                 except:
+                    model.train()
+                    likelihood.train()
                     pass
 
 
@@ -606,19 +610,20 @@ def run_experiment(config):
                 try:
                     model.eval()
                     likelihood.eval()
-                    with torch.no_grad(), gpytorch.settings.prior_mode(True):
-                        observed_pred_prior = likelihood(model(observations_x))
-                        f_preds = model(observations_x)
                     f, ax = plt.subplots()
-                    f, ax = plot_model(model, likelihood, original_observations_x, observations_y, True, f, ax)
-                    ax.plot(original_observations_x, observations_y, 'k*')
+                    f, ax = plot_model(model, likelihood, observations_x, observations_y, True, f, ax)
+                    ax.plot(observations_x, observations_y, 'k*')
                     image_time = time.time()
                     #Store the plots as .png
-                    f.savefig(os.path.join(experiment_path, f"{experiment_keyword}_{exp_num}_MAP.png"))
+                    f.savefig(os.path.join(experiment_path, f"{experiment_keyword}_MAP.png"))
                     #Store the plots as .tex
-                    tikzplotlib.save(os.path.join(experiment_path, f"{experiment_keyword}_{exp_num}_MAP.tex"))
+                    tikzplotlib.save(os.path.join(experiment_path, f"{experiment_keyword}_MAP.tex"))
                     plt.close(f)
+                    model.train()
+                    likelihood.train()
                 except:
+                    model.train()
+                    likelihood.train()
                     pass
 
             # Laplace approximation including prior requires different loss
@@ -645,11 +650,21 @@ def run_experiment(config):
                         test_sample = test_sample + torch.randn(test_sample.shape) * noise_level
                     model.set_train_data(observations_x, test_sample)
                     test_mll.append(mll(model(observations_x), test_sample))
-           except Exception as E:
+            except Exception as E:
                 print(E)
                 print("----")
                 test_mll = [np.nan]
             exp_num_result_dict["test likelihood(MAP)"][model_kernel] = test_mll
+
+
+            if "Nested" in metrics:
+                model.train()
+                likelihood.train()
+                logz_nested, nested_log = NestedSampling(model, store_full=True, pickle_directory=experiment_path)
+                nested_logs = dict()
+                nested_logs["loss"] = logz_nested
+                nested_logs["details"] = nested_log
+                exp_num_result_dict["Nested"][model_kernel] = nested_logs
 
             # Perform MCMC
             if "MC" in metrics:
@@ -677,7 +692,7 @@ def run_experiment(config):
 with open("FINISHED.log", "r") as f:
     finished_configs = [line.strip().split("/")[-1] for line in f.readlines()]
 curdir = os.getcwd()
-num_data =  [50]#[5, 10, 20, 30, 55, 70, 100]
+num_data =  [5, 10, 20, 30]#, 50, 70, 100] 
 data_kernel = ["LIN", "SE", "SE+SE"]
 #data_kernel = ["SE", "RQ", "MAT32", "MAT52", "SE*SE",
 #               "SE+SE", "MAT32+SE", "MAT52+SE", "MAT32*SE", "PER",
