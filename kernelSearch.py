@@ -136,12 +136,6 @@ def CKS(X, Y, likelihood, base_kernels, list_of_variances=None,  experiment=None
                 except Exception as E:
                     print(E)
                     performance[gsr(k)] = np.NINF
-            if metric == "MAP":
-                try:
-                    performance[gsr(k)] = models[gsr(k)].curr_loss + metrics.log_normalized_prior(models[gsr(k)])
-                except:
-                    performance[gsr(k)] = np.NINF
-
             if metric == "MC":
                 #try:
                 performance[gsr(k)], logs = calculate_mc_STAN(models[gsr(k)], models[gsr(k)].likelihood, num_draws=num_draws)
@@ -165,8 +159,10 @@ def CKS(X, Y, likelihood, base_kernels, list_of_variances=None,  experiment=None
                     logables.append(logs)
                 except Exception as E:
                     performance[gsr(k)] = np.NINF
-            elif metric == "MLL":
+            elif metric == "MLL" or metric == "MAP":
                 try:
+                    # If the model was trained using MAP the log normalized prior is already included in the loss
+                    # Otherwise it's just the MLL stored in there 
                     performance[gsr(k)] = models[gsr(k)].curr_loss
                 except:
                     performance[gsr(k)] = np.NINF
