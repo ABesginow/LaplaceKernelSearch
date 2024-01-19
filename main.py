@@ -133,9 +133,43 @@ def run_experiment(config_file, torch_seed):
     # set training iterations to the correct config
     options["training"]["max_iter"] = int(train_iterations)
 
-    for exp_num in range(0, EXPERIMENT_REPITITIONS, 1):
+    ## Create train data
+    # Create base model to generate data
+
+    # training data for model initialization (e.g. 1 point with x=0, y=0) ; this makes initializing the model easier
+    prior_x = torch.linspace(0, 1, 1)
+    prior_y = prior_x
+    # initialize likelihood and model
+    data_likelihood = gpytorch.likelihoods.GaussianLikelihood()
+    data_model = ExactGPModel(prior_x, prior_y, data_likelihood, kernel_text=data_kernel)
+    observations_x = torch.linspace(eval_START, eval_END, eval_COUNT)
+    observations_x = (observations_x - torch.mean(observations_x)) / torch.std(observations_x)
+    # Get into evaluation (predictive posterior) mode
+    data_model.eval()
+    data_likelihood.eval()
+
+    # Make predictions by feeding model through likelihood
+    with torch.no_grad(), gpytorch.settings.prior_mode(True):
+        observed_pred_prior = data_likelihood(data_model(observations_x))
+        f_preds = data_model(observations_x)
+
+    noise_level = 0.1
+    # Percentage noise
+    X = observations_x
+    # Z-Score scaling
+    if data_scaling:
+        X = (X - torch.mean(X)) / torch.std(X)
+        #Y = (Y - torch.mean(Y)) / torch.std(Y)
+
+    all_observations_y = f_preds.sample_n(EXPERIMENT_REPITITIONS)
+    all_observations_y = all_observations_y + torch.randn(all_observations_y.shape) * torch.tensor(noise_level)
+    test_samples = f_preds.sample_n(10)
+    test_samples = test_samples + torch.randn(test_samples.shape) * torch.tensor(noise_level)
+
+    for (exp_num, Y) in enumerate(all_observations_y):
         print(config_file)
         print(f"{metric} - {exp_num}/{EXPERIMENT_REPITITIONS} - {time.strftime('%Y-%m-%d %H:%M', time.localtime())}")
+
 
         log_name = "..."
         experiment_keyword = var_dict["experiment name"]
@@ -145,45 +179,21 @@ def run_experiment(config_file, torch_seed):
         log_experiment_path = os.path.join(experiment_path, f"{experiment_keyword}")
         experiment = Experiment(log_experiment_path, exp_num, attributes=var_dict)
 
+        f, ax = plt.subplots()
+        ax.plot(X, Y, 'k*')
+        ax.plot(X, Y, '-', color="blue")
+        #Store the plots as .png
+        f.savefig(os.path.join(experiment_path, f"DATA_normalized_{exp_num}.png"))
+        #Store the plots as .tex
+        #tikzplotlib.save(os.path.join(experiment_path, f"DATA_normalized_{exp_num}.tex"))
+        plt.close(f)
 
-
-        ## Create train data
-        # Create base model to generate data
-
-        # training data for model initialization (e.g. 1 point with x=0, y=0) ; this makes initializing the model easier
-        prior_x = torch.linspace(0, 1, 1)
-        prior_y = prior_x
-        # initialize likelihood and model
-        data_likelihood = gpytorch.likelihoods.GaussianLikelihood()
-        data_model = ExactGPModel(prior_x, prior_y, data_likelihood, kernel_text=data_kernel)
-        observations_x = torch.linspace(eval_START, eval_END, eval_COUNT)
-        observations_x = (observations_x - torch.mean(observations_x)) / torch.std(observations_x)
-        # Get into evaluation (predictive posterior) mode
-        data_model.eval()
-        data_likelihood.eval()
-
-        # Make predictions by feeding model through likelihood
-        with torch.no_grad(), gpytorch.settings.prior_mode(True):
-            observed_pred_prior = data_likelihood(data_model(observations_x))
-            f_preds = data_model(observations_x)
-            mean_prior = observed_pred_prior.mean
-            lower_prior, upper_prior = observed_pred_prior.confidence_region()
-
-        f_mean = f_preds.mean
-        f_var = f_preds.variance
-        f_covar = f_preds.covariance_matrix
-        observations_y = f_preds.sample()           # samples from the model
-
-        X = observations_x  #[int((1-train_data_ratio)*0.5*eval_COUNT):int((1+train_data_ratio)*0.5*eval_COUNT)]
-        Y = observations_y  #[int((1-train_data_ratio)*0.5*eval_COUNT):int((1+train_data_ratio)*0.5*eval_COUNT)]
-
-        noise_level = 0.1
-        # Percentage noise
-        Y = Y + torch.randn(Y.shape) * torch.tensor(noise_level)
-        # Z-Score scaling
-        if data_scaling:
-            X = (X - torch.mean(X)) / torch.std(X)
-            #Y = (Y - torch.mean(Y)) / torch.std(Y)
+        # store the first, middle and last test samples
+        for test_data_num in [0, 5, 9]:
+            f, ax = plt.subplots()
+            ax.plot(X, test_samples[test_data_num], "k*")
+            ax.plot(X, test_samples[test_data_num], "-", color="blue")
+            f.savefig(os.path.join(experiment_path, f"Test_data_{test_data_num}.png"))
 
         # Run CKS
         list_of_kernels = [gpytorch.kernels.RBFKernel(),
@@ -223,8 +233,6 @@ def run_experiment(config_file, torch_seed):
         # This is directly comparable for ALL metrics, even MAP-LApp
         model.train()
         likelihood.train()
-        test_samples = f_preds.sample_n(10)
-        test_samples = test_samples + torch.randn(test_samples.shape) * torch.tensor(noise_level)
         mll = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood, model)
         #print("post mll init")
         #print(list(model.named_parameters()))
@@ -255,7 +263,7 @@ def run_experiment(config_file, torch_seed):
             f, ax = plt.subplots()
             f, ax = model.plot_model(return_figure=True, figure = f, ax=ax, posterior=True, test_y = test_samples[test_mll.index(max(test_mll))])
             #ax.plot(X, Y, 'k*')
-            ax.set_title(gsr(model.covar_module))
+            ax.set_title(f"{gsr(model.covar_module)} - {max(test_mll)}")
             image_time = time.time()
             # Store the plots as .png
             f.savefig(os.path.join(experiment_path, f"{experiment_keyword}_{exp_num}_best_eval.png"))
@@ -265,7 +273,7 @@ def run_experiment(config_file, torch_seed):
             model.set_train_data(X, test_samples[test_mll.index(min(test_mll))])
             f, ax = plt.subplots()
             f, ax = model.plot_model(return_figure=True, figure = f, ax=ax, posterior=True, test_y = test_samples[test_mll.index(min(test_mll))])
-            ax.set_title(gsr(model.covar_module))
+            ax.set_title(f"{gsr(model.covar_module)} - {min(test_mll)}")
             image_time = time.time()
             # Store the plots as .png
             f.savefig(os.path.join(experiment_path, f"{experiment_keyword}_{exp_num}_worst_eval.png"))
