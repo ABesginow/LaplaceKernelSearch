@@ -49,7 +49,7 @@ general_json = {
     'Variance_list': [4],
     'eval_START':[-5.0],
     'eval_END':[5.0],
-    'eval_COUNT':[5, 10, 20, 30],#, 40, 50, 70, 100, 150, 200],#, 250, 500],
+    'eval_COUNT':[5, 10, 20, 30, 40, 50, 100, 200],#, 250, 500],
     'optimizer':['PyGRANSO'],
     'train_iterations':[100],
     'LR': [0.1],
