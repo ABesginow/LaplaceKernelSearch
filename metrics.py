@@ -676,7 +676,8 @@ def reparameterize_model(model, theta):
 def reparameterize_and_mll(model, likelihood, theta, train_x, train_y):
     reparameterize_model(model, theta)
     mll = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood, model)
-    mll_val = mll(model(train_x), train_y)
+    with torch.no_grad():
+        mll_val = mll(model(train_x), train_y)
     return mll_val
 
 
