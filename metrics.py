@@ -15,6 +15,7 @@ import re
 from scipy.special import lambertw
 import stan
 import scipy
+import sys
 import time
 import torch
 import threading
@@ -688,6 +689,10 @@ def NestedSampling(model, **kwargs):
     store_likelihoods = kwargs.get("store_likelihoods", False)
     store_full = kwargs.get("store_full", False)
     pickle_directory = kwargs.get("pickle_directory", "")
+    checkpoint_file = kwargs.get("checkpoint_file", None)
+    maxcall = kwargs.get("maxcall", sys.maxsize)
+    checkpoint_every = kwargs.get("checkpoint_every", sys.maxsize)
+    res_file_name = kwargs.get("res_file_name", None)
 
     prior_theta_mean, prior_theta_cov = prior_distribution(model)
 
@@ -695,9 +700,13 @@ def NestedSampling(model, **kwargs):
     ndim = len(list(model.parameters()))
 
     def loglike(theta_i):
-        log_like = (reparameterize_and_mll(model, model.likelihood, theta_i, 
-                                           model.train_inputs[0], 
-                                           model.train_targets)*len(*model.train_inputs)).detach().numpy()
+        try:
+            log_like = (reparameterize_and_mll(model, model.likelihood, theta_i, 
+                                            model.train_inputs[0], 
+                                            model.train_targets)*len(*model.train_inputs)).detach().numpy()
+        except Exception as E:
+            print(E)
+            log_like = -np.inf
         return log_like
 
     # Define our prior via the prior transform.
@@ -716,12 +725,14 @@ def NestedSampling(model, **kwargs):
         return x
 
     if dynamic_sampling:
+
         # Trying out dynamic sampler
         dsampler = dynesty.DynamicNestedSampler(loglike, prior_transform, 
                                                 ndim, bound='multi')
         start_time = time.time()
         dsampler.run_nested(dlogz_init=0.01, nlive_init=500, nlive_batch=100,
-                            print_progress=print_progress)
+                            print_progress=print_progress, checkpoint_file=checkpoint_file,
+                            maxcall=maxcall, checkpoint_every=checkpoint_every)
         end_time = time.time()
         res = dsampler.results
 
@@ -750,9 +761,10 @@ def NestedSampling(model, **kwargs):
     if store_samples and not store_full:
         logables["samples"] = res["samples"]
     if store_full:
+        pickle_filename = f"res_{time.time()}.pkl" if res_file_name is None else res_file_name
         if not os.path.exists(os.path.join(pickle_directory, "Nested_results")):
             os.makedirs(os.path.join(pickle_directory, "Nested_results"))
-        pickle_filename = os.path.join(pickle_directory, "Nested_results", f"res_{time.time()}.pkl")
-        pickle.dump(res, open(pickle_filename, "wb"))
-        logables["res file"] = pickle_filename
+        full_pickle_path = os.path.join(pickle_directory, "Nested_results", pickle_filename)
+        pickle.dump(res, open(full_pickle_path, "wb"))
+        logables["res file"] = full_pickle_path
     return res.logz[-1], logables
