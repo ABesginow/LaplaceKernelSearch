@@ -102,7 +102,7 @@ def run_experiment(config_file, torch_seed):
 
     """
     torch.manual_seed(torch_seed)
-    EXPERIMENT_REPITITIONS = 5 
+    EXPERIMENT_REPITITIONS = 10 
     total_time_start = time.time()
     options["kernel search"]["print"] = False
     options["training"]["restarts"] = 2
@@ -166,7 +166,8 @@ def run_experiment(config_file, torch_seed):
     test_samples = f_preds.sample_n(10)
     test_samples = test_samples + torch.randn(test_samples.shape) * torch.tensor(noise_level)
 
-    for (exp_num, Y) in enumerate(all_observations_y):
+    #for (exp_num, Y) in enumerate(all_observations_y):
+    for (exp_num, Y) in zip(range(5, EXPERIMENT_REPITITIONS, 1), all_observations_y[5:]):
         print(config_file)
         print(f"{metric} - {exp_num}/{EXPERIMENT_REPITITIONS} - {time.strftime('%Y-%m-%d %H:%M', time.localtime())}")
 

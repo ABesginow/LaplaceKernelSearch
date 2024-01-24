@@ -693,6 +693,9 @@ def NestedSampling(model, **kwargs):
     maxcall = kwargs.get("maxcall", sys.maxsize)
     checkpoint_every = kwargs.get("checkpoint_every", sys.maxsize)
     res_file_name = kwargs.get("res_file_name", None)
+    random_seed = kwargs.get("random_seed", None)
+    if random_seed is None:
+        random_seed = random.randint(0, 1000000)
 
     prior_theta_mean, prior_theta_cov = prior_distribution(model)
 
@@ -705,7 +708,7 @@ def NestedSampling(model, **kwargs):
                                             model.train_inputs[0], 
                                             model.train_targets)*len(*model.train_inputs)).detach().numpy()
         except Exception as E:
-            print(E)
+            #print(E)
             log_like = -np.inf
         return log_like
 
@@ -724,15 +727,18 @@ def NestedSampling(model, **kwargs):
         x += mu  # add mean
         return x
 
+    rng_generator = np.random.default_rng(seed=random_seed)
+    print(f"Random seed: {random_seed}")
     if dynamic_sampling:
-
         # Trying out dynamic sampler
-        dsampler = dynesty.DynamicNestedSampler(loglike, prior_transform, 
-                                                ndim, bound='multi')
+        dsampler = dynesty.DynamicNestedSampler(loglike, prior_transform, ndim, 
+                                                rstate=rng_generator)
         start_time = time.time()
-        dsampler.run_nested(dlogz_init=0.01, nlive_init=500, nlive_batch=100,
-                            print_progress=print_progress, checkpoint_file=checkpoint_file,
-                            maxcall=maxcall, checkpoint_every=checkpoint_every)
+        #dsampler.run_nested(dlogz_init=0.01, maxcall=100000, print_progress=print_progress)# nlive_init=500, nlive_batch=100,
+        dsampler.run_nested(dlogz_init=0.01,# nlive_init=500, nlive_batch=100,
+                            print_progress=print_progress,
+                            maxcall=maxcall)
+                            # checkpoint_every=checkpoint_every, # checkpoint_file=checkpoint_file
         end_time = time.time()
         res = dsampler.results
 
