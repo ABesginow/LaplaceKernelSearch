@@ -415,7 +415,7 @@ def calculate_laplace(model, loss_of_model, variances_list=None, likelihood_lapl
         import pdb
         pdb.set_trace()
 
-    torch.set_default_tensor_type(torch.FloatTensor)
+    #torch.set_default_tensor_type(torch.FloatTensor)
     return laplace, logables
 
 
