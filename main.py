@@ -102,7 +102,7 @@ def run_experiment(config_file, torch_seed):
 
     """
     torch.manual_seed(torch_seed)
-    EXPERIMENT_REPITITIONS = 10 
+    EXPERIMENT_REPITITIONS = 50 
     total_time_start = time.time()
     options["kernel search"]["print"] = False
     options["training"]["restarts"] = 2
@@ -167,7 +167,7 @@ def run_experiment(config_file, torch_seed):
     test_samples = test_samples + torch.randn(test_samples.shape) * torch.tensor(noise_level)
 
     #for (exp_num, Y) in enumerate(all_observations_y):
-    for (exp_num, Y) in zip(range(5, EXPERIMENT_REPITITIONS, 1), all_observations_y[5:]):
+    for (exp_num, Y) in zip(range(0, EXPERIMENT_REPITITIONS, 1), all_observations_y[:]):
         print(config_file)
         print(f"{metric} - {exp_num}/{EXPERIMENT_REPITITIONS} - {time.strftime('%Y-%m-%d %H:%M', time.localtime())}")
 
@@ -367,7 +367,8 @@ if __name__ == "__main__":
 
     #torch_seed = random.randint(1, 1e+7)
     #run_experiment(os.path.join(curdir, "configs/Laplace_prior/-480495070506691892.json"), torch_seed)
-    torch_seed = random.randint(1, 1e+7)
+    #torch_seed = random.randint(1, 1e+7)
+    torch_seed = 42
     for config in configs:
         run_experiment(config, torch_seed)
 
