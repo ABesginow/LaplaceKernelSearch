@@ -102,7 +102,7 @@ def run_experiment(config_file, torch_seed):
 
     """
     torch.manual_seed(torch_seed)
-    EXPERIMENT_REPITITIONS = 50 
+    EXPERIMENT_REPITITIONS = 50
     total_time_start = time.time()
     options["kernel search"]["print"] = False
     options["training"]["restarts"] = 2
@@ -223,7 +223,7 @@ def run_experiment(config_file, torch_seed):
         # Necessary since the sampling will directly modify the model
         model_state_dict = copy.deepcopy(model.state_dict())
 
-        Nested_approx, Nested_log = NestedSampling(model, store_full=True, pickle_directory=experiment_path)
+        Nested_approx, Nested_log = NestedSampling(model, store_full=True, pickle_directory=experiment_path, maxcall=3000000)
         experiment.store_result("Nested approx", Nested_approx)
         experiment.store_result("Nested details", Nested_log)
 
@@ -251,6 +251,7 @@ def run_experiment(config_file, torch_seed):
                 #test_mll = [mll(model(observations_x), s) * model.train_targets.numel() for test_sample in test_samples]
         except Exception as E:
             print(E)
+            print("Test MLL calculation")
             print("----")
             test_mll = [np.nan]
         experiment.store_result("test mll list", test_mll)
@@ -283,6 +284,7 @@ def run_experiment(config_file, torch_seed):
             plt.close(f)
         except Exception as E:
             print(E)
+            print("Best and worst run plotting")
             print("----")
             open(os.path.join(experiment_path, f"{experiment_keyword}_{exp_num}.png"), "w+").close()
             open(os.path.join(experiment_path, f"{experiment_keyword}_{exp_num}.tex"), "w+").close()
@@ -319,6 +321,7 @@ def run_experiment(config_file, torch_seed):
             plt.close(f)
         except Exception as E:
             print(E)
+            print("Posterior plotting?")
             print("----")
             open(os.path.join(experiment_path, f"{experiment_keyword}_{exp_num}.png"), "w+").close()
             open(os.path.join(experiment_path, f"{experiment_keyword}_{exp_num}.tex"), "w+").close()
