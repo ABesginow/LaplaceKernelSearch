@@ -58,9 +58,8 @@ general_json = {
     'BFGS' : [False]
 }
 
-MC_json = {
-    "Metric": ["MC"],
-    "num_draws": [1000]
+Nested_json = {
+    "Metric": ["Nested"],
 }
 
 Laplace_json = {
@@ -88,7 +87,7 @@ BIC_json = {
     "Metric" : ["BIC"]
 }
 
-specific_jsons = [MC_json, MLL_json, MAP_json,  AIC_json, BIC_json, Laplace_json] # , Laplace_json
+specific_jsons = [Nested_json, MLL_json, MAP_json,  AIC_json, BIC_json, Laplace_json] # , Laplace_json
 #general_json = {
 #                'Metric': ["Laplace", "MC", "MLL", "AIC"],
 #                'Kernel_search': ["CKS"],

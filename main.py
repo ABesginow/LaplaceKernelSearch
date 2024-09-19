@@ -356,7 +356,8 @@ if __name__ == "__main__":
     with open("FINISHED.log", "r") as f:
         finished_configs = [line.strip().split("/")[-1] for line in f.readlines()]
     curdir = os.getcwd()
-    keywords = ["AIC", "BIC", "MLL",  "Laplace", "MAP"]# "MC" only when there's a lot of time
+    keywords = ["AIC", "BIC", "MLL",  "Laplace", "MAP", "Nested"]# "MC" only when there's a lot of time
+    keywords = ["Laplace", "MAP"]# "MC" only when there's a lot of time
     configs = []
     for KEYWORD in keywords:
         configs.extend([os.path.join(curdir, "configs", KEYWORD, item) for item in os.listdir(os.path.join(curdir, "configs", KEYWORD))])

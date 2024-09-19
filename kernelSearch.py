@@ -14,7 +14,7 @@ import stan
 import time
 import torch
 import threading
-from metrics import calculate_AIC, calculate_laplace, calculate_mc_STAN, calculate_BIC
+from metrics import calculate_AIC, calculate_laplace, calculate_mc_STAN, calculate_BIC, NestedSampling
 
 
 # ----------------------------------------------------------------------------------------------------
@@ -106,7 +106,7 @@ def CKS(X, Y, likelihood, base_kernels, list_of_variances=None,  experiment=None
     for i in range(iterations):
         for k in candidates:
             models[gsr(k)] = ExactGPModel(X, Y, copy.deepcopy(likelihood), copy.deepcopy(k))
-            if not metric == "MC":
+            if not metric == "Nested":
                 if options["kernel search"]["multithreading"]:
                     threads.append(threading.Thread(target=models[gsr(k)].optimize_hyperparameters))
                     threads[-1].start()
@@ -145,6 +145,12 @@ def CKS(X, Y, likelihood, base_kernels, list_of_variances=None,  experiment=None
                 #    import pdb
                 #    pdb.post_mortem()
                 #    performance[gsr(k)] = np.NINF
+            if metric == "Nested":
+                try:
+                    performance[gsr(k)], logs = NestedSampling(models[gsr(k)], maxcall=3000000)
+                    logables.append(logs)
+                except:
+                    performance[gsr(k)] = np.NINF
             if metric == "AIC":
                 performance[gsr(k)], logs = calculate_AIC(-models[gsr(k)].curr_loss* models[gsr(k)].train_inputs[0].numel(), sum(p.numel() for p in models[gsr(k)].parameters() if p.requires_grad))
                 performance[gsr(k)] = -performance[gsr(k)]
