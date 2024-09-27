@@ -129,7 +129,7 @@ def calculate_BIC(loss, num_params, num_data):
     return BIC, logables
 
 
-def calculate_neg_AIC(loss, num_params):
+def calculate_AIC(loss, num_params):
     start = time.time()
     AIC = 2*num_params - 2*loss
     end = time.time()
