@@ -119,21 +119,19 @@ def log_normalized_prior(model, theta_mu=None, sigma=None):
     log_prob = prior.log_prob(params) / len(*model.train_inputs)
     return log_prob.squeeze(0)
 
-# This is the NEGATIVE BIC
 def calculate_BIC(loss, num_params, num_data):
     start = time.time()
-    BIC = -num_params*torch.log(num_data) + 2*loss
+    BIC = +num_params*torch.log(num_data) - 2*loss
     end = time.time()
-    logables = {"punish term" : -num_params*torch.log(num_data),
+    logables = {"punish term" : num_params*torch.log(num_data),
                 "Total time": end - start,
                 "loss term": 2*loss}
     return BIC, logables
 
 
-# This is the NEGATIVE AIC
-def calculate_AIC(loss, num_params):
+def calculate_neg_AIC(loss, num_params):
     start = time.time()
-    AIC = -2*num_params + 2*loss
+    AIC = 2*num_params - 2*loss
     end = time.time()
     logables = {"punish term" : 2*num_params,
                 "Total time": end - start,
