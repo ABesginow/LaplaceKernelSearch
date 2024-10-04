@@ -13,7 +13,6 @@ import pickle
 import random
 import re
 from scipy.special import lambertw
-import stan
 import scipy
 import sys
 import time
@@ -524,6 +523,7 @@ def generate_STAN_code(kernel_representation : str, lower_bound = -15):
 
  
 def calculate_mc_STAN(model, likelihood, num_draws, **kwargs):
+    import stan
     logables = dict()
     # Grab variables from kwargs
     log_param_path = kwargs.get("log_param_path", False)    
