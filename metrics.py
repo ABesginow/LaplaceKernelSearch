@@ -387,10 +387,11 @@ def calculate_laplace(model, loss_of_model, variances_list=None, likelihood_lapl
 
     total_time = end - total_start
     # Everything worth logging
-    logables["neg MLL"] = mll 
+    logables["MAP"] = mll 
     logables["punish term"] = punish_term 
     #logables["punish without replacement"] = punish_without_replacement
     logables["laplace without replacement"] = laplace_without_replacement
+    logables["correction term"] = param_punish_term
 
     logables["num_replaced"] = num_replaced
     logables["parameter list"] = debug_param_name_list
