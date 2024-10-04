@@ -10,7 +10,6 @@ import numpy as np
 import re
 import random
 from scipy.special import lambertw
-import stan
 import time
 import torch
 import threading
