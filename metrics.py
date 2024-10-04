@@ -285,7 +285,7 @@ def calculate_laplace(model, loss_of_model, variances_list=None, likelihood_lapl
     vals, T = torch.linalg.eigh(hessian)
     oldHessian = hessian.clone()
     if param_punish_term == "BIC":
-        param_punish_term = -torch.log(torch.tensor(model.train_targets.numel()))
+        param_punish_term = -0.5*torch.log(torch.tensor(model.train_targets.numel()))
     if not likelihood_laplace:
         # Appendix E.1
         # it says mll, but it's actually the MAP here
