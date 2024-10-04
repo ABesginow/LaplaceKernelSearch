@@ -4,8 +4,6 @@ global options
 options = default_options
 global hyperparameter_limits
 hyperparameter_limits = hpl
-global prior_dict
-prior_dict = pd
 
 def init():
     """
