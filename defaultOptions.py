@@ -21,6 +21,7 @@ default_options = {
 hyperparameter_limits = {"RBFKernel": {"lengthscale": [1e-3,1]},
                          "MaternKernel": {"lengthscale": [1e-3,1]},
                          "LinearKernel": {"variance": [1e-4,1]},
+                         "AffineKernel": {"variance": [1e-4,1]},
                          "RQKernel": {"lengthscale": [1e-3,1],
                                       "alpha": [1e-3,1]},
                          "CosineKernel": {"period_length": [1e-3,3]},
