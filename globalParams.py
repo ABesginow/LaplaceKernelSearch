@@ -1,4 +1,4 @@
-from defaultOptions import default_options, hyperparameter_limits as hpl, prior_dict as pd
+from defaultOptions import default_options, hyperparameter_limits as hpl
 
 global options
 options = default_options
@@ -17,4 +17,3 @@ def init():
     global options, hyperparameter_limits, prior_dict
     options = default_options
     hyperparameter_limits = hpl
-    prior_dict = pd
