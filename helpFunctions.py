@@ -77,6 +77,8 @@ def get_string_representation_of_kernel(kernel_expression):
             raise "shit"
     elif kernel_expression._get_name() == "RQKernel":
         return "RQ"
+    elif kernel_expression._get_name() == "AffineKernel":
+        return "AFF"
     else:
         return kernel_expression._get_name()
 
