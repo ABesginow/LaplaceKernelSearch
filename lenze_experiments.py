@@ -284,7 +284,7 @@ def run_experiment(filepath, channel):
     logables["attributes"] = attributes
     logables["results"] = list()
 
-    #t,
+    # t,
     # lu_phase_current,
     # lv_phase_current,
     # lw_phase_current,
@@ -297,12 +297,12 @@ def run_experiment(filepath, channel):
     # S32_act_rot_spd,
     # lstdrehmoment_act_motor_torq
 
-    data_path = ".".join(filepath.split("/")[-2:].split(".")[:2])
+    data_path = ".".join("/".join(filepath.split("/")[-2:]).split(".")[:2])
     # Load data
     data = pandas.read_csv(filepath, sep=",")
     # 0 is time
     # then 11 more "output" channels
-    observations_x = data[0] # assuming "t" is always first
+    observations_x = data[0]  # assuming "t" is always first
     observations_y = data[channel] 
 
     # Apply upsampling
@@ -325,14 +325,14 @@ def run_experiment(filepath, channel):
     observations_y = (observations_y - torch.mean(observations_y)
                       ) / torch.std(observations_y)
 
-    experiment_path = os.path.join("results", "hardcoded", f"{data_path}_{data_kernel}")
+    experiment_path = os.path.join("results", "lenze", f"{data_path}")
     if not os.path.exists(experiment_path):
         os.makedirs(experiment_path)
     f, ax = plt.subplots()
     ax.plot(original_observations_x, original_observations_y, 'k*')
     ax.plot(original_observations_x, original_observations_y, '-', color="blue")
     #Store the plots as .png
-    f.savefig(os.path.join(experiment_path, f"DATA_{data_path}.png"))
+    f.savefig(os.path.join(experiment_path, f"{data_path}_DATA.png"))
     #Store the plots as .tex
     #tikzplotlib.save(os.path.join(experiment_path, f"DATA_{exp_num}.tex"))
     plt.close(f)
@@ -342,7 +342,7 @@ def run_experiment(filepath, channel):
     ax.plot(observations_x, observations_y, 'k*')
     ax.plot(observations_x, observations_y, '-', color="blue")
     #Store the plots as .png
-    f.savefig(os.path.join(experiment_path, f"DATA_normalized_{data_path}.png"))
+    f.savefig(os.path.join(experiment_path, f"{data_path}_DATA_normalized.png"))
     #Store the plots as .tex
     #tikzplotlib.save(os.path.join(experiment_path, f"DATA_normalized_{exp_num}.tex"))
     plt.close(f)
@@ -351,7 +351,7 @@ def run_experiment(filepath, channel):
 
     for model_kernel in tqdm(model_kernels):
         print(f"Data Kernel: {data_kernel}")
-        experiment_keyword = f"{model_kernel}"
+        experiment_keyword = f"{data_path}_{model_kernel}"
 
         if any([m in metrics for m in ["MLL", "AIC", "BIC"]]):
             loss = np.nan
@@ -395,6 +395,10 @@ def run_experiment(filepath, channel):
                 Laplace_logs[parameter_punishment]["Train time"] = train_time
                 Laplace_logs[parameter_punishment]["details"] = LApp_log
             exp_num_result_dict["Laplace"][model_kernel] = Laplace_logs
+
+
+
+
 
         if any([m in metrics for m in ["MLL", "AIC", "BIC"]]):
             try:
@@ -540,12 +544,15 @@ def run_experiment(filepath, channel):
             exp_num_result_dict["MC"][model_kernel] = MC_logs
     logables["results"].append(exp_num_result_dict)
 
-    experiment_path = os.path.join("results", "lenze",  f"{data_path}_{data_kernel}")
-    if not os.path.exists(experiment_path):
-        os.makedirs(experiment_path)
     with open(os.path.join(experiment_path, f"results.pickle"), 'wb') as fh:
         pickle.dump(logables, fh)
 
+    #param_punishments = [0.0, -1.0, "BIC"]
+    with open(os.path.join(experiment_path, f"res_tab.md"), "w") as f:
+        res_table = f"\n{'MAP':<10} | {'MLL':<10} |{'Laplace_0.0':<10} |{'Laplace_-1.0':<10} |{'Laplace_BIC':<10} | {'AIC':<10} | {'AIC Scaled':<10} | {'BIC':<10} | {'BIC Scaled':<10} | {'Model Evidence':<10}\n" +\
+        "--|--|--|--|--|--|--|--|--|--\n" +\
+        f"{MAP_logs["loss"]:<10.2f} | {MLL_logs["loss"]:<10.2f} | {Laps_log[param_punishments[0]]["loss"]:<10.2f} | {Laps_log[param_punishments[1]]["loss"]:<10.2f} | {Laps_log[param_punishments[2]]["loss"]:<10.2f} |{AIC_approx:<10.2f} | {AIC_approx*(-0.5):<10.2f} | {BIC_approx:<10.2f} | {BIC_approx*(-0.5):<10.2f} | {logz_nested:<10.2f}\n"
+        f.write(res_table)
     return 0
 
 
