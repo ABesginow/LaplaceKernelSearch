@@ -16,6 +16,7 @@ from metrics import *
 from multiprocessing import Pool
 import numpy as np
 import os
+import pandas
 import pdb
 import pickle
 from pygranso.pygranso import pygranso
@@ -245,7 +246,7 @@ def optimize_hyperparameters(model, likelihood, **kwargs):
 
 
 
-def run_experiment(filepath):
+def run_experiment(filepath, channel):
     """
     This contains the training, kernel search, evaluation, logging, plotting.
     It takes an input file, processes the whole training, evaluation and log
@@ -283,14 +284,26 @@ def run_experiment(filepath):
     logables["attributes"] = attributes
     logables["results"] = list()
 
-    #t,lu_phase_current,lv_phase_current,lw_phase_current,Uu_volt,Uv_volt,Uw_volt,Uzk_intermediate_circuit,U32_rot_angle_rotor,leff_motorcurr_stator_fxd_coord,S32_act_rot_spd,lstdrehmoment_act_motor_torq
-    #0.0,-0.9274610955973662,-0.42803296828751103,1.3479205416778843,-54.81875521796729,-23.494738913984598,77.71290287075381,574.796716151931,0.11878958344459534,0.051853717770427465,0.0009444355964660645,3.073364496231079e-08
+    #t,
+    # lu_phase_current,
+    # lv_phase_current,
+    # lw_phase_current,
+    # Uu_volt,
+    # Uv_volt,
+    # Uw_volt,
+    # Uzk_intermediate_circuit,
+    # U32_rot_angle_rotor,
+    # leff_motorcurr_stator_fxd_coord,
+    # S32_act_rot_spd,
+    # lstdrehmoment_act_motor_torq
 
-    data_path = filepath.split("/")[-1].split(".")[0]
+    data_path = ".".join(filepath.split("/")[-2:].split(".")[:2])
     # Load data
-    data = np.loadtxt(filepath, delimiter=",")
+    data = pandas.read_csv(filepath, sep=",")
+    # 0 is time
+    # then 11 more "output" channels
     observations_x = data[0] # assuming "t" is always first
-    observations_y = data[1] # assuming "lu_phase_current" is always second
+    observations_y = data[channel] 
 
     # Apply upsampling
     observations_x = torch.cat([observations_x[i*upsampling] for i in range(len(observations_x)//upsampling)])
@@ -527,7 +540,7 @@ def run_experiment(filepath):
             exp_num_result_dict["MC"][model_kernel] = MC_logs
     logables["results"].append(exp_num_result_dict)
 
-    experiment_path = os.path.join("results", "hardcoded",  f"{data_path}_{data_kernel}")
+    experiment_path = os.path.join("results", "lenze",  f"{data_path}_{data_kernel}")
     if not os.path.exists(experiment_path):
         os.makedirs(experiment_path)
     with open(os.path.join(experiment_path, f"results.pickle"), 'wb') as fh:
@@ -542,5 +555,8 @@ curdir = os.getcwd()
 # Make a list of files ending with .csv in the directory (and subdirectories)
 path = "/home/besginow/code/LaplaceKernelSearch/lenze/bhn"
 files = [os.path.join(dp, f) for dp, dn, filenames in os.walk(path) for f in filenames if f.endswith(".csv")]
-for file in files:
-    run_experiment(file)
+channels = ["t", "lu_phase_current", "lv_phase_current", "lw_phase_current", "Uu_volt", "Uv_volt", "Uw_volt", "Uzk_intermediate_circuit", "U32_rot_angle_rotor", "leff_motorcurr_stator_fxd_coord", "S32_act_rot_spd", "lstdrehmoment_act_motor_torq"]
+# Let's begin with a subset of channels
+channels = channels[:5]
+for file, channel in product(files, channels):
+    run_experiment(file, channel)
