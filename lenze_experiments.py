@@ -551,19 +551,19 @@ def run_experiment(filepath, channel):
     with open(os.path.join(experiment_path, f"res_tab.md"), "w") as f:
         res_table = f"\n{'MAP':<10} | {'MLL':<10} |{'Laplace_0.0':<10} |{'Laplace_-1.0':<10} |{'Laplace_BIC':<10} | {'AIC':<10} | {'AIC Scaled':<10} | {'BIC':<10} | {'BIC Scaled':<10} | {'Model Evidence':<10}\n" +\
         "--|--|--|--|--|--|--|--|--|--\n" +\
-        f"{MAP_logs["loss"]:<10.2f} | {MLL_logs["loss"]:<10.2f} | {Laps_log[param_punishments[0]]["loss"]:<10.2f} | {Laps_log[param_punishments[1]]["loss"]:<10.2f} | {Laps_log[param_punishments[2]]["loss"]:<10.2f} |{AIC_approx:<10.2f} | {AIC_approx*(-0.5):<10.2f} | {BIC_approx:<10.2f} | {BIC_approx*(-0.5):<10.2f} | {logz_nested:<10.2f}\n"
+        f"{MAP_logs['loss']:<10.2f} | {MLL_logs['loss']:<10.2f} | {Laps_log[param_punishments[0]]['loss']:<10.2f} | {Laps_log[param_punishments[1]]['loss']:<10.2f} | {Laps_log[param_punishments[2]]['loss']:<10.2f} |{AIC_approx:<10.2f} | {AIC_approx*(-0.5):<10.2f} | {BIC_approx:<10.2f} | {BIC_approx*(-0.5):<10.2f} | {logz_nested:<10.2f}\n"
         f.write(res_table)
     return 0
 
 
-with open("FINISHED.log", "r") as f:
-    finished_configs = [line.strip().split("/")[-1] for line in f.readlines()]
+#with open("FINISHED.log", "r") as f:
+#    finished_configs = [line.strip().split("/")[-1] for line in f.readlines()]
 curdir = os.getcwd()
 # Make a list of files ending with .csv in the directory (and subdirectories)
 path = "/home/besginow/code/LaplaceKernelSearch/lenze/bhn"
 files = [os.path.join(dp, f) for dp, dn, filenames in os.walk(path) for f in filenames if f.endswith(".csv")]
 channels = ["t", "lu_phase_current", "lv_phase_current", "lw_phase_current", "Uu_volt", "Uv_volt", "Uw_volt", "Uzk_intermediate_circuit", "U32_rot_angle_rotor", "leff_motorcurr_stator_fxd_coord", "S32_act_rot_spd", "lstdrehmoment_act_motor_torq"]
 # Let's begin with a subset of channels
-channels = channels[:5]
+channels = channels[:3]
 for file, channel in product(files, channels):
     run_experiment(file, channel)
