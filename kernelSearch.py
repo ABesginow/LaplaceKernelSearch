@@ -152,7 +152,6 @@ def CKS(X, Y, likelihood, base_kernels, list_of_variances=None,  experiment=None
                     performance[gsr(k)] = np.NINF
             if metric == "AIC":
                 performance[gsr(k)], logs = calculate_AIC(-models[gsr(k)].curr_loss* models[gsr(k)].train_inputs[0].numel(), sum(p.numel() for p in models[gsr(k)].parameters() if p.requires_grad))
-                performance[gsr(k)] = -performance[gsr(k)]
                 logables.append(logs)
             if metric == "BIC":
                 try:
@@ -160,7 +159,6 @@ def CKS(X, Y, likelihood, base_kernels, list_of_variances=None,  experiment=None
                     bic_params = sum(p.numel() for p in models[gsr(k)].parameters() if p.requires_grad)
                     bic_data_count =  torch.tensor(models[gsr(k)].train_inputs[0].numel())
                     performance[gsr(k)], logs = calculate_BIC(bic_loss, bic_params, bic_data_count)
-                    performance[gsr(k)] = -performance[gsr(k)]
                     logables.append(logs)
                 except Exception as E:
                     performance[gsr(k)] = np.NINF
