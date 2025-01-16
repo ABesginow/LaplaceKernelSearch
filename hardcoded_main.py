@@ -637,8 +637,6 @@ def run_experiment(config):
                     Laps_log[parameter_punishment]["details"] = Lap_log
                 exp_num_result_dict["Laplace"][model_kernel] = Laps_log
 
-
-
             data_model.eval()
             data_likelihood.eval()
 
@@ -688,11 +686,7 @@ def run_experiment(config):
 
     return 0
 
-
-with open("FINISHED.log", "r") as f:
-    finished_configs = [line.strip().split("/")[-1] for line in f.readlines()]
-curdir = os.getcwd()
-num_data =  [5, 10, 20, 30]#, 50, 70, 100] 
+num_data =  [5, 10, 20, 30, 50, 70, 100, 200] 
 data_kernel = ["LIN", "SE", "SE+SE"]
 #data_kernel = ["SE", "RQ", "MAT32", "MAT52", "SE*SE",
 #               "SE+SE", "MAT32+SE", "MAT52+SE", "MAT32*SE", "PER",

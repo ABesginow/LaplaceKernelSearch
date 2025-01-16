@@ -44,7 +44,7 @@ general_json = {
     'train_data_ratio': [0.5],#50% of the eval data
     #'Data_kernel': ["SE", "PER", "MAT32", "PER*SE", "PER+SE", "MAT32*PER", "MAT32+PER", "MAT32+SE", "MAT32*SE"],
     #'Data_kernel': ["PER", "SE", "MAT32", "MAT32+SE", "MAT32*SE", "MAT32*PER", "MAT32+PER", "PER*SE"],
-    'Data_kernel': ["SE", "SE+SE", "LIN", "MAT32"],
+    'Data_kernel': ["SE", "SE+SE", "LIN", "MAT32", "MAT32*PER", "MAT32+PER", "PER*SE"],
     'weights': [[1., 1.]],
     'Variance_list': [4],
     'eval_START':[-5.0],
