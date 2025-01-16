@@ -110,18 +110,12 @@ def run_experiment(config_file, torch_seed):
     var_dict = load_config(config_file)
 
     metric = var_dict["Metric"]
-    kernel_search = var_dict["Kernel_search"]
-    train_data_ratio = var_dict["train_data_ratio"]
     data_kernel = var_dict["Data_kernel"]
-    weights = var_dict["weights"]
     variance_list_variance = var_dict["Variance_list"]
     eval_START = var_dict["eval_START"]
     eval_END = var_dict["eval_END"]
     eval_COUNT = var_dict["eval_COUNT"]
-    optimizer = var_dict["optimizer"]
     train_iterations = var_dict["train_iterations"]
-    LR = var_dict["LR"]
-    noise = var_dict["Noise"]
     data_scaling = var_dict["Data_scaling"]
     use_BFGS = var_dict["BFGS"]
     num_draws = var_dict["num_draws"] if metric == "MC" else None
@@ -148,21 +142,21 @@ def run_experiment(config_file, torch_seed):
     data_model.eval()
     data_likelihood.eval()
 
-    # Make predictions by feeding model through likelihood
+    # Get predictive distribution 
     with torch.no_grad(), gpytorch.settings.prior_mode(True):
-        observed_pred_prior = data_likelihood(data_model(observations_x))
         f_preds = data_model(observations_x)
 
     noise_level = 0.1
-    # Percentage noise
     X = observations_x
     # Z-Score scaling
     if data_scaling:
         X = (X - torch.mean(X)) / torch.std(X)
         #Y = (Y - torch.mean(Y)) / torch.std(Y)
 
+    # Sample EXP_REPITITIONS many data sets
     all_observations_y = f_preds.sample_n(EXPERIMENT_REPITITIONS)
     all_observations_y = all_observations_y + torch.randn(all_observations_y.shape) * torch.tensor(noise_level)
+    # Sample 10 test data sets
     test_samples = f_preds.sample_n(10)
     test_samples = test_samples + torch.randn(test_samples.shape) * torch.tensor(noise_level)
 
@@ -170,7 +164,6 @@ def run_experiment(config_file, torch_seed):
     for (exp_num, Y) in zip(range(0, EXPERIMENT_REPITITIONS, 1), all_observations_y[:]):
         print(config_file)
         print(f"{metric} - {exp_num}/{EXPERIMENT_REPITITIONS} - {time.strftime('%Y-%m-%d %H:%M', time.localtime())}")
-
 
         log_name = "..."
         experiment_keyword = var_dict["experiment name"]
@@ -186,7 +179,7 @@ def run_experiment(config_file, torch_seed):
         #Store the plots as .png
         f.savefig(os.path.join(experiment_path, f"DATA_normalized_{exp_num}.png"))
         #Store the plots as .tex
-        #tikzplotlib.save(os.path.join(experiment_path, f"DATA_normalized_{exp_num}.tex"))
+        tikzplotlib.save(os.path.join(experiment_path, f"DATA_normalized_{exp_num}.tex"))
         plt.close(f)
 
         # store the first, middle and last test samples
@@ -199,6 +192,7 @@ def run_experiment(config_file, torch_seed):
         # Run CKS
         list_of_kernels = [gpytorch.kernels.RBFKernel(),
                            gpytorch.kernels.LinearKernel(),
+                           gpytorch.kernels.PeriodicKernel(),
                            gpytorch.kernels.MaternKernel(nu=1.5)]
         #list_of_kernels = [gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel()),
         #                   gpytorch.kernels.ScaleKernel(gpytorch.kernels.PeriodicKernel()),
@@ -356,8 +350,7 @@ if __name__ == "__main__":
     with open("FINISHED.log", "r") as f:
         finished_configs = [line.strip().split("/")[-1] for line in f.readlines()]
     curdir = os.getcwd()
-    keywords = ["AIC", "BIC", "MLL",  "Laplace", "MAP", "Nested"]# "MC" only when there's a lot of time
-    keywords = ["Laplace", "MAP"]# "MC" only when there's a lot of time
+    keywords = ["AIC", "BIC", "MLL",  "Laplace", "MAP", "Nested"]# "Nested" only when there's a lot of time
     configs = []
     for KEYWORD in keywords:
         configs.extend([os.path.join(curdir, "configs", KEYWORD, item) for item in os.listdir(os.path.join(curdir, "configs", KEYWORD))])
