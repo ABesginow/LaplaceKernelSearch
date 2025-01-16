@@ -416,7 +416,7 @@ def run_experiment(config):
         #Store the plots as .png
         f.savefig(os.path.join(experiment_path, f"DATA_{exp_num}.png"))
         #Store the plots as .tex
-        #tikzplotlib.save(os.path.join(experiment_path, f"DATA_{exp_num}.tex"))
+        tikzplotlib.save(os.path.join(experiment_path, f"DATA_{exp_num}.tex"))
         plt.close(f)
 
 
@@ -426,7 +426,7 @@ def run_experiment(config):
         #Store the plots as .png
         f.savefig(os.path.join(experiment_path, f"DATA_normalized_{exp_num}.png"))
         #Store the plots as .tex
-        #tikzplotlib.save(os.path.join(experiment_path, f"DATA_normalized_{exp_num}.tex"))
+        tikzplotlib.save(os.path.join(experiment_path, f"DATA_normalized_{exp_num}.tex"))
         plt.close(f)
 
         # store the first, middle and last test samples
@@ -670,7 +670,7 @@ def run_experiment(config):
     return 0
 
 num_data =  [5, 10, 20, 30, 50, 70, 100, 200] 
-data_kernel = ["LIN", "SE", "SE+SE"]
+data_kernel = ["LIN", "SE", "SE+SE", "MAT32", "LIN*SE", "PER*SE", "MAT32*PER", "MAT32+PER", "LIN*PER"]
 #data_kernel = ["SE", "RQ", "MAT32", "MAT52", "SE*SE",
 #               "SE+SE", "MAT32+SE", "MAT52+SE", "MAT32*SE", "PER",
 #               "PER*SE", "(SE+RQ)*PER", "SE+SE+SE", "MAT32+(MAT52*PER)"]
