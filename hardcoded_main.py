@@ -245,19 +245,10 @@ def optimize_hyperparameters(model, likelihood, **kwargs):
     find optimal hyperparameters either by BO or by starting from random initial values multiple times, using an optimizer every time
     and then returning the best result
     """
-    log_param_path = kwargs.get("log_param_path", False)
-    log_likelihood = kwargs.get("log_likelihood", False)
     random_restarts = kwargs.get("random_restarts", options["training"]["restarts"]+1)
-    line_search = kwargs.get("line_search", False)
-    BFGS_iter = kwargs.get("BFGS_iter", 50)
-    train_iterations = kwargs.get("train_iterations", 0)
     train_x = kwargs.get("X", model.train_inputs)
     train_y = kwargs.get("Y", model.train_targets)
-    with_BFGS = kwargs.get("with_BFGS", False)
-    history_size = kwargs.get("history_size", 100)
     MAP = kwargs.get("MAP", True)
-    prior = kwargs.get("prior", False)
-    granso = kwargs.get("granso", True)
     double_precision = kwargs.get("double_precision", False)
 
     # Set up the likelihood and model
@@ -299,7 +290,7 @@ def optimize_hyperparameters(model, likelihood, **kwargs):
 
     random_restarts = int(5)
     best_f = np.inf
-    for restart in range(random_restarts):
+    for _ in range(random_restarts):
         print(f"pre training parameters: {list(model.named_parameters())}")
         # Train the model using PyGRANSO
         # TODO write a try/except block around here and watch the stacktrace in case it explodes
@@ -335,8 +326,6 @@ def optimize_hyperparameters(model, likelihood, **kwargs):
     return loss, model, likelihood
 
 
-
-
 def run_experiment(config):
     """
     This contains the training, kernel search, evaluation, logging, plotting.
@@ -354,7 +343,6 @@ def run_experiment(config):
     train_iterations = 100
     LR = 0.1
     # noise =
-    data_scaling = True
     use_BFGS = False
     num_draws = 1000
     param_punishments = [0.0, -1.0, "BIC"]
@@ -394,7 +382,6 @@ def run_experiment(config):
 
     # Make predictions by feeding model through likelihood
     with torch.no_grad(), gpytorch.settings.prior_mode(True):
-        observed_pred_prior = data_likelihood(data_model(observations_x))
         f_preds = data_model(observations_x)
 
     original_observations_x = copy.deepcopy(observations_x)
@@ -449,11 +436,7 @@ def run_experiment(config):
             ax.plot(observations_x, test_observations_y[test_data_num], "-", color="blue")
             f.savefig(os.path.join(experiment_path, f"Test_data_{test_data_num}.png"))
 
-
-        #model_kernels = ["MAT32+PER"]
-        model_kernels = ["LIN*SE", "LIN*PER", "SE", "SE+SE", "MAT32", "LIN"]
-        #model_kernels = ["C*C*SE", "SE", "PER", "MAT32", "MAT32+SE", "MAT32*SE"]#"PER*SE", "PER+SE", "MAT32*PER", "MAT32+PER",
-        #model_kernels = ["MAT32*PER"]
+        model_kernels = ["LIN*SE", "LIN*PER", "SE", "SE+SE", "MAT32", "LIN", "PER*SE", "MAT32*PER", "MAT32+PER"]
 
         for model_kernel in tqdm(model_kernels):
             print(f"Data Kernel: {data_kernel}")
