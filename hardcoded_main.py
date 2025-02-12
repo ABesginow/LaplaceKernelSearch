@@ -29,7 +29,7 @@ from tqdm import tqdm
 
 
 def plot_model(model, likelihood, X, Y, return_figure=False, figure=None,
-               ax=None):
+               ax=None, loss_val=None, loss_type = None):
     interval_length = torch.max(X) - torch.min(X)
     shift = interval_length * options["plotting"]["border_ratio"]
     test_x = torch.linspace(torch.min(
@@ -62,6 +62,7 @@ def plot_model(model, likelihood, X, Y, return_figure=False, figure=None,
             ax.legend(loc="upper left")
         ax.set_xlabel("Normalized Input")
         ax.set_ylabel("Normalized Output")
+        ax.set_title(f"{loss_type}: {loss_val:.2f}")
     if not return_figure:
         plt.show()
     else:
@@ -86,14 +87,16 @@ class DataGPModel(gpytorch.models.ExactGP):
             self.covar_module = gpytorch.kernels.PeriodicKernel()
         elif kernel_text == "SE+SE":
             self.covar_module = gpytorch.kernels.RBFKernel()+gpytorch.kernels.RBFKernel()
+        elif kernel_text == "LIN*SE":
+            self.covar_module = gpytorch.kernels.RBFKernel()*gpytorch.kernels.RBFKernel()
         elif kernel_text == "SE*SE":
             self.covar_module = gpytorch.kernels.RBFKernel()*gpytorch.kernels.RBFKernel()
         elif kernel_text == "PER+SE":
             self.covar_module = gpytorch.kernels.PeriodicKernel() +gpytorch.kernels.RBFKernel()
         elif kernel_text == "PER*SE":
             self.covar_module = gpytorch.kernels.PeriodicKernel() * gpytorch.kernels.RBFKernel()
-        elif kernel_text == "PER*LIN":
-            self.covar_module = gpytorch.kernels.PeriodicKernel() * gpytorch.kernels.LinearKernel()
+        elif kernel_text == "LIN*PER":
+            self.covar_module = gpytorch.kernels.LinearKernel() * gpytorch.kernels.PeriodicKernel()
         elif kernel_text == "MAT32":
             self.covar_module = gpytorch.kernels.MaternKernel(nu=1.5)
         elif kernel_text == "MAT32*PER":
@@ -162,44 +165,44 @@ class ExactGPModel(gpytorch.models.ExactGP):
         elif kernel_text == "SE+SE":
             self.covar_module =  gpytorch.kernels.RBFKernel() + gpytorch.kernels.RBFKernel()
         elif kernel_text == "RQ":
-            self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.RQKernel())
+            self.covar_module = gpytorch.kernels.RQKernel()
         elif kernel_text == "PER":
-            self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.PeriodicKernel())
+            self.covar_module = gpytorch.kernels.PeriodicKernel()
         #elif kernel_text == "PER+SE":
         #    if weights is None:
         #        self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.PeriodicKernel()) + gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel())
         #    else:
         #        self.covar_module = weights[0]*gpytorch.kernels.PeriodicKernel() + weights[1]*gpytorch.kernels.RBFKernel()
         elif kernel_text == "PER*SE":
-            self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.PeriodicKernel()) * gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel())
+            self.covar_module = gpytorch.kernels.PeriodicKernel() * gpytorch.kernels.RBFKernel()
         #elif kernel_text == "PER*LIN":
         #    self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.PeriodicKernel()) * gpytorch.kernels.ScaleKernel(gpytorch.kernels.LinearKernel())
         elif kernel_text == "MAT32":
             self.covar_module = gpytorch.kernels.MaternKernel(nu=1.5)
         elif kernel_text == "MAT32+MAT52":
-            self.covar_module =  gpytorch.kernels.ScaleKernel(gpytorch.kernels.MaternKernel(nu=1.5)) + gpytorch.kernels.ScaleKernel(gpytorch.kernels.MaternKernel())
-        #elif kernel_text == "MAT32*PER":
-        #    self.covar_module =  gpytorch.kernels.ScaleKernel(gpytorch.kernels.MaternKernel(nu=1.5)) * gpytorch.kernels.ScaleKernel(gpytorch.kernels.PeriodicKernel())
+            self.covar_module =  gpytorch.kernels.MaternKernel(nu=1.5) + gpytorch.kernels.MaternKernel()
+        elif kernel_text == "MAT32*PER":
+            self.covar_module =  gpytorch.kernels.MaternKernel(nu=1.5) * gpytorch.kernels.PeriodicKernel()
         elif kernel_text == "MAT32+PER":
-            self.covar_module =  gpytorch.kernels.ScaleKernel(gpytorch.kernels.MaternKernel(nu=1.5)) + gpytorch.kernels.ScaleKernel(gpytorch.kernels.PeriodicKernel())
+            self.covar_module =  gpytorch.kernels.MaternKernel(nu=1.5) + gpytorch.kernels.PeriodicKernel()
         elif kernel_text == "MAT32*SE":
-            self.covar_module =  gpytorch.kernels.ScaleKernel(gpytorch.kernels.MaternKernel(nu=1.5)) * gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel())
+            self.covar_module =  gpytorch.kernels.MaternKernel(nu=1.5) * gpytorch.kernels.RBFKernel()
         elif kernel_text == "MAT32+SE":
-            self.covar_module =  gpytorch.kernels.ScaleKernel(gpytorch.kernels.MaternKernel(nu=1.5)) + gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel())
+            self.covar_module =  gpytorch.kernels.MaternKernel(nu=1.5) + gpytorch.kernels.RBFKernel()
         elif kernel_text == "MAT52":
-            self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.MaternKernel())
+            self.covar_module = gpytorch.kernels.MaternKernel()
         elif kernel_text == "MAT52*PER":
-            self.covar_module =  gpytorch.kernels.ScaleKernel(gpytorch.kernels.MaternKernel()) * gpytorch.kernels.ScaleKernel(gpytorch.kernels.PeriodicKernel())
+            self.covar_module =  gpytorch.kernels.MaternKernel() * gpytorch.kernels.PeriodicKernel()
         elif kernel_text == "MAT52+SE":
-            self.covar_module =  gpytorch.kernels.ScaleKernel(gpytorch.kernels.MaternKernel()) + gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel())
+            self.covar_module =  gpytorch.kernels.MaternKernel() + gpytorch.kernels.RBFKernel()
         elif kernel_text == "SE*SE":
-            self.covar_module =  gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel()) * gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel())
+            self.covar_module =  gpytorch.kernels.RBFKernel() * gpytorch.kernels.RBFKernel()
         elif kernel_text == "(SE+RQ)*PER":
-            self.covar_module =  (gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel()) + gpytorch.kernels.ScaleKernel(gpytorch.kernels.RQKernel())) * gpytorch.kernels.ScaleKernel(gpytorch.kernels.PeriodicKernel())
+            self.covar_module =  (gpytorch.kernels.RBFKernel() + gpytorch.kernels.RQKernel()) * gpytorch.kernels.PeriodicKernel()
         elif kernel_text == "SE+SE+SE":
-            self.covar_module =  gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel()) + gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel()) + gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel())
+            self.covar_module =  gpytorch.kernels.RBFKernel() + gpytorch.kernels.RBFKernel() + gpytorch.kernels.RBFKernel()
         elif kernel_text == "MAT32+(MAT52*PER)":
-            self.covar_module =  gpytorch.kernels.ScaleKernel(gpytorch.kernels.MaternKernel(nu=1.5)) + (gpytorch.kernels.ScaleKernel(gpytorch.kernels.MaternKernel()) * gpytorch.kernels.ScaleKernel(gpytorch.kernels.PeriodicKernel()))
+            self.covar_module =  gpytorch.kernels.MaternKernel(nu=1.5) + (gpytorch.kernels.MaternKernel() * gpytorch.kernels.PeriodicKernel())
 
         #elif kernel_text == "RQ*PER":
         #    self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.RQKernel()) * gpytorch.kernels.ScaleKernel(gpytorch.kernels.PeriodicKernel())
@@ -391,6 +394,8 @@ def run_experiment(config):
     all_observations_y = f_preds.sample_n(EXPERIMENT_REPITITIONS)
     test_observations_y = f_preds.sample_n(10)
     for (observations_y, exp_num) in tqdm(zip(all_observations_y, range(EXPERIMENT_REPITITIONS))):
+        if exp_num >= 1:
+            continue
         exp_num_result_dict = dict()
         for metric in metrics:
             exp_num_result_dict[metric] = dict()
@@ -490,7 +495,7 @@ def run_experiment(config):
                     model.eval()
                     likelihood.eval()
                     f, ax = plt.subplots()
-                    f, ax = plot_model(model, likelihood, observations_x, observations_y, True, f, ax)
+                    f, ax = plot_model(model, likelihood, observations_x, observations_y, True, f, ax, loss_val = loss, loss_type = "MLL")
                     ax.plot(observations_x, observations_y, 'k*')
                     image_time = time.time()
                     #Store the plots as .png
@@ -504,6 +509,10 @@ def run_experiment(config):
                     model.train()
                     likelihood.train()
                     pass
+
+
+
+                # TILL HERE
 
 
             if "MLL" in metrics:
@@ -594,7 +603,7 @@ def run_experiment(config):
                     model.eval()
                     likelihood.eval()
                     f, ax = plt.subplots()
-                    f, ax = plot_model(model, likelihood, observations_x, observations_y, True, f, ax)
+                    f, ax = plot_model(model, likelihood, observations_x, observations_y, True, f, ax, loss_val = loss, loss_type="MAP")
                     ax.plot(observations_x, observations_y, 'k*')
                     image_time = time.time()
                     #Store the plots as .png
@@ -607,7 +616,6 @@ def run_experiment(config):
                 except:
                     model.train()
                     likelihood.train()
-                    pass
 
             # Laplace approximation including prior requires different loss
             if "Laplace" in metrics:
@@ -641,7 +649,7 @@ def run_experiment(config):
             if "Nested" in metrics:
                 model.train()
                 likelihood.train()
-                logz_nested, nested_log = NestedSampling(model, store_full=True, pickle_directory=experiment_path)
+                logz_nested, nested_log = NestedSampling(model, store_full=True, pickle_directory=experiment_path, maxcall=3000000)
                 nested_logs = dict()
                 nested_logs["loss"] = logz_nested
                 nested_logs["details"] = nested_log
@@ -667,10 +675,9 @@ def run_experiment(config):
     with open(os.path.join(experiment_path, f"results.pickle"), 'wb') as fh:
         pickle.dump(logables, fh)
 
-    return 0
 
-num_data =  [5, 10, 20, 30, 50, 70, 100, 200] 
-data_kernel = ["LIN", "SE", "SE+SE", "MAT32", "LIN*SE", "PER*SE", "MAT32*PER", "MAT32+PER", "LIN*PER"]
+num_data =  [20, 50, 70, 100, 200, 5, 10, 30] 
+data_kernel = ["LIN", "SE", "SE+SE", "MAT32", "LIN*SE", "PER*SE", "MAT32*PER", "MAT32+PER", "LIN*PER", "PER"]
 #data_kernel = ["SE", "RQ", "MAT32", "MAT52", "SE*SE",
 #               "SE+SE", "MAT32+SE", "MAT52+SE", "MAT32*SE", "PER",
 #               "PER*SE", "(SE+RQ)*PER", "SE+SE+SE", "MAT32+(MAT52*PER)"]
@@ -679,5 +686,7 @@ data_kernel = ["LIN", "SE", "SE+SE", "MAT32", "LIN*SE", "PER*SE", "MAT32*PER", "
 #               "PER*SE", "(SE+RQ)*PER", "SE+SE+SE", "MAT32+(MAT52*PER)"]
 temp = product(num_data, data_kernel)
 configs = [{"num_data": n, "data_kernel": dat} for n, dat in temp]
+print(configs)
 for config in configs:
+    print(config)
     run_experiment(config)
