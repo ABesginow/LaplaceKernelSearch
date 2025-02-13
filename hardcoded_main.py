@@ -28,6 +28,68 @@ import torch
 from tqdm import tqdm
 
 
+
+def plot_3d_gp_samples(samples, xx, yy, return_figure=False):
+    """
+    Visualize multiple samples drawn from a 2D-input (xx, yy) -> 1D-output GP in 3D.
+    Each sample in 'samples' should be a 1D tensor that can be reshaped to match xx, yy.
+    """
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    if samples.ndim == 1:
+        samples = samples.unsqueeze(0)
+    for i, sample in enumerate(samples):
+        z_vals = sample.reshape(xx.shape)
+        ax.plot_surface(xx.numpy(), yy.numpy(), z_vals.numpy(), alpha=0.4)
+
+    ax.set_title('GP Samples in 3D')
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Output')
+    if not return_figure:
+        plt.show()
+    else:
+        return fig, ax
+
+def plot_3d_gp(model, likelihood, x_min=0.0, x_max=1.0, y_min=0.0, y_max=1.0,
+                resolution=50, return_figure=False):
+
+    model.eval()
+    likelihood.eval()
+
+    x_vals = torch.linspace(x_min, x_max, resolution)
+    y_vals = torch.linspace(y_min, y_max, resolution)
+    xx, yy = torch.meshgrid(x_vals, y_vals)
+    test_x = torch.stack([xx.reshape(-1), yy.reshape(-1)], dim=-1)
+
+    with torch.no_grad():
+        preds = likelihood(model(test_x))
+        mean = preds.mean.reshape(resolution, resolution)
+        lower, upper = preds.confidence_region()
+        lower = lower.reshape(resolution, resolution)
+        upper = upper.reshape(resolution, resolution)
+
+    fig = plt.figure(figsize=(8, 6))
+    ax = fig.add_subplot(111, projection='3d')
+
+    # Plot mean surface
+    ax.plot_surface(xx.numpy(), yy.numpy(), mean.numpy(), cmap='viridis', alpha=0.8)
+
+    # Plot lower and upper surfaces
+    ax.plot_surface(xx.numpy(), yy.numpy(), lower.numpy(), color='gray', alpha=0.2)
+    ax.plot_surface(xx.numpy(), yy.numpy(), upper.numpy(), color='gray', alpha=0.2)
+
+    ax.set_title('2D GP in 3D')
+    ax.set_xlabel('X1')
+    ax.set_ylabel('X2')
+    ax.set_zlabel('Mean and Variance Range')
+
+    if not return_figure:
+        plt.show()
+    else:
+        return fig, ax
+
+
 def plot_model(model, likelihood, X, Y, return_figure=False, figure=None,
                ax=None, loss_val=None, loss_type = None):
     interval_length = torch.max(X) - torch.min(X)
@@ -217,6 +279,44 @@ class ExactGPModel(gpytorch.models.ExactGP):
         return gpytorch.distributions.MultivariateNormal(mean_x, covar_x)
 
 
+class DataMIGPModel(gpytorch.models.ExactGP):
+    def __init__(self, train_x, train_y, likelihood, kernel_text="RBF", weights=None):
+        super(DataMIGPModel, self).__init__(train_x, train_y, likelihood)
+        self.mean_module = gpytorch.means.ZeroMean()
+        if kernel_text == "[RBF; RBF]":
+            self.covar_module = gpytorch.kernels.AdditiveStructureKernel(gpytorch.kernels.RBFKernel(active_dims=0) + gpytorch.kernels.RBFKernel(active_dims=1), num_dims=2)
+        elif kernel_text == "[RBF; RBF_ell2]":
+            self.covar_module = gpytorch.kernels.AdditiveStructureKernel(gpytorch.kernels.RBFKernel(active_dims=0) + gpytorch.kernels.RBFKernel(active_dims=1), num_dims=2)
+        elif kernel_text == "[RBF; LIN]":
+            self.covar_module = gpytorch.kernels.AdditiveStructureKernel(gpytorch.kernels.RBFKernel(active_dims=0) + gpytorch.kernels.LinearKernel(active_dims=1), num_dims=2)
+        elif kernel_text == "[LIN; RBF]":
+            self.covar_module = gpytorch.kernels.AdditiveStructureKernel(gpytorch.kernels.LinearKernel(active_dims=0) + gpytorch.kernels.RBFKernel(active_dims=1), num_dims=2)
+
+    def forward(self, x):
+        mean_x = self.mean_module(x)
+        covar_x = self.covar_module(x)
+        return gpytorch.distributions.MultivariateNormal(mean_x, covar_x)
+        
+
+class ExactMIGPModel(gpytorch.models.ExactGP):
+    def __init__(self, train_x, train_y, likelihood, kernel_text="RBF", weights=None):
+        super(ExactMIGPModel, self).__init__(train_x, train_y, likelihood)
+        self.mean_module = gpytorch.means.ZeroMean()
+        if kernel_text == "[RBF; RBF]":
+            self.covar_module = gpytorch.kernels.AdditiveStructureKernel(gpytorch.kernels.RBFKernel(active_dims=0) + gpytorch.kernels.RBFKernel(active_dims=1), num_dims=2)
+        elif kernel_text == "[RBF; LIN]":
+            self.covar_module = gpytorch.kernels.AdditiveStructureKernel(gpytorch.kernels.RBFKernel(active_dims=0) + gpytorch.kernels.LinearKernel(active_dims=1), num_dims=2)
+        elif kernel_text == "[LIN; RBF]":
+            self.covar_module = gpytorch.kernels.AdditiveStructureKernel(gpytorch.kernels.LinearKernel(active_dims=0) + gpytorch.kernels.RBFKernel(active_dims=1), num_dims=2)
+
+
+    def forward(self, x):
+        mean_x = self.mean_module(x)
+        covar_x = self.covar_module(x)
+        return gpytorch.distributions.MultivariateNormal(mean_x, covar_x)
+
+
+
 def load_config(config_file):
     with open(os.path.join("configs", config_file), "r") as configfile:
         temp = configfile.readlines()
@@ -329,7 +429,7 @@ def optimize_hyperparameters(model, likelihood, **kwargs):
     return loss, model, likelihood
 
 
-def run_experiment(config):
+def run_experiment(config, MI=False):
     """
     This contains the training, kernel search, evaluation, logging, plotting.
     It takes an input file, processes the whole training, evaluation and log
@@ -338,8 +438,8 @@ def run_experiment(config):
     """
     torch.manual_seed(43)
     metrics = ["AIC", "BIC", "Laplace", "MLL", "MAP", "Nested"] #"MC",
-    eval_START = -5
-    eval_END = 5
+    eval_START = -1 
+    eval_END = 1 
     eval_COUNT = config["num_data"]
     optimizer = "PyGRANSO"
     data_kernel = config["data_kernel"]
@@ -371,19 +471,41 @@ def run_experiment(config):
     }
     logables["attributes"] = attributes
     logables["results"] = list()
+   
+    if MI: 
+        prior_x = torch.tensor(list(product(torch.linspace(0, 1, 1), torch.linspace(0, 1, 1))))
+        prior_y = torch.linspace(0, 1, 1) 
+        # initialize likelihood and model
+        data_likelihood = gpytorch.likelihoods.GaussianLikelihood()
+        data_model = DataMIGPModel(prior_x, prior_y, data_likelihood, kernel_text=data_kernel)
+        # Hardcoded variant to just modify the kernel on the second channel
+        # This is regexable if I want to in a general fashion
+        if "ell" in data_kernel:
+            list(data_model.named_parameters())[2][1].data = torch.tensor([[0.5]])
 
-    # training data for model initialization (e.g. 1 point with x=0, y=0) ; this makes initializing the model easier
-    prior_x = torch.linspace(0, 1, 1)
-    prior_y = prior_x
-    # initialize likelihood and model
-    data_likelihood = gpytorch.likelihoods.GaussianLikelihood()
-    data_model = DataGPModel(prior_x, prior_y, data_likelihood, kernel_text=data_kernel)
-    observations_x = torch.linspace(eval_START, eval_END, eval_COUNT)
-    # Get into evaluation (predictive posterior) mode
-    data_model.eval()
-    data_likelihood.eval()
+        x_vals = torch.linspace(eval_START, eval_END, eval_COUNT)
+        y_vals = torch.linspace(eval_START, eval_END, eval_COUNT)
+        xx, yy = torch.meshgrid(x_vals, y_vals)
+        observations_x = torch.stack([xx.reshape(-1), yy.reshape(-1)], dim=-1)
+        # Get into evaluation (predictive posterior) mode
+        data_model.eval()
+        data_likelihood.eval()
 
-    # Make predictions by feeding model through likelihood
+    else:
+        # training data for model initialization (e.g. 1 point with x=0, y=0) ; this makes initializing the model easier
+        prior_x = torch.linspace(0, 1, 1)
+        prior_y = prior_x
+    
+        # initialize likelihood and model
+        data_likelihood = gpytorch.likelihoods.GaussianLikelihood()
+        data_model = DataGPModel(prior_x, prior_y, data_likelihood, kernel_text=data_kernel)
+        observations_x = torch.linspace(eval_START, eval_END, eval_COUNT)
+
+        # Get into evaluation (predictive posterior) mode
+        data_model.eval()
+        data_likelihood.eval()
+
+        # Make predictions by feeding model through likelihood
     with torch.no_grad(), gpytorch.settings.prior_mode(True):
         f_preds = data_model(observations_x)
 
@@ -404,8 +526,9 @@ def run_experiment(config):
         # To store performance of kernels on a test dataset (i.e. more samples)
         exp_num_result_dict["test likelihood"] = dict()
         exp_num_result_dict["test likelihood(MAP)"] = dict()
-        observations_x = (observations_x - torch.mean(observations_x)
-                        ) / torch.std(observations_x)
+        if not MI:
+            observations_x = (observations_x - torch.mean(observations_x)
+                            ) / torch.std(observations_x)
         noise_level = torch.sqrt(torch.tensor(0.1))
         original_observations_y = copy.deepcopy(observations_y)
         observations_y = observations_y + torch.randn(observations_y.shape) * noise_level
@@ -413,35 +536,59 @@ def run_experiment(config):
         #                  ) / torch.std(observations_y)
 
         experiment_path = os.path.join("results", "hardcoded", f"{eval_COUNT}_{data_kernel}")
+
+        print(f"PATH: {experiment_path}")
+
         if not os.path.exists(experiment_path):
             os.makedirs(experiment_path)
-        f, ax = plt.subplots()
-        ax.plot(original_observations_x, original_observations_y, 'k*')
-        ax.plot(original_observations_x, original_observations_y, '-', color="blue")
+        if MI:
+            # Head (samples, xx, yy)
+            f, ax = plot_3d_gp_samples(original_observations_y, xx, yy, return_figure=True)
+        else:
+            f, ax = plt.subplots()
+            ax.plot(original_observations_x, original_observations_y, 'k*')
+            ax.plot(original_observations_x, original_observations_y, '-', color="blue")
         #Store the plots as .png
         f.savefig(os.path.join(experiment_path, f"DATA_{exp_num}.png"))
-        #Store the plots as .tex
-        tikzplotlib.save(os.path.join(experiment_path, f"DATA_{exp_num}.tex"))
+        if MI:
+            f.savefig(os.path.join(experiment_path, f"DATA_{exp_num}.pgf"))
+        else:   
+            #Store the plots as .tex
+            tikzplotlib.save(os.path.join(experiment_path, f"DATA_{exp_num}.tex"))
         plt.close(f)
 
 
-        f, ax = plt.subplots()
-        ax.plot(observations_x, observations_y, 'k*')
-        ax.plot(observations_x, observations_y, '-', color="blue")
+        if MI:
+            # Head (samples, xx, yy)
+            f, ax = plot_3d_gp_samples(observations_y, xx, yy, return_figure=True)
+        else:
+            f, ax = plt.subplots()
+            ax.plot(observations_x, observations_y, 'k*')
+            ax.plot(observations_x, observations_y, '-', color="blue")
         #Store the plots as .png
         f.savefig(os.path.join(experiment_path, f"DATA_normalized_{exp_num}.png"))
-        #Store the plots as .tex
-        tikzplotlib.save(os.path.join(experiment_path, f"DATA_normalized_{exp_num}.tex"))
+        if MI:
+            f.savefig(os.path.join(experiment_path, f"DATA_normalized_{exp_num}.pgf"))
+        else:
+            #Store the plots as .tex
+            tikzplotlib.save(os.path.join(experiment_path, f"DATA_normalized_{exp_num}.tex"))
         plt.close(f)
 
         # store the first, middle and last test samples
         for test_data_num in [0, 5, 9]:
-            f, ax = plt.subplots()
-            ax.plot(observations_x, test_observations_y[test_data_num], "k*")
-            ax.plot(observations_x, test_observations_y[test_data_num], "-", color="blue")
+            if MI:
+                # Head (samples, xx, yy)
+                f, ax = plot_3d_gp_samples(test_observations_y[test_data_num], xx, yy, return_figure=True)
+            else:
+                f, ax = plt.subplots()
+                ax.plot(observations_x, test_observations_y[test_data_num], "k*")
+                ax.plot(observations_x, test_observations_y[test_data_num], "-", color="blue")
             f.savefig(os.path.join(experiment_path, f"Test_data_{test_data_num}.png"))
 
-        model_kernels = ["LIN*SE", "LIN*PER", "SE", "SE+SE", "MAT32", "LIN", "PER*SE", "MAT32*PER", "MAT32+PER"]
+        if MI:
+            model_kernels = ["[RBF; RBF]", "[RBF; LIN]", "[LIN; RBF]"]
+        else:
+            model_kernels = ["LIN*SE", "LIN*PER", "SE", "SE+SE", "MAT32", "LIN", "PER*SE", "MAT32*PER", "MAT32+PER"]
 
         for model_kernel in tqdm(model_kernels):
             print(f"Data Kernel: {data_kernel}")
@@ -456,8 +603,12 @@ def run_experiment(config):
                 likelihood = gpytorch.likelihoods.GaussianLikelihood()
                 # list_of_variances = [float(variance_list_variance) for i in range(28)]
                 model = None
-                model = ExactGPModel(
-                    observations_x, observations_y, likelihood, model_kernel)
+                if MI:
+                    model = ExactMIGPModel(
+                        observations_x, observations_y, likelihood, model_kernel)
+                else:
+                    model = ExactGPModel(
+                        observations_x, observations_y, likelihood, model_kernel)
                 for i in range(100):
                     try:
                         train_start = time.time()
@@ -469,16 +620,26 @@ def run_experiment(config):
                         train_end = time.time()
                         break
                     except Exception as E:
+                        import pdb
+                        pdb.set_trace()
                         print(f"Error:{E}")
                         print(f"Data:{data_kernel}")
                         print(f"Model:{model_kernel}")
                         model = None
-                        model = ExactGPModel(
-                            observations_x, observations_y, likelihood, model_kernel)
+                        if MI:
+                            model = ExactMIGPModel(
+                                observations_x, observations_y, likelihood, model_kernel)
+                        else:
+                            model = ExactGPModel(
+                                observations_x, observations_y, likelihood, model_kernel)
                         continue
                 if loss is np.nan:
                     raise ValueError("training fucked up")
                 train_time = train_end - train_start
+
+                print("===========================")
+                print(f"Trained parameters (MLL): {list(model.named_parameters())}")
+                print("===========================")
             if "Likelihood Laplace" in metrics:
                 Laplace_logs = {param_punish : {} for param_punish in param_punishments}
                 for parameter_punishment in param_punishments:
@@ -492,16 +653,31 @@ def run_experiment(config):
 
             if any([m in metrics for m in ["MLL", "AIC", "BIC"]]):
                 try:
-                    model.eval()
-                    likelihood.eval()
-                    f, ax = plt.subplots()
-                    f, ax = plot_model(model, likelihood, observations_x, observations_y, True, f, ax, loss_val = loss, loss_type = "MLL")
-                    ax.plot(observations_x, observations_y, 'k*')
+                    if MI:
+                        #import pdb; pdb.set_trace()
+                        print("MLL CASE")
+                        f, ax = plot_3d_gp(model, likelihood, x_min=eval_START, x_max=eval_END, y_min=eval_START, y_max=eval_END, resolution=100, return_figure=True)
+                        if observations_y.ndim == 1:
+                            samples = observations_y.unsqueeze(0)
+                        else:
+                            samples = observations_y
+                        for i, sample in enumerate(samples):
+                            z_vals = sample.reshape(xx.shape)
+                            ax.plot_surface(xx, yy, z_vals.numpy(), alpha=0.2, color="red")
+                    else:
+                        model.eval()
+                        likelihood.eval()
+                        f, ax = plt.subplots()
+                        f, ax = plot_model(model, likelihood, observations_x, observations_y, True, f, ax, loss_val = loss, loss_type = "MLL")
+                        ax.plot(observations_x, observations_y, 'k*')
                     image_time = time.time()
                     #Store the plots as .png
                     f.savefig(os.path.join(experiment_path, f"{experiment_keyword}_MLL.png"))
-                    #Store the plots as .tex
-                    tikzplotlib.save(os.path.join(experiment_path, f"{experiment_keyword}_MLL.tex"))
+                    if MI:
+                        f.savefig(os.path.join(experiment_path, f"{experiment_keyword}_MLL.pgf"))
+                    else:
+                        #Store the plots as .tex
+                        tikzplotlib.save(os.path.join(experiment_path, f"{experiment_keyword}_MLL.tex"))
                     plt.close(f)
                     model.train()
                     likelihood.train()
@@ -572,8 +748,12 @@ def run_experiment(config):
                 likelihood = gpytorch.likelihoods.GaussianLikelihood()
                 # list_of_variances = [float(variance_list_variance) for i in range(28)]
                 model = None
-                model = ExactGPModel(
-                    observations_x, observations_y, likelihood, model_kernel)
+                if MI:
+                    model = ExactMIGPModel(
+                        observations_x, observations_y, likelihood, model_kernel)
+                else:
+                    model = ExactGPModel(
+                        observations_x, observations_y, likelihood, model_kernel)
                 for i in range(100):
                     try:
                         train_start = time.time()
@@ -587,11 +767,18 @@ def run_experiment(config):
                     except Exception as E:
                         print(E)
                         model = None
-                        model = ExactGPModel(
-                            observations_x, observations_y, likelihood, model_kernel)
+                        if MI:
+                            model = ExactMIGPModel(
+                                observations_x, observations_y, likelihood, model_kernel)
+                        else:
+                            model = ExactGPModel(
+                                observations_x, observations_y, likelihood, model_kernel)
                         continue
                 if loss is np.nan:
                     raise ValueError("training fucked up")
+                print("===========================")
+                print(f"Trained parameters (MAP): {list(model.named_parameters())}")
+                print("===========================")
                 if "MAP" in metrics:
                     MAP_logs = dict()
                     MAP_logs["loss"] = -loss * len(observations_x)
@@ -600,16 +787,33 @@ def run_experiment(config):
                     exp_num_result_dict["MAP"][model_kernel] = MAP_logs
 
                 try:
-                    model.eval()
-                    likelihood.eval()
-                    f, ax = plt.subplots()
-                    f, ax = plot_model(model, likelihood, observations_x, observations_y, True, f, ax, loss_val = loss, loss_type="MAP")
-                    ax.plot(observations_x, observations_y, 'k*')
+                    if MI:
+                        #import pdb;pdb.set_trace()
+                        print("MAP CASE")
+                        f, ax = plot_3d_gp(model, likelihood, x_min=eval_START, x_max=eval_END, y_min=eval_START, y_max=eval_END, resolution=100, return_figure=True)
+                        if observations_y.ndim == 1:
+                            samples = observations_y.unsqueeze(0)
+                        else:
+                            samples = observations_y
+                        for i, sample in enumerate(samples):
+                            z_vals = sample.reshape(xx.shape)
+                            ax.plot_surface(xx, yy, z_vals.numpy(), alpha=0.2, color="red")
+                             
+                        #f, ax = plot_3d_gp(model, likelihood, x_min=0.0, x_max=1.0, y_min=0.0, y_max=1.0, resolution=100, return_figure=True)
+                    else:
+                        model.eval()
+                        likelihood.eval()
+                        f, ax = plt.subplots()
+                        f, ax = plot_model(model, likelihood, observations_x, observations_y, True, f, ax, loss_val = loss, loss_type="MAP")
+                        ax.plot(observations_x, observations_y, 'k*')
                     image_time = time.time()
                     #Store the plots as .png
                     f.savefig(os.path.join(experiment_path, f"{experiment_keyword}_MAP.png"))
-                    #Store the plots as .tex
-                    tikzplotlib.save(os.path.join(experiment_path, f"{experiment_keyword}_MAP.tex"))
+                    if MI:
+                        f.savefig(os.path.join(experiment_path, f"{experiment_keyword}_MAP.pgf"))
+                    else:
+                        #Store the plots as .tex
+                        tikzplotlib.save(os.path.join(experiment_path, f"{experiment_keyword}_MAP.tex"))
                     plt.close(f)
                     model.train()
                     likelihood.train()
@@ -649,11 +853,13 @@ def run_experiment(config):
             if "Nested" in metrics:
                 model.train()
                 likelihood.train()
-                logz_nested, nested_log = NestedSampling(model, store_full=True, pickle_directory=experiment_path, maxcall=3000000)
+                #logz_nested, nested_log = NestedSampling(model, store_full=True, pickle_directory=experiment_path, maxcall=3000000)
+                logz_nested, nested_log = NestedSampling(model, store_full=True, pickle_directory=experiment_path, maxcall=30000)
                 nested_logs = dict()
                 nested_logs["loss"] = logz_nested
                 nested_logs["details"] = nested_log
                 exp_num_result_dict["Nested"][model_kernel] = nested_logs
+
 
             # Perform MCMC
             if "MC" in metrics:
@@ -676,17 +882,14 @@ def run_experiment(config):
         pickle.dump(logables, fh)
 
 
-num_data =  [20, 50, 70, 100, 200, 5, 10, 30] 
-data_kernel = ["LIN", "SE", "SE+SE", "MAT32", "LIN*SE", "PER*SE", "MAT32*PER", "MAT32+PER", "LIN*PER", "PER"]
-#data_kernel = ["SE", "RQ", "MAT32", "MAT52", "SE*SE",
-#               "SE+SE", "MAT32+SE", "MAT52+SE", "MAT32*SE", "PER",
-#               "PER*SE", "(SE+RQ)*PER", "SE+SE+SE", "MAT32+(MAT52*PER)"]
-#data_kernel = ["SE", "RQ", "MAT32", "MAT52", "SE*SE",
-#               "SE+SE", "MAT32+SE", "MAT52+SE", "MAT32*SE", "PER",
-#               "PER*SE", "(SE+RQ)*PER", "SE+SE+SE", "MAT32+(MAT52*PER)"]
-temp = product(num_data, data_kernel)
+num_data =  [20, 5, 10 ] #[20, 50, 70, 100, 200, 5, 10, 30] 
+#data_kernel = ["LIN", "SE", "SE+SE", "MAT32", "LIN*SE", "PER*SE", "MAT32*PER", "MAT32+PER", "LIN*PER", "PER"]
+MI_data_kernel = ["[RBF; RBF]", "[RBF; RBF_ell2]", "[RBF; LIN]", "[LIN; RBF]"]
+
+#temp = product(num_data, data_kernel)
+temp = product(num_data, MI_data_kernel)
 configs = [{"num_data": n, "data_kernel": dat} for n, dat in temp]
 print(configs)
 for config in configs:
     print(config)
-    run_experiment(config)
+    run_experiment(config, MI=True)

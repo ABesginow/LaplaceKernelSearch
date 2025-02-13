@@ -11,6 +11,8 @@ def get_kernels_in_kernel_expression(kernel_expression):
         for kernel in kernel_expression.kernels:
             ret.extend(get_kernels_in_kernel_expression(kernel))
         return ret
+    elif kernel_expression._get_name() == "AdditiveStructureKernel":
+        return get_kernels_in_kernel_expression(kernel_expression.base_kernel)
     elif kernel_expression._get_name() == "ScaleKernel":
         return get_kernels_in_kernel_expression(kernel_expression.base_kernel)
     elif kernel_expression._get_name() == "GridKernel":
@@ -31,6 +33,9 @@ def get_full_kernels_in_kernel_expression(kernel_expression):
             kernel_list.extend(get_full_kernels_in_kernel_expression(kernel))
     elif kernel_expression._get_name() in ["ScaleKernel", "GridKernel"]:
         kernel_list.extend([kernel_expression._get_name()])
+        kernel_list.extend(get_full_kernels_in_kernel_expression(
+            kernel_expression.base_kernel))
+    elif kernel_expression._get_name() in ["AdditiveStructureKernel"]:
         kernel_list.extend(get_full_kernels_in_kernel_expression(
             kernel_expression.base_kernel))
     else:
@@ -55,6 +60,8 @@ def get_string_representation_of_kernel(kernel_expression):
         for k in kernel_expression.kernels:
             s += get_string_representation_of_kernel(k) + " + "
         return "(" + s[:-3] + ")"
+    elif kernel_expression._get_name() == "AdditiveStructureKernel":
+        return get_string_representation_of_kernel(kernel_expression.base_kernel)
     elif kernel_expression._get_name() == "ProductKernel":
         s = ""
         for k in kernel_expression.kernels:
