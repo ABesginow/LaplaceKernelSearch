@@ -166,38 +166,41 @@ def Eigenvalue_correction(hessian, param_punish_term):
     return corrected_hessian, torch.diag(constructed_eigvals), num_replaced
         
 
-def Eigenvalue_correction_likelihood_laplace(hessian, theta_mu, params, sigma, param_punish_term):
-    # Appendix E.4
-    vals, vecs = torch.linalg.eigh(hessian)
-    #vecs = vecs.real
-    theta_bar = vecs@(theta_mu - params)
-    sigma_bar = vecs@sigma@vecs.t()
+#def Eigenvalue_correction_likelihood_laplace(hessian, theta_mu, params, sigma, param_punish_term):
+#    # Appendix E.4
+#    vals, vecs = torch.linalg.eigh(hessian)
+#    #vecs = vecs.real
+#    theta_bar = vecs@(theta_mu - params)
+#    sigma_bar = vecs@sigma@vecs.t()
+#
+#    def cor(i):
+#        import pdb
+#        c = (theta_bar[i])**2/sigma_bar[i][i]
+#        lamw_val = np.real(lambertw(c * torch.exp(c + 2*param_punish_term)))
+#        return (c/(sigma_bar[i][i]*lamw_val) - 1/sigma_bar[i][i])
+#
+#        # return -((trans_theta_mu[i] - trans_params[i])**2 /
+#        #          (np.real(lambertw((trans_theta_mu[i] - trans_params[i])**2
+#        #                            * 1/trans_sigma[i][i]
+#        #                            * torch.exp((trans_theta_mu[i] - trans_params[i])**2
+#        #                                        * 1/trans_sigma[i][i]-param_punish_term)))
+#        #           * trans_sigma[i][i]**2)+
+#        #           (1/trans_sigma[i][i])
+#
+#    constructed_eigvals = torch.diag(torch.Tensor(
+#        [max(val, cor(i)) for i, val in enumerate(vals)]))
+#    num_replaced = torch.count_nonzero(vals - torch.diag(constructed_eigvals))
+#    corrected_hessian = vecs@constructed_eigvals@vecs.t()
+#    #print(f"new vals: {torch.linalg.eigh(corrected_hessian)[0]}")
+#    if any(torch.diag(constructed_eigvals) < -1e-10):
+#        print("Something went horribly wrong with the c(i)s")
+#        import pdb
+#        pdb.set_trace()
+#        print(constructed_eigvals)
+#    return corrected_hessian, torch.diag(constructed_eigvals), num_replaced
+#
 
-    def cor(i):
-        import pdb
-        c = (theta_bar[i])**2/sigma_bar[i][i]
-        lamw_val = np.real(lambertw(c * torch.exp(c + 2*param_punish_term)))
-        return (c/(sigma_bar[i][i]*lamw_val) - 1/sigma_bar[i][i])
 
-        # return -((trans_theta_mu[i] - trans_params[i])**2 /
-        #          (np.real(lambertw((trans_theta_mu[i] - trans_params[i])**2
-        #                            * 1/trans_sigma[i][i]
-        #                            * torch.exp((trans_theta_mu[i] - trans_params[i])**2
-        #                                        * 1/trans_sigma[i][i]-param_punish_term)))
-        #           * trans_sigma[i][i]**2)+
-        #           (1/trans_sigma[i][i])
-
-    constructed_eigvals = torch.diag(torch.Tensor(
-        [max(val, cor(i)) for i, val in enumerate(vals)]))
-    num_replaced = torch.count_nonzero(vals - torch.diag(constructed_eigvals))
-    corrected_hessian = vecs@constructed_eigvals@vecs.t()
-    #print(f"new vals: {torch.linalg.eigh(corrected_hessian)[0]}")
-    if any(torch.diag(constructed_eigvals) < -1e-10):
-        print("Something went horribly wrong with the c(i)s")
-        import pdb
-        pdb.set_trace()
-        print(constructed_eigvals)
-    return corrected_hessian, torch.diag(constructed_eigvals), num_replaced
 def calculate_laplace(model, loss_of_model, variances_list=None, likelihood_laplace=False, param_punish_term = -1.0, **kwargs):
     torch.set_default_tensor_type(torch.DoubleTensor)
     """
@@ -333,74 +336,49 @@ def calculate_laplace(model, loss_of_model, variances_list=None, likelihood_lapl
                 import pdb
                 pdb.set_trace()
                 print(constructed_eigvals_log)
-    else:
-        # Appendix E.3
-        # Hessian correcting part (for Eigenvalues < 0 < c(i)  )
-        start = time.time()
-        hessian, constructed_eigvals_log, num_replaced = Eigenvalue_correction_likelihood_laplace(
-            hessian, theta_mu, params, variance, param_punish_term)
-        end = time.time()
-        #print(f"{num_replaced}")
-        hessian_correction_time = end - start
+    #else:
+    #    # Appendix E.3
+    #    # Hessian correcting part (for Eigenvalues < 0 < c(i)  )
+    #    start = time.time()
+    #    hessian, constructed_eigvals_log, num_replaced = Eigenvalue_correction_likelihood_laplace(
+    #        hessian, theta_mu, params, variance, param_punish_term)
+    #    end = time.time()
+    #    #print(f"{num_replaced}")
+    #    hessian_correction_time = end - start
 
-        start = time.time()
-        # Here comes what's wrapped in the exp-function:
-        thetas_added = params-theta_mu
-        thetas_added_transposed = (params-theta_mu).reshape(1, -1)
-        middle_term = (variance.inverse()-hessian).inverse()
-        matmuls = thetas_added_transposed @ variance.inverse() @ middle_term @ hessian @ thetas_added
+    #    start = time.time()
+    #    # Here comes what's wrapped in the exp-function:
+    #    thetas_added = params-theta_mu
+    #    thetas_added_transposed = (params-theta_mu).reshape(1, -1)
+    #    middle_term = (variance.inverse()-hessian).inverse()
+    #    matmuls = thetas_added_transposed @ variance.inverse() @ middle_term @ hessian @ thetas_added
 
-        # This can probably also be "-0.5 matmuls" where "matmuls" is based on the negative MLL
-        punish_term = - (1/2)*torch.log(variance.det()) - (1/2)*torch.log((variance.inverse()+hessian).det()) - (1/2) * matmuls
-        matmuls_without_replacement = thetas_added_transposed @ variance.inverse() @ middle_term @ oldHessian @ thetas_added
-        punish_without_replacement = - (1/2)*torch.log(variance.det()) - (1/2)*torch.log((variance.inverse()+oldHessian).det()) - (1/2) * matmuls_without_replacement
-        laplace = loss_of_model + punish_term
-        end = time.time()
-        approximation_time = end - start
+    #    # This can probably also be "-0.5 matmuls" where "matmuls" is based on the negative MLL
+    #    punish_term = - (1/2)*torch.log(variance.det()) - (1/2)*torch.log((variance.inverse()+hessian).det()) - (1/2) * matmuls
+    #    matmuls_without_replacement = thetas_added_transposed @ variance.inverse() @ middle_term @ oldHessian @ thetas_added
+    #    punish_without_replacement = - (1/2)*torch.log(variance.det()) - (1/2)*torch.log((variance.inverse()+oldHessian).det()) - (1/2) * matmuls_without_replacement
+    #    laplace = loss_of_model + punish_term
+    #    end = time.time()
+    #    approximation_time = end - start
 
-        #print(f"mll - 1/2 log variance - 1/2 log variance H + matmuls\n{mll} - {(1/2)*torch.log(variance.det())} - {(1/2)*torch.log((variance.inverse()-hessian).det())} + {(1/2) * matmuls}")
-        D = torch.diag(constructed_eigvals_log)
-        variance_h = T@(variance.inverse())@T.t() 
-        #print(f"logdet variance H; matmul\n {0.5*torch.log(torch.linalg.det(variance_h - D))} ; {0.5*(thetas_added.t()@T.t())@variance_h@((variance_h - D).inverse())@D@(T@thetas_added)}")
-        if param_punish_term == -1.0:
-            if (len(theta_mu) + punish_term) > 1e-4:
-                print("Something went horribly wrong with the c(i)s")
-                import pdb
-                pdb.set_trace()
-                print(constructed_eigvals_log)
-        else:
-            if (len(theta_mu) + punish_term) > len(theta_mu):
-                print("Something went horribly wrong with the c(i)s")
-                import pdb
-                pdb.set_trace()
-                print(constructed_eigvals_log)
+    #    #print(f"mll - 1/2 log variance - 1/2 log variance H + matmuls\n{mll} - {(1/2)*torch.log(variance.det())} - {(1/2)*torch.log((variance.inverse()-hessian).det())} + {(1/2) * matmuls}")
+    #    D = torch.diag(constructed_eigvals_log)
+    #    variance_h = T@(variance.inverse())@T.t() 
+    #    #print(f"logdet variance H; matmul\n {0.5*torch.log(torch.linalg.det(variance_h - D))} ; {0.5*(thetas_added.t()@T.t())@variance_h@((variance_h - D).inverse())@D@(T@thetas_added)}")
+    #    if param_punish_term == -1.0:
+    #        if (len(theta_mu) + punish_term) > 1e-4:
+    #            print("Something went horribly wrong with the c(i)s")
+    #            import pdb
+    #            pdb.set_trace()
+    #            print(constructed_eigvals_log)
+    #    else:
+    #        if (len(theta_mu) + punish_term) > len(theta_mu):
+    #            print("Something went horribly wrong with the c(i)s")
+    #            import pdb
+    #            pdb.set_trace()
+    #            print(constructed_eigvals_log)
 
 
-        #if any(constructed_eigvals_log < 0):
-        #    print("Something went horribly wrong with the c(i)s")
-        #    import pdb
-        #    pdb.set_trace()
-        #    print(constructed_eigvals_log)
-        #elif punish_term < 0:
-        #    print("matmuls positive!!")
-        #    import pdb
-        #    pdb.set_trace()
-        #    print(matmuls)
-        #laplace = mll - (1/2)*torch.log(variance.det()) - (1/2)*torch.log( (variance.inverse()-hessian).det() )  + (1/2) * matmuls
-
-        #oldLaplace = mll - (1/2)*torch.log(variance.det()) - (1/2)*torch.log( (variance.inverse()-oldHessian).det() )  + (1/2) * thetas_added_transposed @ variance.inverse() @ (variance.inverse()-oldHessian).inverse() @ oldHessian @ thetas_added
-        #print(f"theta_s: {thetas_added_transposed}")
-        #print(f"variance inv: {variance.inverse()}")
-        #print(f"(variance.inverse()-hessian): {(variance.inverse()-hessian)}")
-        #print(f"(variance.inverse()-hessian).inverse(): {(variance.inverse()-hessian).inverse()}")
-        #print(f"Hessian: {hessian}")
-        #print(f"Frob. norm(H):{np.linalg.norm(hessian)}")
-        #print(f"matmuls: {matmuls}")
-        #print(f"----")
-        #print(f"param_list:{debug_param_name_list}")
-        #print(f"Corrected eig(H):{torch.linalg.eig(hessian)}")
-        #print(f"Old  eig(H):{torch.linalg.eig(oldHessian)}")
-        #print(f"Symmetry error: {hessian - hessian.t()}")
     
 
 
