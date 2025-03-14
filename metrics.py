@@ -227,26 +227,26 @@ def calculate_laplace(model, loss_of_model, variances_list=None, likelihood_lapl
     end = time.time()
     derivative_calc_time = end - start
     # TODO de-spaghettize this with prior function that generated mu and var
-    prior_dict = {'SE': {'raw_lengthscale' : {"mean": -0.21221139138922668 , "std":1.8895426067756804}},
-                'MAT52': {'raw_lengthscale' :{"mean": 0.7993038925994188, "std":2.145122566357853 } },
-                'MAT32': {'raw_lengthscale' :{"mean": 1.5711054238673443, "std":2.4453761235991216 } },
-                'RQ': {'raw_lengthscale' :{"mean": -0.049841950913676276, "std":1.9426354614713097 }, 
-                        'raw_alpha' :{"mean": 1.882148553921053, "std":3.096431944989054 } },
-                'CosineKernel':{'raw_period_length':{"mean": 0.6485334993738499, "std":0.9930632050553377 }},
-                'PER':{'raw_lengthscale':{"mean": 0.7778461197268618, "std":2.288946656544974 },
-                        'raw_period_length':{"mean": 0.6485334993738499, "std":0.9930632050553377 } },
-                'LIN':{'raw_variance' :{"mean": -0.8017903983055685, "std":0.9966569921354465 } },
-                'AFF':{'raw_variance' :{"mean": -0.8017903983055685, "std":0.9966569921354465 } },
-                'c':{'raw_outputscale':{"mean": -1.6253091096349706, "std":2.2570021716661923 } },
-                'noise': {'raw_noise':{"mean": -3.51640656386717, "std":3.5831320474767407 }},
-                'MyPeriodKernel':{'raw_period_length':{"mean": 0.6485334993738499, "std":0.9930632050553377 }}}
+    #prior_dict = {'SE': {'raw_lengthscale' : {"mean": -0.21221139138922668 , "std":1.8895426067756804}},
+    #            'MAT52': {'raw_lengthscale' :{"mean": 0.7993038925994188, "std":2.145122566357853 } },
+    #            'MAT32': {'raw_lengthscale' :{"mean": 1.5711054238673443, "std":2.4453761235991216 } },
+    #            'RQ': {'raw_lengthscale' :{"mean": -0.049841950913676276, "std":1.9426354614713097 }, 
+    #                    'raw_alpha' :{"mean": 1.882148553921053, "std":3.096431944989054 } },
+    #            'CosineKernel':{'raw_period_length':{"mean": 0.6485334993738499, "std":0.9930632050553377 }},
+    #            'PER':{'raw_lengthscale':{"mean": 0.7778461197268618, "std":2.288946656544974 },
+    #                    'raw_period_length':{"mean": 0.6485334993738499, "std":0.9930632050553377 } },
+    #            'LIN':{'raw_variance' :{"mean": -0.8017903983055685, "std":0.9966569921354465 } },
+    #            'AFF':{'raw_variance' :{"mean": -0.8017903983055685, "std":0.9966569921354465 } },
+    #            'c':{'raw_outputscale':{"mean": -1.6253091096349706, "std":2.2570021716661923 } },
+    #            'noise': {'raw_noise':{"mean": -3.51640656386717, "std":3.5831320474767407 }},
+    #            'MyPeriodKernel':{'raw_period_length':{"mean": 0.6485334993738499, "std":0.9930632050553377 }}}
 
-    start = time.time()
+    #start = time.time()
     if theta_mu is None:
         theta_mu = []
     if variances_list is None:
         variances_list = []
-    debug_param_name_list = []
+    debug_param_name_list = [l[0] for l in list(model.named_parameters())] 
     #if variances_list == [] and theta_mu == []:
     #    covar_string = gsr(model.covar_module)
     #    covar_string = covar_string.replace("(", "")
