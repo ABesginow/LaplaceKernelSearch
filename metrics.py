@@ -114,8 +114,8 @@ def prior_distribution(model, uninformed=False):
     variance = sigma@sigma
     return theta_mu, variance
  
-def log_normalized_prior(model, theta_mu=None, sigma=None):
-    theta_mu, sigma = prior_distribution(model) if theta_mu is None or sigma is None else (theta_mu, sigma)
+def log_normalized_prior(model, theta_mu=None, sigma=None, uninformed=False):
+    theta_mu, sigma = prior_distribution(model, uninformed=uninformed) if theta_mu is None or sigma is None else (theta_mu, sigma)
     prior = torch.distributions.MultivariateNormal(theta_mu.t(), sigma)
 
     params = None
@@ -206,6 +206,7 @@ def calculate_laplace(model, loss_of_model, variances_list=None, likelihood_lapl
         loss_of_model - The positive optimal log likelihood from PyTorch 
     """
     theta_mu = kwargs["theta_mu"] if "theta_mu" in kwargs else None
+    uninformed = kwargs["uninformed"] if "uninformed" in kwargs else False
     logables = {}
     total_start = time.time()
     # Save a list of model parameters and compute the Hessian of the MLL
@@ -285,7 +286,7 @@ def calculate_laplace(model, loss_of_model, variances_list=None, likelihood_lapl
     #                    #
     #                    #
     if variances_list == [] and theta_mu == []:
-        theta_mu, variance = prior_distribution(model)
+        theta_mu, variance = prior_distribution(model, uninformed=uninformed)
     #theta_mu = torch.tensor(theta_mu)
     #theta_mu = theta_mu.unsqueeze(0).t()
 
