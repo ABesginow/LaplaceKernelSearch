@@ -223,7 +223,7 @@ def calculate_laplace(model, loss_of_model, variances_list=None, likelihood_lapl
     hess_params = []
     # Calcuate -\nabla\nabla log(f(\theta)) (i.e. Hessian of negative log marginal likelihood)
     for i in range(len(env_grads)):
-            hess_params.append(torch.autograd.grad(env_grads[i], params_list, retain_graph=True, allow_unused=True))
+        hess_params.append(torch.autograd.grad(env_grads[i], params_list, retain_graph=True, allow_unused=True))
     end = time.time()
     derivative_calc_time = end - start
     # TODO de-spaghettize this with prior function that generated mu and var
