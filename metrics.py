@@ -247,47 +247,51 @@ def calculate_laplace(model, loss_of_model, variances_list=None, likelihood_lapl
     if variances_list is None:
         variances_list = []
     debug_param_name_list = []
+    #if variances_list == [] and theta_mu == []:
+    #    covar_string = gsr(model.covar_module)
+    #    covar_string = covar_string.replace("(", "")
+    #    covar_string = covar_string.replace(")", "")
+    #    covar_string = covar_string.replace(" ", "")
+    #    covar_string = covar_string.replace("PER", "PER+PER")
+    #    covar_string = covar_string.replace("RQ", "RQ+RQ")
+    #    covar_string_list = [s.split("*") for s in covar_string.split("+")]
+    #    covar_string_list.insert(0, ["LIKELIHOOD"])
+    #    covar_string_list = list(chain.from_iterable(covar_string_list))
+    #    both_PER_params = False
+    #    for (param_name, param), cov_str in zip(model.named_parameters(), covar_string_list):
+    #        debug_param_name_list.append(param_name)
+    #        # First param is (always?) noise and is always with the likelihood
+    #        if "likelihood" in param_name:
+    #            theta_mu.append(prior_dict["noise"]["raw_noise"]["mean"])
+    #            variances_list.append(prior_dict["noise"]["raw_noise"]["std"])
+    #            continue
+    #        else:
+    #            if (cov_str == "PER" or cov_str == "RQ") and not both_PER_params:
+    #                theta_mu.append(prior_dict[cov_str][param_name.split(".")[-1]]["mean"])
+    #                variances_list.append(prior_dict[cov_str][param_name.split(".")[-1]]["std"])
+    #                both_PER_params = True
+    #            elif (cov_str == "PER" or cov_str == "RQ") and both_PER_params:
+    #                theta_mu.append(prior_dict[cov_str][param_name.split(".")[-1]]["mean"])
+    #                variances_list.append(prior_dict[cov_str][param_name.split(".")[-1]]["std"])
+    #                both_PER_params = False
+    #            else:
+    #                try:
+    #                    theta_mu.append(prior_dict[cov_str][param_name.split(".")[-1]]["mean"])
+    #                    variances_list.append(prior_dict[cov_str][param_name.split(".")[-1]]["std"])
+    #                except Exception as E:
+    #                    import pdb
+    #                    pdb.set_trace()
+    #                    prev_cov = cov_str
+    #                    #
+    #                    #
     if variances_list == [] and theta_mu == []:
-        covar_string = gsr(model.covar_module)
-        covar_string = covar_string.replace("(", "")
-        covar_string = covar_string.replace(")", "")
-        covar_string = covar_string.replace(" ", "")
-        covar_string = covar_string.replace("PER", "PER+PER")
-        covar_string = covar_string.replace("RQ", "RQ+RQ")
-        covar_string_list = [s.split("*") for s in covar_string.split("+")]
-        covar_string_list.insert(0, ["LIKELIHOOD"])
-        covar_string_list = list(chain.from_iterable(covar_string_list))
-        both_PER_params = False
-        for (param_name, param), cov_str in zip(model.named_parameters(), covar_string_list):
-            debug_param_name_list.append(param_name)
-            # First param is (always?) noise and is always with the likelihood
-            if "likelihood" in param_name:
-                theta_mu.append(prior_dict["noise"]["raw_noise"]["mean"])
-                variances_list.append(prior_dict["noise"]["raw_noise"]["std"])
-                continue
-            else:
-                if (cov_str == "PER" or cov_str == "RQ") and not both_PER_params:
-                    theta_mu.append(prior_dict[cov_str][param_name.split(".")[-1]]["mean"])
-                    variances_list.append(prior_dict[cov_str][param_name.split(".")[-1]]["std"])
-                    both_PER_params = True
-                elif (cov_str == "PER" or cov_str == "RQ") and both_PER_params:
-                    theta_mu.append(prior_dict[cov_str][param_name.split(".")[-1]]["mean"])
-                    variances_list.append(prior_dict[cov_str][param_name.split(".")[-1]]["std"])
-                    both_PER_params = False
-                else:
-                    try:
-                        theta_mu.append(prior_dict[cov_str][param_name.split(".")[-1]]["mean"])
-                        variances_list.append(prior_dict[cov_str][param_name.split(".")[-1]]["std"])
-                    except Exception as E:
-                        import pdb
-                        pdb.set_trace()
-                        prev_cov = cov_str
-    theta_mu = torch.tensor(theta_mu)
-    theta_mu = theta_mu.unsqueeze(0).t()
+        theta_mu, variance = prior_distribution(model)
+    #theta_mu = torch.tensor(theta_mu)
+    #theta_mu = theta_mu.unsqueeze(0).t()
 
-    # sigma is a matrix of variance priors
-    sigma = torch.diag(torch.Tensor(variances_list))
-    sigma = sigma@sigma
+    ## sigma is a matrix of variance priors
+    #sigma = torch.diag(torch.Tensor(variances_list))
+    #sigma = sigma@sigma
     params = torch.tensor(params_list).clone().reshape(-1, 1)
 
     end = time.time()
@@ -333,7 +337,7 @@ def calculate_laplace(model, loss_of_model, variances_list=None, likelihood_lapl
         # Hessian correcting part (for Eigenvalues < 0 < c(i)  )
         start = time.time()
         hessian, constructed_eigvals_log, num_replaced = Eigenvalue_correction_likelihood_laplace(
-            hessian, theta_mu, params, sigma, param_punish_term)
+            hessian, theta_mu, params, variance, param_punish_term)
         end = time.time()
         #print(f"{num_replaced}")
         hessian_correction_time = end - start
@@ -342,21 +346,21 @@ def calculate_laplace(model, loss_of_model, variances_list=None, likelihood_lapl
         # Here comes what's wrapped in the exp-function:
         thetas_added = params-theta_mu
         thetas_added_transposed = (params-theta_mu).reshape(1, -1)
-        middle_term = (sigma.inverse()-hessian).inverse()
-        matmuls = thetas_added_transposed @ sigma.inverse() @ middle_term @ hessian @ thetas_added
+        middle_term = (variance.inverse()-hessian).inverse()
+        matmuls = thetas_added_transposed @ variance.inverse() @ middle_term @ hessian @ thetas_added
 
         # This can probably also be "-0.5 matmuls" where "matmuls" is based on the negative MLL
-        punish_term = - (1/2)*torch.log(sigma.det()) - (1/2)*torch.log((sigma.inverse()+hessian).det()) - (1/2) * matmuls
-        matmuls_without_replacement = thetas_added_transposed @ sigma.inverse() @ middle_term @ oldHessian @ thetas_added
-        punish_without_replacement = - (1/2)*torch.log(sigma.det()) - (1/2)*torch.log((sigma.inverse()+oldHessian).det()) - (1/2) * matmuls_without_replacement
+        punish_term = - (1/2)*torch.log(variance.det()) - (1/2)*torch.log((variance.inverse()+hessian).det()) - (1/2) * matmuls
+        matmuls_without_replacement = thetas_added_transposed @ variance.inverse() @ middle_term @ oldHessian @ thetas_added
+        punish_without_replacement = - (1/2)*torch.log(variance.det()) - (1/2)*torch.log((variance.inverse()+oldHessian).det()) - (1/2) * matmuls_without_replacement
         laplace = loss_of_model + punish_term
         end = time.time()
         approximation_time = end - start
 
-        #print(f"mll - 1/2 log sigma - 1/2 log sigma H + matmuls\n{mll} - {(1/2)*torch.log(sigma.det())} - {(1/2)*torch.log((sigma.inverse()-hessian).det())} + {(1/2) * matmuls}")
+        #print(f"mll - 1/2 log variance - 1/2 log variance H + matmuls\n{mll} - {(1/2)*torch.log(variance.det())} - {(1/2)*torch.log((variance.inverse()-hessian).det())} + {(1/2) * matmuls}")
         D = torch.diag(constructed_eigvals_log)
-        sigma_h = T@(sigma.inverse())@T.t() 
-        #print(f"logdet sigma H; matmul\n {0.5*torch.log(torch.linalg.det(sigma_h - D))} ; {0.5*(thetas_added.t()@T.t())@sigma_h@((sigma_h - D).inverse())@D@(T@thetas_added)}")
+        variance_h = T@(variance.inverse())@T.t() 
+        #print(f"logdet variance H; matmul\n {0.5*torch.log(torch.linalg.det(variance_h - D))} ; {0.5*(thetas_added.t()@T.t())@variance_h@((variance_h - D).inverse())@D@(T@thetas_added)}")
         if param_punish_term == -1.0:
             if (len(theta_mu) + punish_term) > 1e-4:
                 print("Something went horribly wrong with the c(i)s")
@@ -381,13 +385,13 @@ def calculate_laplace(model, loss_of_model, variances_list=None, likelihood_lapl
         #    import pdb
         #    pdb.set_trace()
         #    print(matmuls)
-        #laplace = mll - (1/2)*torch.log(sigma.det()) - (1/2)*torch.log( (sigma.inverse()-hessian).det() )  + (1/2) * matmuls
+        #laplace = mll - (1/2)*torch.log(variance.det()) - (1/2)*torch.log( (variance.inverse()-hessian).det() )  + (1/2) * matmuls
 
-        #oldLaplace = mll - (1/2)*torch.log(sigma.det()) - (1/2)*torch.log( (sigma.inverse()-oldHessian).det() )  + (1/2) * thetas_added_transposed @ sigma.inverse() @ (sigma.inverse()-oldHessian).inverse() @ oldHessian @ thetas_added
+        #oldLaplace = mll - (1/2)*torch.log(variance.det()) - (1/2)*torch.log( (variance.inverse()-oldHessian).det() )  + (1/2) * thetas_added_transposed @ variance.inverse() @ (variance.inverse()-oldHessian).inverse() @ oldHessian @ thetas_added
         #print(f"theta_s: {thetas_added_transposed}")
-        #print(f"Sigma inv: {sigma.inverse()}")
-        #print(f"(sigma.inverse()-hessian): {(sigma.inverse()-hessian)}")
-        #print(f"(sigma.inverse()-hessian).inverse(): {(sigma.inverse()-hessian).inverse()}")
+        #print(f"variance inv: {variance.inverse()}")
+        #print(f"(variance.inverse()-hessian): {(variance.inverse()-hessian)}")
+        #print(f"(variance.inverse()-hessian).inverse(): {(variance.inverse()-hessian).inverse()}")
         #print(f"Hessian: {hessian}")
         #print(f"Frob. norm(H):{np.linalg.norm(hessian)}")
         #print(f"matmuls: {matmuls}")
@@ -415,7 +419,7 @@ def calculate_laplace(model, loss_of_model, variances_list=None, likelihood_lapl
     logables["diag(constructed eigvals)"] = constructed_eigvals_log
     logables["original symmetrized Hessian"] = oldHessian
     logables["prior mean"] = theta_mu
-    logables["diag(prior var)"] = torch.diag(sigma)
+    logables["diag(prior var)"] = torch.diag(variance)
     logables["likelihood approximation"] = laplace
 
     # Everything time related
