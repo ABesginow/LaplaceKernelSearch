@@ -22,17 +22,17 @@ import os
 
 
 def prior_distribution(model, uninformed=False):
-    uninformed_prior_dict = {'SE': {'raw_lengthscale' : {"mean": 0. , "std":10.}},
-                  'MAT52': {'raw_lengthscale' :{"mean": 0., "std":10. } },
-                  'MAT32': {'raw_lengthscale' :{"mean": 0., "std":10. } },
-                  'RQ': {'raw_lengthscale' :{"mean": 0., "std":10. },
-                          'raw_alpha' :{"mean": 0., "std":10. } },
-                  'PER':{'raw_lengthscale':{"mean": 0., "std":10. },
-                          'raw_period_length':{"mean": 0., "std":10. } },
-                  'LIN':{'raw_variance' :{"mean": 0., "std":10. } },
-                  'AFF':{'raw_variance' :{"mean": 0., "std":10. } },
-                  'c':{'raw_outputscale':{"mean": 0., "std":10. } },
-                  'noise': {'raw_noise':{"mean": 0., "std":10. }}}
+    uninformed_prior_dict = {'SE': {'raw_lengthscale' : {"mean": 0. , "std":30.}},
+                  'MAT52': {'raw_lengthscale' :{"mean": 0., "std":30. } },
+                  'MAT32': {'raw_lengthscale' :{"mean": 0., "std":30. } },
+                  'RQ': {'raw_lengthscale' :{"mean": 0., "std":30. },
+                          'raw_alpha' :{"mean": 0., "std":30. } },
+                  'PER':{'raw_lengthscale':{"mean": 0., "std":30. },
+                          'raw_period_length':{"mean": 0., "std":30. } },
+                  'LIN':{'raw_variance' :{"mean": 0., "std":30. } },
+                  'AFF':{'raw_variance' :{"mean": 0., "std":30. } },
+                  'c':{'raw_outputscale':{"mean": 0., "std":30. } },
+                  'noise': {'raw_noise':{"mean": 0., "std":30. }}}
 
     # TODO de-spaghettize this once the priors are coded properly
     prior_dict = {'SE': {'raw_lengthscale' : {"mean": -0.21221139138922668 , "std":1.8895426067756804}},
