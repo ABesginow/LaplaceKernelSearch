@@ -519,21 +519,15 @@ def calculate_mc_STAN(model, likelihood, num_draws, **kwargs):
 
 
 
-
-
-
-
-
 def reparameterize_model(model, theta):
     for model_param, sampled_param in zip(model.parameters(), theta):
         model_param.data = torch.full_like(model_param.data, float(sampled_param))
 
-def reparameterize_and_mll(model, likelihood, theta, train_x, train_y):
+def reparameterize_and_pos_mll(model, likelihood, theta, train_x, train_y):
     reparameterize_model(model, theta)
     mll = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood, model)
     with torch.no_grad():
-        mll_val = mll(model(train_x), train_y)
-    return mll_val
+        return mll(model(train_x), train_y)
 
 
 def NestedSampling(model, **kwargs):
@@ -560,7 +554,7 @@ def NestedSampling(model, **kwargs):
 
     def loglike(theta_i):
         try:
-            log_like = (reparameterize_and_mll(model, model.likelihood, theta_i, 
+            log_like = (reparameterize_and_pos_mll(model, model.likelihood, theta_i, 
                                             model.train_inputs[0], 
                                             model.train_targets)*len(*model.train_inputs)).detach().numpy()
         except Exception as E:
