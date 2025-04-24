@@ -158,12 +158,10 @@ def Eigenvalue_correction(neg_mll_hessian, param_punish_term):
     # Appendix E.2
     vals, vecs = torch.linalg.eigh(neg_mll_hessian)
     constructed_eigvals = torch.diag(torch.Tensor(
-        [max(val, (torch.exp(torch.tensor(-2*param_punish_term))*(2*torch.pi))) for i, val in enumerate(vals)]))
-    #constructed_eigvals = torch.diag(torch.Tensor(
-    #    [max(val, (torch.exp(torch.tensor(2*param_punish_term))*(6.283))) for i, val in enumerate(vals)]))
+        [max(val, (torch.exp(torch.tensor(-2*param_punish_term))*(2*torch.pi))) for val in vals]))
     num_replaced = torch.count_nonzero(vals - torch.diag(constructed_eigvals))
     corrected_hessian = vecs@constructed_eigvals@vecs.t()
-    return corrected_hessian, torch.diag(constructed_eigvals), num_replaced
+    return corrected_hessian, torch.diag(constructed_eigvals), num_replaced, vecs
         
 
 def calculate_laplace(model, pos_unscaled_mll, variances_list=None, param_punish_term = -1.0, **kwargs):
@@ -219,7 +217,7 @@ def calculate_laplace(model, pos_unscaled_mll, variances_list=None, param_punish
     # Appendix E.1
     # it says mll, but it's actually the MAP here
     start = time.time()
-    hessian_neg_unscaled_mll_symmetrized_corrected, constructed_eigvals_log, num_replaced = Eigenvalue_correction(hessian_neg_unscaled_mll_symmetrized, param_punish_term)
+    hessian_neg_unscaled_mll_symmetrized_corrected, constructed_eigvals_log, num_replaced, hessian_neg_unscaled_mll_symmetrized_eigvecs = Eigenvalue_correction(hessian_neg_unscaled_mll_symmetrized, param_punish_term)
     end = time.time()
     hessian_correction_time = end - start
     # 1.8378 = log(2pi)
@@ -254,6 +252,7 @@ def calculate_laplace(model, pos_unscaled_mll, variances_list=None, param_punish
     logables["parameter values"] = params
     logables["corrected Hessian"] = hessian_neg_unscaled_mll_symmetrized_corrected
     logables["diag(constructed eigvals)"] = constructed_eigvals_log
+    logables["eigenvectors"] = hessian_neg_unscaled_mll_symmetrized_eigvecs
     logables["original symmetrized Hessian"] = oldHessian
     logables["prior mean"] = theta_mu
     logables["diag(prior var)"] = torch.diag(variance)
