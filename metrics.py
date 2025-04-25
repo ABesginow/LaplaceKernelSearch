@@ -166,11 +166,6 @@ def Eigenvalue_correction(neg_mll_hessian, param_punish_term):
 
 def calculate_laplace(model, pos_unscaled_map, variances_list=None, param_punish_term = -1.0, **kwargs):
     torch.set_default_tensor_type(torch.DoubleTensor)
-    """
-        likelihood_laplace - Decides whether the original Laplace or the 
-                             likelihood Laplace approximation is used
-        loss_of_model - The positive optimal log likelihood from PyTorch 
-    """
     theta_mu = kwargs["theta_mu"] if "theta_mu" in kwargs else None
     uninformed = kwargs["uninformed"] if "uninformed" in kwargs else False
     logables = {}
@@ -188,7 +183,7 @@ def calculate_laplace(model, pos_unscaled_map, variances_list=None, param_punish
         pdb.set_trace()
         print(f"E:{E}")
     hessian_neg_unscaled_map_raw = []
-    # Calcuate -\nabla\nabla log(f(\theta)) (i.e. Hessian of negative log marginal likelihood)
+    # Calcuate -\nabla\nabla log(f(\theta)) (i.e. Hessian of negative log posterior)
     for i in range(len(jacobian_neg_unscaled_map)):
         hessian_neg_unscaled_map_raw.append(torch.autograd.grad(jacobian_neg_unscaled_map[i], params_list, retain_graph=True, allow_unused=True))
     end = time.time()
