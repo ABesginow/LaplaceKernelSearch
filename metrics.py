@@ -215,11 +215,14 @@ def calculate_laplace(model, pos_unscaled_map, variances_list=None, param_punish
     hessian_neg_unscaled_map_symmetrized_corrected, constructed_eigvals_log, num_replaced, hessian_neg_unscaled_map_symmetrized_eigvecs = Eigenvalue_correction(hessian_neg_unscaled_map_symmetrized, param_punish_term)
     end = time.time()
     hessian_correction_time = end - start
-    # 1.8378 = log(2pi)
-    punish_term = 0.5*len(theta_mu)*torch.tensor(1.8378) - 0.5*torch.sum(torch.log(constructed_eigvals_log))
+    # punish term = + u/2 * ln(2pi) - 1/2 * ln(det(H))
+    # u = number of hyperparameters
+    #punish_term = 0.5*len(theta_mu)*torch.tensor(1.8378) - 0.5*torch.sum(torch.log(constructed_eigvals_log))
+    punish_term = 0.5*len(theta_mu)*torch.log(torch.tensor(2*np.pi)) - 0.5*torch.sum(torch.log(constructed_eigvals_log))
+    # 1.8378 = ln(2pi)
     laplace = pos_unscaled_map + punish_term
     #punish_without_replacement = 0.5*len(theta_mu)*torch.tensor(1.8378) - 0.5*torch.logdet(oldHessian)
-    laplace_without_replacement = pos_unscaled_map + 0.5*len(theta_mu)*torch.tensor(1.8378) - 0.5*torch.logdet(oldHessian)
+    laplace_without_replacement = pos_unscaled_map + 0.5*len(theta_mu)*torch.log(torch.tensor(2*np.pi)) - 0.5*torch.logdet(oldHessian)
     end = time.time()
     approximation_time = end - start
     if param_punish_term == -1.0:
