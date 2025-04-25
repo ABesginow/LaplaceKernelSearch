@@ -164,7 +164,7 @@ def Eigenvalue_correction(neg_mll_hessian, param_punish_term):
     return corrected_hessian, torch.diag(constructed_eigvals), num_replaced, vecs
         
 
-def calculate_laplace(model, pos_unscaled_mll, variances_list=None, param_punish_term = -1.0, **kwargs):
+def calculate_laplace(model, pos_unscaled_map, variances_list=None, param_punish_term = -1.0, **kwargs):
     torch.set_default_tensor_type(torch.DoubleTensor)
     """
         likelihood_laplace - Decides whether the original Laplace or the 
@@ -178,19 +178,19 @@ def calculate_laplace(model, pos_unscaled_mll, variances_list=None, param_punish
     # Save a list of model parameters and compute the Hessian of the MLL
     params_list = [p for p in model.parameters()]
     # This is now the negative MLL
-    neg_unscaled_mll = -pos_unscaled_mll
+    neg_unscaled_map = -pos_unscaled_map
     start = time.time()
     try:
-        jacobian_neg_unscaled_mll = torch.autograd.grad(neg_unscaled_mll, params_list, retain_graph=True, create_graph=True, allow_unused=True)
+        jacobian_neg_unscaled_map = torch.autograd.grad(neg_unscaled_map, params_list, retain_graph=True, create_graph=True, allow_unused=True)
     except Exception as E:
         print(E)
         import pdb
         pdb.set_trace()
         print(f"E:{E}")
-    hessian_neg_unscaled_mll_raw = []
+    hessian_neg_unscaled_map_raw = []
     # Calcuate -\nabla\nabla log(f(\theta)) (i.e. Hessian of negative log marginal likelihood)
-    for i in range(len(jacobian_neg_unscaled_mll)):
-        hessian_neg_unscaled_mll_raw.append(torch.autograd.grad(jacobian_neg_unscaled_mll[i], params_list, retain_graph=True, allow_unused=True))
+    for i in range(len(jacobian_neg_unscaled_map)):
+        hessian_neg_unscaled_map_raw.append(torch.autograd.grad(jacobian_neg_unscaled_map[i], params_list, retain_graph=True, allow_unused=True))
     end = time.time()
     derivative_calc_time = end - start
     if theta_mu is None:
@@ -207,24 +207,24 @@ def calculate_laplace(model, pos_unscaled_mll, variances_list=None, param_punish
     end = time.time()
     prior_generation_time = end - start
 
-    hessian_neg_unscaled_mll_symmetrized = torch.tensor(hessian_neg_unscaled_mll_raw).clone()
-    hessian_neg_unscaled_mll_symmetrized = (hessian_neg_unscaled_mll_symmetrized + hessian_neg_unscaled_mll_symmetrized.t()) / 2
-    hessian_neg_unscaled_mll_symmetrized = hessian_neg_unscaled_mll_symmetrized.to(torch.float64)
+    hessian_neg_unscaled_map_symmetrized = torch.tensor(hessian_neg_unscaled_map_raw).clone()
+    hessian_neg_unscaled_map_symmetrized = (hessian_neg_unscaled_map_symmetrized + hessian_neg_unscaled_map_symmetrized.t()) / 2
+    hessian_neg_unscaled_map_symmetrized = hessian_neg_unscaled_map_symmetrized.to(torch.float64)
 
-    oldHessian = hessian_neg_unscaled_mll_symmetrized.clone()
+    oldHessian = hessian_neg_unscaled_map_symmetrized.clone()
     if param_punish_term == "BIC":
         param_punish_term = -0.5*torch.log(torch.tensor(model.train_targets.numel()))
     # Appendix E.1
     # it says mll, but it's actually the MAP here
     start = time.time()
-    hessian_neg_unscaled_mll_symmetrized_corrected, constructed_eigvals_log, num_replaced, hessian_neg_unscaled_mll_symmetrized_eigvecs = Eigenvalue_correction(hessian_neg_unscaled_mll_symmetrized, param_punish_term)
+    hessian_neg_unscaled_map_symmetrized_corrected, constructed_eigvals_log, num_replaced, hessian_neg_unscaled_map_symmetrized_eigvecs = Eigenvalue_correction(hessian_neg_unscaled_map_symmetrized, param_punish_term)
     end = time.time()
     hessian_correction_time = end - start
     # 1.8378 = log(2pi)
     punish_term = 0.5*len(theta_mu)*torch.tensor(1.8378) - 0.5*torch.sum(torch.log(constructed_eigvals_log))
-    laplace = pos_unscaled_mll + punish_term
+    laplace = pos_unscaled_map + punish_term
     #punish_without_replacement = 0.5*len(theta_mu)*torch.tensor(1.8378) - 0.5*torch.logdet(oldHessian)
-    laplace_without_replacement = pos_unscaled_mll + 0.5*len(theta_mu)*torch.tensor(1.8378) - 0.5*torch.logdet(oldHessian)
+    laplace_without_replacement = pos_unscaled_map + 0.5*len(theta_mu)*torch.tensor(1.8378) - 0.5*torch.logdet(oldHessian)
     end = time.time()
     approximation_time = end - start
     if param_punish_term == -1.0:
@@ -241,18 +241,18 @@ def calculate_laplace(model, pos_unscaled_mll, variances_list=None, param_punish
             print(constructed_eigvals_log)
     total_time = end - total_start
     # Everything worth logging
-    logables["MAP"] = neg_unscaled_mll 
+    logables["MAP"] = neg_unscaled_map 
     logables["punish term"] = punish_term 
     logables["laplace without replacement"] = laplace_without_replacement
     logables["correction term"] = param_punish_term
 
     logables["num_replaced"] = num_replaced
     logables["parameter list"] = debug_param_name_list
-    logables["Jacobian"] = jacobian_neg_unscaled_mll
+    logables["Jacobian"] = jacobian_neg_unscaled_map
     logables["parameter values"] = params
-    logables["corrected Hessian"] = hessian_neg_unscaled_mll_symmetrized_corrected
+    logables["corrected Hessian"] = hessian_neg_unscaled_map_symmetrized_corrected
     logables["diag(constructed eigvals)"] = constructed_eigvals_log
-    logables["eigenvectors"] = hessian_neg_unscaled_mll_symmetrized_eigvecs
+    logables["eigenvectors"] = hessian_neg_unscaled_map_symmetrized_eigvecs
     logables["original symmetrized Hessian"] = oldHessian
     logables["prior mean"] = theta_mu
     logables["diag(prior var)"] = torch.diag(variance)
