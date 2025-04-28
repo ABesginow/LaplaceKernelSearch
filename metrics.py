@@ -253,7 +253,6 @@ def calculate_laplace(model, pos_unscaled_map, variances_list=None, param_punish
     hessian_neg_unscaled_map_symmetrized = (hessian_neg_unscaled_map_symmetrized + hessian_neg_unscaled_map_symmetrized.t()) / 2
     hessian_neg_unscaled_map_symmetrized = hessian_neg_unscaled_map_symmetrized.to(torch.float64)
 
-    oldHessian = hessian_neg_unscaled_map_symmetrized.clone()
     if param_punish_term == "BIC":
         param_punish_term = -0.5*torch.log(torch.tensor(model.train_targets.numel()))
 
@@ -273,7 +272,7 @@ def calculate_laplace(model, pos_unscaled_map, variances_list=None, param_punish
     # 1.8378 = ln(2pi)
     laplace = pos_unscaled_map + punish_term
     #punish_without_replacement = 0.5*len(theta_mu)*torch.tensor(1.8378) - 0.5*torch.logdet(oldHessian)
-    laplace_without_replacement = pos_unscaled_map + 0.5*len(theta_mu)*torch.log(torch.tensor(2*np.pi)) - 0.5*torch.logdet(oldHessian)
+    laplace_without_replacement = pos_unscaled_map + 0.5*len(theta_mu)*torch.log(torch.tensor(2*np.pi)) - 0.5*torch.logdet(hessian_to_use)
     end = time.time()
     approximation_time = end - start
     if param_punish_term == -1.0:
@@ -302,7 +301,7 @@ def calculate_laplace(model, pos_unscaled_map, variances_list=None, param_punish
     logables["diag(constructed eigvals)"] = constructed_eigvals_log
     logables["use finite differences"] = bool_use_finite_difference_hessian
     logables["Hessian finite difference"] = hessian_neg_unscaled_finite_differences
-    logables["Hessian autograd symmetrized"] = oldHessian
+    logables["Hessian autograd symmetrized"] = hessian_neg_unscaled_map_symmetrized
     logables["Hessian pre correction"] = hessian_to_use
     logables["eigenvectors Hessian pre correction"] = hessian_neg_unscaled_map_symmetrized_eigvecs
     logables["Hessian post correction"] = hessian_neg_unscaled_map_symmetrized_corrected
