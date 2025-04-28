@@ -202,7 +202,7 @@ def Eigenvalue_correction(neg_mll_hessian, param_punish_term):
     # Appendix E.2
     vals, vecs = torch.linalg.eigh(neg_mll_hessian)
     constructed_eigvals = torch.diag(torch.Tensor(
-        [max(val, (torch.exp(torch.tensor(-2*param_punish_term))*(2*torch.pi))) for val in vals]))
+        [max(val, torch.tensor((torch.exp(torch.tensor(-2*param_punish_term))*(2*torch.pi)), dtype=torch.float64)) for val in vals]))
     num_replaced = torch.count_nonzero(vals - torch.diag(constructed_eigvals))
     corrected_hessian = vecs@constructed_eigvals@vecs.t()
     return corrected_hessian, torch.diag(constructed_eigvals), num_replaced, vecs
