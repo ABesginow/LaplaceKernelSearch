@@ -201,8 +201,8 @@ def finite_difference_hessian(model, likelihood, num_params, train_x, train_y, u
 def Eigenvalue_correction(neg_mll_hessian, param_punish_term):
     # Appendix E.2
     vals, vecs = torch.linalg.eigh(neg_mll_hessian)
-    constructed_eigvals = torch.diag(torch.Tensor(
-        [max(val, torch.tensor((torch.exp(torch.tensor(-2*param_punish_term))*(2*torch.pi)), dtype=torch.float64)) for val in vals]))
+    constructed_eigvals = torch.diag(torch.tensor(
+        [max(val, (torch.exp(torch.tensor(-2*param_punish_term))*(2*torch.pi))) for val in vals], dtype=vals.dtype))
     num_replaced = torch.count_nonzero(vals - torch.diag(constructed_eigvals))
     corrected_hessian = vecs@constructed_eigvals@vecs.t()
     return corrected_hessian, torch.diag(constructed_eigvals), num_replaced, vecs
@@ -297,6 +297,7 @@ def calculate_laplace(model, pos_unscaled_map, variances_list=None, param_punish
     logables["num_replaced"] = num_replaced
     logables["parameter list"] = debug_param_name_list
     logables["Jacobian"] = jacobian_neg_unscaled_map
+    logables["use_finite_difference_hessian"] = bool_use_finite_difference_hessian
     logables["parameter values"] = params
     logables["corrected Hessian"] = hessian_neg_unscaled_map_symmetrized_corrected
     logables["diag(constructed eigvals)"] = constructed_eigvals_log
