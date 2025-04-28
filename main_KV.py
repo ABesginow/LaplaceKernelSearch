@@ -202,7 +202,7 @@ def run_experiment(config, MI=False):
                         train_start = time.time()
                         loss, model, likelihood = optimize_hyperparameters(
                             model, likelihood,
-                            train_iterations=train_iterations, MAP=False,
+                            MAP=False,
                             X=observations_x, Y=observations_y, 
                             uninformed=uninformed, logarithmic_reinit=logarithmic_reinit)
                         train_end = time.time()
@@ -343,7 +343,7 @@ def run_experiment(config, MI=False):
                         train_start = time.time()
                         loss, model, likelihood = optimize_hyperparameters(
                             model, likelihood,
-                            train_iterations=train_iterations, MAP=False,
+                            MAP=False,
                             X=observations_x, Y=observations_y, 
                             uninformed=uninformed, logarithmic_reinit=logarithmic_reinit)
                         train_end = time.time()
