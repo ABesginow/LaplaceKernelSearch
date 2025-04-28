@@ -154,6 +154,50 @@ def calculate_AIC(pos_unscaled_mll, num_params):
     return AIC, logables
 
 
+def fixed_reinit(model, parameters: torch.tensor) -> None:
+    for i, (param, value) in enumerate(zip(model.parameters(), parameters)):
+        param.data = torch.full_like(param.data, value)
+
+
+# https://www.sfu.ca/sasdoc/sashtml/iml/chap11/sect8.htm
+# Also https://en.wikipedia.org/wiki/Finite_difference_coefficient
+def finite_difference_second_derivative_GP_neg_unscaled_map(model, likelihood, train_x, train_y, uninformed=False, h_i_step=1e-3, h_j_step=1e-3, h_i_vec=[0.0, 0.0, 0.0], h_j_vec=[0.0, 0.0, 0.0]):
+    curr_params = torch.tensor(list(model.parameters()))
+    mll_fkt = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood, model)
+
+    h_i = h_i_step * torch.tensor(h_i_vec)
+    h_j = h_j_step * torch.tensor(h_j_vec)
+
+    fixed_reinit(model, curr_params+h_i + h_j)
+    f_plus = (-mll_fkt(model(train_x), train_y) - log_normalized_prior(model, uninformed=uninformed))*len(*model.train_inputs)
+
+    fixed_reinit(model, curr_params+h_i - h_j)
+    f1 = (-mll_fkt(model(train_x), train_y) - log_normalized_prior(model, uninformed=uninformed))*len(*model.train_inputs)
+    fixed_reinit(model, curr_params-h_i + h_j)
+    f2 = (-mll_fkt(model(train_x), train_y) - log_normalized_prior(model, uninformed=uninformed))*len(*model.train_inputs)
+
+    fixed_reinit(model, curr_params - h_i - h_j)
+    f_minus = (-mll_fkt(model(train_x), train_y) - log_normalized_prior(model, uninformed=uninformed))*len(*model.train_inputs)
+
+    # Reverse model reparameterization
+    fixed_reinit(model, curr_params)
+
+    return (f_plus - f1 - f2 + f_minus) / (4*h_i_step*h_j_step)
+
+
+def finite_difference_hessian(model, likelihood, num_params, train_x, train_y, uninformed=False, h_i_step=5e-2, h_j_step=5e-2):
+    hessian_finite_differences_neg_unscaled_map = np.zeros((num_params, num_params))
+    for i, j in itertools.product(range(num_params), range(num_params)):
+        h_i_vec = np.zeros(num_params)
+        h_j_vec = np.zeros(num_params)
+        h_i_vec[i] = 1.0
+        h_j_vec[j] = 1.0
+        hessian_finite_differences_neg_unscaled_map[i][j] = finite_difference_second_derivative_GP_neg_unscaled_map(model, likelihood, train_x, train_y, uninformed=uninformed, h_i_step=h_i_step, h_j_step=h_j_step, h_i_vec=h_i_vec, h_j_vec=h_j_vec)
+    return hessian_finite_differences_neg_unscaled_map
+
+
+
+
 def Eigenvalue_correction(neg_mll_hessian, param_punish_term):
     # Appendix E.2
     vals, vecs = torch.linalg.eigh(neg_mll_hessian)
