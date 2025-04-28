@@ -6,7 +6,7 @@ from globalParams import options
 import gpytorch
 from gpytorch.kernels import ScaleKernel
 from helpFunctions import get_string_representation_of_kernel as gsr, clean_kernel_expression, print_formatted_hyperparameters
-from itertools import chain
+import itertools
 import matplotlib.pyplot as plt
 import numpy as np
 import pickle
@@ -70,7 +70,7 @@ def prior_distribution(model, uninformed=False):
     covar_string = covar_string.replace("RQ", "RQ+RQ")
     covar_string_list = [s.split("*") for s in covar_string.split("+")]
     covar_string_list.insert(0, ["LIKELIHOOD"])
-    covar_string_list = list(chain.from_iterable(covar_string_list))
+    covar_string_list = list(itertools.chain.from_iterable(covar_string_list))
     both_PER_params = False
     for (param_name, param), cov_str in zip(model.named_parameters(), covar_string_list):
         if params == None:
@@ -211,6 +211,7 @@ def Eigenvalue_correction(neg_mll_hessian, param_punish_term):
 def calculate_laplace(model, pos_unscaled_map, variances_list=None, param_punish_term = -1.0, **kwargs):
     torch.set_default_tensor_type(torch.DoubleTensor)
     theta_mu = kwargs["theta_mu"] if "theta_mu" in kwargs else None
+    bool_use_finite_difference_hessian = kwargs["use_finite_difference_hessian"] if "use_finite_difference_hessian" in kwargs else False
     uninformed = kwargs["uninformed"] if "uninformed" in kwargs else False
     logables = {}
     total_start = time.time()
@@ -219,17 +220,21 @@ def calculate_laplace(model, pos_unscaled_map, variances_list=None, param_punish
     # This is now the negative MLL
     neg_unscaled_map = -pos_unscaled_map
     start = time.time()
-    try:
-        jacobian_neg_unscaled_map = torch.autograd.grad(neg_unscaled_map, params_list, retain_graph=True, create_graph=True, allow_unused=True)
-    except Exception as E:
-        print(E)
-        import pdb
-        pdb.set_trace()
-        print(f"E:{E}")
-    hessian_neg_unscaled_map_raw = []
-    # Calcuate -\nabla\nabla log(f(\theta)) (i.e. Hessian of negative log posterior)
-    for i in range(len(jacobian_neg_unscaled_map)):
-        hessian_neg_unscaled_map_raw.append(torch.autograd.grad(jacobian_neg_unscaled_map[i], params_list, retain_graph=True, allow_unused=True))
+    if not bool_use_finite_difference_hessian:
+        try:
+            jacobian_neg_unscaled_map = torch.autograd.grad(neg_unscaled_map, params_list, retain_graph=True, create_graph=True, allow_unused=True)
+        except Exception as E:
+            print(E)
+            import pdb
+            pdb.set_trace()
+            print(f"E:{E}")
+        hessian_neg_unscaled_map_raw = []
+        # Calcuate -\nabla\nabla log(f(\theta)) (i.e. Hessian of negative log posterior)
+        for i in range(len(jacobian_neg_unscaled_map)):
+            hessian_neg_unscaled_map_raw.append(torch.autograd.grad(jacobian_neg_unscaled_map[i], params_list, retain_graph=True, allow_unused=True))
+    else:
+        # Calculate the Hessian using finite differences
+        hessian_neg_unscaled_map_raw = finite_difference_hessian(model, model.likelihood, len(params_list), model.train_inputs[0], model.train_targets, uninformed=uninformed)
     end = time.time()
     derivative_calc_time = end - start
     if theta_mu is None:
