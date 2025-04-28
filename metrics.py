@@ -209,7 +209,7 @@ def Eigenvalue_correction(neg_mll_hessian, param_punish_term):
         
 
 def calculate_laplace(model, pos_unscaled_map, variances_list=None, param_punish_term = -1.0, **kwargs):
-    torch.set_default_tensor_type(torch.DoubleTensor)
+    #torch.set_default_tensor_type(torch.DoubleTensor)
     theta_mu = kwargs["theta_mu"] if "theta_mu" in kwargs else None
     bool_use_finite_difference_hessian = kwargs["use_finite_difference_hessian"] if "use_finite_difference_hessian" in kwargs else False
     uninformed = kwargs["uninformed"] if "uninformed" in kwargs else False
@@ -317,7 +317,7 @@ def calculate_laplace(model, pos_unscaled_map, variances_list=None, param_punish
         import pdb
         pdb.set_trace()
 
-    torch.set_default_tensor_type(torch.FloatTensor)
+    #torch.set_default_tensor_type(torch.FloatTensor)
     return laplace, logables
 
 
