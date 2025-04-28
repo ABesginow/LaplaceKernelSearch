@@ -295,20 +295,20 @@ def calculate_laplace(model, pos_unscaled_map, variances_list=None, param_punish
     logables["laplace without replacement"] = laplace_without_replacement
     logables["correction term"] = param_punish_term
 
-    logables["num_replaced"] = num_replaced
+    logables["num replaced"] = num_replaced
     logables["parameter list"] = debug_param_name_list
-    logables["Jacobian"] = jacobian_neg_unscaled_map
+    logables["Jacobian autograd"] = jacobian_neg_unscaled_map
     logables["parameter values"] = params
     logables["diag(constructed eigvals)"] = constructed_eigvals_log
-    logables["eigenvectors"] = hessian_neg_unscaled_map_symmetrized_eigvecs
-    logables["autograd symmetrized Hessian"] = oldHessian
     logables["use finite differences"] = bool_use_finite_difference_hessian
-    logables["finite difference Hessian"] = hessian_neg_unscaled_finite_differences
+    logables["Hessian finite difference"] = hessian_neg_unscaled_finite_differences
+    logables["Hessian autograd symmetrized"] = oldHessian
     logables["Hessian pre correction"] = hessian_to_use
-    logables["corrected Hessian"] = hessian_neg_unscaled_map_symmetrized_corrected
+    logables["eigenvectors Hessian pre correction"] = hessian_neg_unscaled_map_symmetrized_eigvecs
+    logables["Hessian post correction"] = hessian_neg_unscaled_map_symmetrized_corrected
     logables["prior mean"] = theta_mu
     logables["diag(prior var)"] = torch.diag(variance)
-    logables["likelihood approximation"] = laplace
+    logables["model evidence approx"] = laplace
 
     # Everything time related
     logables["Derivative time"]         = derivative_calc_time
