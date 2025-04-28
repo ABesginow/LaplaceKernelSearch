@@ -232,7 +232,7 @@ def calculate_laplace(model, pos_unscaled_map, variances_list=None, param_punish
     for i in range(len(jacobian_neg_unscaled_map)):
         hessian_neg_unscaled_map_raw.append(torch.autograd.grad(jacobian_neg_unscaled_map[i], params_list, retain_graph=True, allow_unused=True))
     # Calculate the Hessian using finite differences
-    hessian_neg_unscaled_finite_differences = finite_difference_hessian(model, model.likelihood, len(params_list), model.train_inputs[0], model.train_targets, uninformed=uninformed) if bool_use_finite_difference_hessian else None
+    hessian_neg_unscaled_finite_differences = torch.tensor(finite_difference_hessian(model, model.likelihood, len(params_list), model.train_inputs[0], model.train_targets, uninformed=uninformed) if bool_use_finite_difference_hessian else None)
     end = time.time()
     derivative_calc_time = end - start
     if theta_mu is None:

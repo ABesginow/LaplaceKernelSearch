@@ -200,7 +200,7 @@ def run_experiment(config, MI=False):
                 for i in range(100):
                     try:
                         train_start = time.time()
-                        loss, model, likelihood = optimize_hyperparameters(
+                        loss, model, likelihood, mll_train_log = optimize_hyperparameters(
                             model, likelihood,
                             MAP=False,
                             X=observations_x, Y=observations_y, 
@@ -341,7 +341,7 @@ def run_experiment(config, MI=False):
                 for i in range(100):
                     try:
                         train_start = time.time()
-                        loss, model, likelihood = optimize_hyperparameters(
+                        loss, model, likelihood, map_train_log = optimize_hyperparameters(
                             model, likelihood,
                             MAP=False,
                             X=observations_x, Y=observations_y, 
