@@ -339,3 +339,5 @@ def percentage_inside_ellipse(mu, K, points, sigma_level=2):
 def log_dill(data, filename):
     with open(filename, 'wb') as f:
         dill.dump(data, f)
+
+

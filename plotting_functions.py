@@ -493,7 +493,7 @@ def posterior_surface_plot(model, model_evidence_log, xdim=0, ydim=1, filter_typ
 
 
 
-    def plot_3d_data(samples, xx, yy, return_figure=False, fig=None, ax=None, display_figure=True, title_add = "", shadow=True):
+def plot_3d_data(samples, xx, yy, return_figure=False, fig=None, ax=None, display_figure=True, title_add = "", shadow=True):
     """
     Similar to plot_3d_gp_samples, but color-codes each (xx, yy) point in 3D.
     'samples' can be a single 1D tensor or multiple samples in a 2D tensor.
