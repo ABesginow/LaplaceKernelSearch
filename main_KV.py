@@ -108,8 +108,6 @@ def run_experiment(config, MI=False):
     all_observations_y = f_preds.sample_n(EXPERIMENT_REPITITIONS)
     test_observations_y = f_preds.sample_n(10)
     for (observations_y, exp_num) in tqdm(zip(all_observations_y, range(EXPERIMENT_REPITITIONS))):
-        if exp_num >= 1:
-            continue
         exp_num_result_dict = dict()
         for metric in metrics:
             exp_num_result_dict[metric] = dict()
@@ -176,7 +174,8 @@ def run_experiment(config, MI=False):
         if MI:
             model_kernels = ["[RBF; RBF]", "[RBF; LIN]", "[LIN; RBF]"]
         else:
-            model_kernels = ["LIN*SE", "LIN*PER", "SE", "SE+SE", "MAT32", "LIN", "PER*SE", "MAT32*PER", "MAT32+PER"]
+            #model_kernels = ["LIN*SE", "LIN*PER", "SE", "SE+SE", "MAT32", "LIN", "PER*SE", "MAT32*PER", "MAT32+PER"]
+            model_kernels = ["LIN", "SE", "SE+SE", "MAT32", "LIN*SE", "PER*SE", "MAT32*PER", "MAT32+PER", "LIN*PER", "PER"]
 
         for model_kernel in tqdm(model_kernels):
             print(f"Data Kernel: {data_kernel}")

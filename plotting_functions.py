@@ -21,7 +21,7 @@ from pygranso.private.getNvar import getNvarTorch
 import re
 import torch
 
-
+from helper_functions import percentage_inside_ellipse, get_std_points
 
 
 def plot_parameter_progression(parameter_progression, losses=None, xlabel=None, ylabel=None, fig=None, ax=None, xdim=0, ydim=1, display_figure=True, return_figure=False, title_add=""):
@@ -181,7 +181,7 @@ def nested_sampling_plot(model, model_evidence_log, xdim=0, ydim=1, filter_type=
                 continue
             lap_param_mu = lap_log["parameter values"]
             # Wait a minute, isn't the Hessian the inverse of the covariance matrix? Yes, see Murphy PML 1 eq. (7.228)
-            lap_param_cov_matr = torch.linalg.inv(lap_log["corrected Hessian"])
+            lap_param_cov_matr = torch.linalg.inv(lap_log["Hessian post correction"])
             # Calculate the amount of samples that are covered by the 1 sigma and 2 sigma interval based on the lap_mu and lap_cov values
             lap_2_sig_coverage = percentage_inside_ellipse(lap_param_mu.flatten().numpy(), lap_param_cov_matr.numpy(), res.samples[mask])
             coverages.append(lap_2_sig_coverage)
@@ -438,7 +438,7 @@ def posterior_surface_plot(model, model_evidence_log, xdim=0, ydim=1, filter_typ
     if plot_mll_opt and not mll_opt_params is None:
         ax.scatter(mll_opt_params[xdim], mll_opt_params[ydim], c="black", s=10)
         # Add a small text beside the point saying "MLL"
-        ax.text(mll_opt_params[xdim], mll_opt_params[ydim], "MLL", fontsize=12, color="black", verticalalignment='center', horizontalalignment='right')
+        ax.text(mll_opt_params[xdim], mll_opt_params[ydim], "MAP", fontsize=12, color="black", verticalalignment='center', horizontalalignment='right')
     
     coverages = list()
     if plot_lap:
@@ -448,7 +448,7 @@ def posterior_surface_plot(model, model_evidence_log, xdim=0, ydim=1, filter_typ
                 continue
             lap_param_mu = lap_log["parameter values"]
             # Wait a minute, isn't the Hessian the inverse of the covariance matrix? Yes, see Murphy PML 1 eq. (7.228)
-            lap_param_cov_matr = torch.linalg.inv(lap_log["corrected Hessian"])
+            lap_param_cov_matr = torch.linalg.inv(lap_log["Hessian post correction"])
             # Calculate the amount of samples that are covered by the 1 sigma and 2 sigma interval based on the lap_mu and lap_cov values
             lap_2_sig_coverage = percentage_inside_ellipse(lap_param_mu.flatten().numpy(), lap_param_cov_matr.numpy(), res.samples[mask])
             coverages.append(lap_2_sig_coverage)
