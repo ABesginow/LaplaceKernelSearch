@@ -165,20 +165,28 @@ def finite_difference_second_derivative_GP_neg_unscaled_map(model, likelihood, t
     curr_params = torch.tensor(list(model.parameters()))
     mll_fkt = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood, model)
 
-    h_i = h_i_step * torch.tensor(h_i_vec)
-    h_j = h_j_step * torch.tensor(h_j_vec)
+    while h_i_step > 1e-10 and h_j_step > 1e-10:
+        h_i = h_i_step * torch.tensor(h_i_vec)
+        h_j = h_j_step * torch.tensor(h_j_vec)
 
-    fixed_reinit(model, curr_params+h_i + h_j)
-    f_plus = (-mll_fkt(model(train_x), train_y) - log_normalized_prior(model, uninformed=uninformed))*len(*model.train_inputs)
+        try:
+            fixed_reinit(model, curr_params+h_i + h_j)
+            f_plus = (-mll_fkt(model(train_x), train_y) - log_normalized_prior(model, uninformed=uninformed))*len(*model.train_inputs)
 
-    fixed_reinit(model, curr_params+h_i - h_j)
-    f1 = (-mll_fkt(model(train_x), train_y) - log_normalized_prior(model, uninformed=uninformed))*len(*model.train_inputs)
-    fixed_reinit(model, curr_params-h_i + h_j)
-    f2 = (-mll_fkt(model(train_x), train_y) - log_normalized_prior(model, uninformed=uninformed))*len(*model.train_inputs)
+            fixed_reinit(model, curr_params+h_i - h_j)
+            f1 = (-mll_fkt(model(train_x), train_y) - log_normalized_prior(model, uninformed=uninformed))*len(*model.train_inputs)
+            fixed_reinit(model, curr_params-h_i + h_j)
+            f2 = (-mll_fkt(model(train_x), train_y) - log_normalized_prior(model, uninformed=uninformed))*len(*model.train_inputs)
 
-    fixed_reinit(model, curr_params - h_i - h_j)
-    f_minus = (-mll_fkt(model(train_x), train_y) - log_normalized_prior(model, uninformed=uninformed))*len(*model.train_inputs)
+            fixed_reinit(model, curr_params - h_i - h_j)
+            f_minus = (-mll_fkt(model(train_x), train_y) - log_normalized_prior(model, uninformed=uninformed))*len(*model.train_inputs)
 
+            break
+        except Exception as E:
+            print(f"Precision {h_i_step+h_j_step} too low. Halving precision")
+            h_i_step /= 2
+            h_j_step /= 2
+            pass
     # Reverse model reparameterization
     fixed_reinit(model, curr_params)
 
