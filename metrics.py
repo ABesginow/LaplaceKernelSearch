@@ -181,16 +181,17 @@ def finite_difference_second_derivative_GP_neg_unscaled_map(model, likelihood, t
             fixed_reinit(model, curr_params - h_i - h_j)
             f_minus = (-mll_fkt(model(train_x), train_y) - log_normalized_prior(model, uninformed=uninformed))*len(*model.train_inputs)
 
-            break
+            # Reverse model reparameterization
+            fixed_reinit(model, curr_params)
+
+            return (f_plus - f1 - f2 + f_minus) / (4*h_i_step*h_j_step)
+
         except Exception as E:
             print(f"Precision {h_i_step+h_j_step} too low. Halving precision")
             h_i_step /= 2
             h_j_step /= 2
             pass
-    # Reverse model reparameterization
-    fixed_reinit(model, curr_params)
-
-    return (f_plus - f1 - f2 + f_minus) / (4*h_i_step*h_j_step)
+    raise ValueError("Finite difference Hessian calculation failed.")
 
 
 def finite_difference_hessian(model, likelihood, num_params, train_x, train_y, uninformed=False, h_i_step=5e-2, h_j_step=5e-2):
