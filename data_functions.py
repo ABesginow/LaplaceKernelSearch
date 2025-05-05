@@ -259,7 +259,8 @@ class DataGenerator:
             else:
                 standard_pattern = INPUT_PATTERNS[pattern]
                 input = standard_pattern(n_points, n_dim, **kwargs)
-
+        if n_dim == 1:
+            input = input.flatten()
         return input
 
 

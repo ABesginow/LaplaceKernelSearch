@@ -455,7 +455,7 @@ def run_experiment(config, MI=False):
         pickle.dump(logables, fh)
 
 
-num_data =  [5] #[20, 50, 70, 100, 200, 5, 10, 30] 
+num_data =  [10, 20, 30, 50] #[20, 50, 70, 100, 200, 5, 10, 30] 
 data_kernel = ["LIN", "SE", "SE+SE", "MAT32", "LIN*SE", "PER*SE", "MAT32*PER", "MAT32+PER", "LIN*PER", "PER"]
 #MI_data_kernel = ["[RBF; RBF]", "[RBF; RBF_ell2]", "[RBF; LIN]", "[LIN; RBF]"]
 

@@ -211,6 +211,7 @@ def optimize_hyperparameters(model, likelihood, **kwargs):
     train_y = kwargs.get("Y", model.train_targets)
     MAP = kwargs.get("MAP", True)
     double_precision = kwargs.get("double_precision", False)
+    verbose = kwargs.get("verbose", False)
 
     # Set up the likelihood and model
     #likelihood = gpytorch.likelihoods.GaussianLikelihood()
@@ -261,12 +262,14 @@ def optimize_hyperparameters(model, likelihood, **kwargs):
 
     best_f = np.inf
     for restart in range(random_restarts):
-        print("---")
-        print("start parameters: ", opts.x0)
+        if verbose:
+            print("---")
+            print("start parameters: ", opts.x0)
         # Train the model using PyGRANSO
         try:
             soln = pygranso(var_spec=model, combined_fn=objective_function, user_opts=opts)
-            print(f"Restart {restart} : trained parameters: {list(model.named_parameters())}")
+            if verbose:
+                print(f"Restart {restart} : trained parameters: {list(model.named_parameters())}")
         except Exception as e:
             print(e)
             import pdb
@@ -274,7 +277,8 @@ def optimize_hyperparameters(model, likelihood, **kwargs):
             pass
 
         if soln.final.f < best_f:
-            print(f"LOG: Found new best solution: {soln.final.f}")
+            if verbose:
+                print(f"LOG: Found new best solution: {soln.final.f}")
             best_f = soln.final.f
             best_model_state_dict = model.state_dict()
             best_likelihood_state_dict = likelihood.state_dict()
@@ -283,9 +287,10 @@ def optimize_hyperparameters(model, likelihood, **kwargs):
 
     model.load_state_dict(best_model_state_dict)
     likelihood.load_state_dict(best_likelihood_state_dict)
-    print(f"----")
-    print(f"Final best parameters: {list(model.named_parameters())} w. loss: {best_f} (smaller=better)")
-    print(f"----")
+    if verbose:
+        print(f"----")
+        print(f"Final best parameters: {list(model.named_parameters())} w. loss: {best_f} (smaller=better)")
+        print(f"----")
 
     loss = -mll_fkt(model(train_x), train_y)
     #print(f"LOG: Final MLL: {loss}")
