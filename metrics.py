@@ -197,11 +197,19 @@ def finite_difference_second_derivative_GP_neg_unscaled_map(model, likelihood, t
 def finite_difference_hessian(model, likelihood, num_params, train_x, train_y, uninformed=False, h_i_step=5e-2, h_j_step=5e-2):
     hessian_finite_differences_neg_unscaled_map = np.zeros((num_params, num_params))
     for i, j in itertools.product(range(num_params), range(num_params)):
+        halving_factor = 1.0
         h_i_vec = np.zeros(num_params)
         h_j_vec = np.zeros(num_params)
         h_i_vec[i] = 1.0
         h_j_vec[j] = 1.0
         hessian_finite_differences_neg_unscaled_map[i][j] = finite_difference_second_derivative_GP_neg_unscaled_map(model, likelihood, train_x, train_y, uninformed=uninformed, h_i_step=h_i_step, h_j_step=h_j_step, h_i_vec=h_i_vec, h_j_vec=h_j_vec)
+        while i == j and hessian_finite_differences_neg_unscaled_map[i][j] < 0 and h_i_step > 1e-10 and h_j_step > 1e-10:
+            halving_factor *= 2
+            print("Negative diagonal entry in Hessian. Running with smaller step")
+            print(f"New precision: {(h_i_step+h_j_step)/halving_factor}")
+            h_i_step_temp = h_i_step/halving_factor
+            h_j_step_temp = h_j_step/halving_factor
+            hessian_finite_differences_neg_unscaled_map[i][j] = finite_difference_second_derivative_GP_neg_unscaled_map(model, likelihood, train_x, train_y, uninformed=uninformed, h_i_step=h_i_step_temp, h_j_step=h_j_step_temp, h_i_vec=h_i_vec, h_j_vec=h_j_vec)
     return hessian_finite_differences_neg_unscaled_map
 
 
