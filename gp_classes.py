@@ -18,6 +18,8 @@ class DataGPModel(gpytorch.models.ExactGP):
             self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.LinearKernel())
         elif kernel_text == "LIN*SE":
             self.covar_module = gpytorch.kernels.LinearKernel() * gpytorch.kernels.RBFKernel()
+        elif kernel_text == "C*PER":
+            self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.PeriodicKernel())
         elif kernel_text == "LIN*PER":
             self.covar_module = gpytorch.kernels.LinearKernel() * gpytorch.kernels.PeriodicKernel()
         elif kernel_text == "SE+SE":
@@ -93,6 +95,8 @@ class ExactGPModel(gpytorch.models.ExactGP):
             self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.LinearKernel())
         elif kernel_text == "LIN*SE":
             self.covar_module = gpytorch.kernels.LinearKernel() * gpytorch.kernels.RBFKernel()
+        elif kernel_text == "C*PER":
+            self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.PeriodicKernel())
         elif kernel_text == "LIN*PER":
             self.covar_module = gpytorch.kernels.LinearKernel() * gpytorch.kernels.PeriodicKernel()
         elif kernel_text == "SE+SE":
@@ -106,6 +110,11 @@ class ExactGPModel(gpytorch.models.ExactGP):
         #        self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.PeriodicKernel()) + gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel())
         #    else:
         #        self.covar_module = weights[0]*gpytorch.kernels.PeriodicKernel() + weights[1]*gpytorch.kernels.RBFKernel()
+
+        elif kernel_text == "PER+C*SE":
+            self.covar_module = gpytorch.kernels.PeriodicKernel() * gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel())
+        elif kernel_text == "PER+SE":
+            self.covar_module = gpytorch.kernels.PeriodicKernel() * gpytorch.kernels.RBFKernel()
         elif kernel_text == "PER*SE":
             self.covar_module = gpytorch.kernels.PeriodicKernel() * gpytorch.kernels.RBFKernel()
         #elif kernel_text == "PER*LIN":
