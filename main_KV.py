@@ -38,7 +38,7 @@ def run_experiment(config, MI=False):
     Returns nothing
 
     """
-    torch.manual_seed(42)
+    torch.manual_seed(43)
     metrics = ["AIC", "BIC", "Laplace", "MLL", "MAP", "Nested"]
     eval_START = -1 
     eval_END = 1 
@@ -438,7 +438,7 @@ def run_experiment(config, MI=False):
                 model.train()
                 likelihood.train()
                 #logz_nested, nested_log = NestedSampling(model, store_full=True, pickle_directory=experiment_path, maxcall=3000000)
-                logz_nested, nested_log = NestedSampling(model, store_full=True, pickle_directory=experiment_path, maxcall=30000)
+                logz_nested, nested_log = Nested(model, store_full=True, pickle_directory=experiment_path, maxcall=1e+5, uninformed=uninformed)
                 nested_logs = dict()
                 nested_logs["loss"] = logz_nested
                 nested_logs["details"] = nested_log
@@ -455,7 +455,7 @@ def run_experiment(config, MI=False):
         pickle.dump(logables, fh)
 
 
-num_data =  [10, 20, 30, 50] #[20, 50, 70, 100, 200, 5, 10, 30] 
+num_data =  [5, 10, 20, 30, 50] #[20, 50, 70, 100, 200, 5, 10, 30] 
 data_kernel = ["LIN", "SE", "SE+SE", "MAT32", "LIN*SE", "PER*SE", "MAT32*PER", "MAT32+PER", "LIN*PER", "PER"]
 #MI_data_kernel = ["[RBF; RBF]", "[RBF; RBF_ell2]", "[RBF; LIN]", "[LIN; RBF]"]
 

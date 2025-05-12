@@ -48,6 +48,52 @@ def list_available_patterns():
 # -------------------------------------------------------
 
 
+@register_input_pattern("linear shifted")
+def linear_shifted(n_points: int, n_dim: int, **kwargs) -> torch.tensor:
+    """
+    Linear input pattern shifted by a constant value to the right.
+    Will result in a linear pattern with a constant offset to the right by "SHIFT".
+
+    Parameters
+    ----------
+    n_points : int
+        Number of points to generate
+    n_dim : int
+        Number of dimensions
+    kwargs : dict
+        Additional arguments
+            - START : float
+                Base start value for the linear pattern, BEFORE shifting
+            - END : float
+                Base end value for the linear pattern, BEFORE shifting
+            - SHIFT : float
+                Shift value for the linear pattern
+            - NOISE : float
+                Noise value to add to the linear pattern    
+            - dim_weights : list of floats
+                Weights for each dimension (default: [1.0] * n_dim)
+
+    Returns
+    -------
+    torch.tensor
+        Generated input pattern
+
+    """
+    START = kwargs["START"] if "START" in kwargs else 0.0
+    END = kwargs["END"] if "END" in kwargs else 1.0
+    SHIFT = kwargs["SHIFT"] if "SHIFT" in kwargs else 0.0
+    NOISE = kwargs["NOISE"] if "NOISE" in kwargs else 0.0
+    # Purpose of dim weighting is to have dimensions grow at different rates
+    dim_weights = kwargs["dim_weights"] if "dim_weights" in kwargs else [1.0] * n_dim
+    # Example: [1.0, 2.0] means that the first dimension grows at 1x and the second at 2x
+    base_data = torch.stack([torch.linspace(START, END, n_points) + SHIFT for _ in range(n_dim)], dim=-1)
+    if n_dim > 1:
+        # Apply dimension weights
+        for i in range(n_dim):
+            base_data[:, i] = base_data[:, i] * dim_weights[i]
+    return base_data
+
+
 @register_input_pattern("linear")
 def linear(n_points: int, n_dim: int, **kwargs) -> torch.tensor:
     """
@@ -65,6 +111,8 @@ def linear(n_points: int, n_dim: int, **kwargs) -> torch.tensor:
                 Start value for the linear pattern
             - END : float
                 End value for the linear pattern
+            - NOISE : float
+                Noise value for the linear pattern
             - dim_weights : list of floats
                 Weights for each dimension (default: [1.0] * n_dim)
 
@@ -76,6 +124,7 @@ def linear(n_points: int, n_dim: int, **kwargs) -> torch.tensor:
     """
     START = kwargs["START"] if "START" in kwargs else 0.0
     END = kwargs["END"] if "END" in kwargs else 1.0
+    NOISE = kwargs["NOISE"] if "NOISE" in kwargs else 0.0
     # Purpose of dim weighting is to have dimensions grow at different rates
     dim_weights = kwargs["dim_weights"] if "dim_weights" in kwargs else [1.0] * n_dim
     # Example: [1.0, 2.0] means that the first dimension grows at 1x and the second at 2x
