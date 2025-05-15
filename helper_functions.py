@@ -1,6 +1,7 @@
 import sys
 sys.path.insert(1, "..")
 from collections import namedtuple
+import copy
 import dill
 from helpFunctions import get_string_representation_of_kernel as gsr
 from helpFunctions import get_full_kernels_in_kernel_expression
@@ -257,8 +258,8 @@ def optimize_hyperparameters(model, likelihood, **kwargs):
         #print(f"LOG: {loss}")
         return [loss, None, None]
 
-    best_model_state_dict = model.state_dict()
-    best_likelihood_state_dict = likelihood.state_dict()
+    best_model_state_dict = copy.deepcopy(model.state_dict())
+    best_likelihood_state_dict = copy.deepcopy(likelihood.state_dict())
 
     best_f = np.inf
     for restart in range(random_restarts):
@@ -280,8 +281,8 @@ def optimize_hyperparameters(model, likelihood, **kwargs):
             if verbose:
                 print(f"LOG: Found new best solution: {soln.final.f}")
             best_f = soln.final.f
-            best_model_state_dict = model.state_dict()
-            best_likelihood_state_dict = likelihood.state_dict()
+            best_model_state_dict = copy.deepcopy(model.state_dict())
+            best_likelihood_state_dict = copy.deepcopy(likelihood.state_dict())
         random_reinit(model, logarithmic=logarithmic_reinit)
         opts.x0 = torch.nn.utils.parameters_to_vector(model.parameters()).detach().reshape(nvar,1)
 
