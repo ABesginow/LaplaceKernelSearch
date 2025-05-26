@@ -53,9 +53,9 @@ def run_experiment(config, MI=False):
     logables = dict()
     # Make an "attributes" dictionary containing the settings
     attributes = {
-        "eval_START": eval_START,
-        "eval_END": eval_END,
-        "eval_COUNT": eval_COUNT,
+        "eval_START": str(eval_START),
+        "eval_END": str(eval_END),
+        "eval_COUNT": str(eval_COUNT),
         "optimizer": optimizer,
         "uninformed": uninformed,
         "log reinit": logarithmic_reinit,
@@ -407,7 +407,7 @@ def run_experiment(config, MI=False):
 
             # Laplace approximation including prior requires different loss
             if "Laplace" in metrics:
-                Laps_log = {param_punish : {} for param_punish in param_punishments}
+                Laps_log = {str(param_punish) : {} for param_punish in param_punishments}
                 for parameter_punishment in param_punishments:
                     approx, Lap_log = calculate_laplace(model, (-loss)*len(*model.train_inputs), param_punish_term = parameter_punishment, use_finite_difference_hessian=True, uninformed=True)
                     Laps_log[parameter_punishment]["parameter_punishment"] = parameter_punishment
