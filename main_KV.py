@@ -409,7 +409,7 @@ def run_experiment(config, MI=False):
             if "Laplace" in metrics:
                 Laps_log = {str(param_punish) : {} for param_punish in param_punishments}
                 for parameter_punishment in param_punishments:
-                    approx, Lap_log = calculate_laplace(model, (-loss)*len(*model.train_inputs), param_punish_term = parameter_punishment, use_finite_difference_hessian=True, uninformed=True)
+                    approx, Lap_log = calculate_laplace(model, copy.deepcopy((-loss)*len(*model.train_inputs)), param_punish_term = parameter_punishment, use_finite_difference_hessian=True, uninformed=True)
                     Laps_log[parameter_punishment]["parameter_punishment"] = parameter_punishment
                     Laps_log[parameter_punishment]["loss"] = approx
                     Laps_log[parameter_punishment]["Train time"] = train_end - train_start
