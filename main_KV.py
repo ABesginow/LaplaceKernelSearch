@@ -151,7 +151,7 @@ def run_experiment(config, MI=False):
             # Head (samples, xx, yy)
             f, ax = plot_3d_gp_samples(observations_y, xx, yy, return_figure=True)
         else:
-            f, ax = plot_data(original_observations_x, original_observations_y, return_figure=True, title_add="", display_figure=False)
+            f, ax = plot_data(observations_x, observations_y, return_figure=True, title_add="", display_figure=False)
        #Store the plots as .png
         f.savefig(os.path.join(experiment_path, f"DATA_normalized_{exp_num}.png"))
         if MI:
@@ -168,7 +168,7 @@ def run_experiment(config, MI=False):
                 # Head (samples, xx, yy)
                 f, ax = plot_3d_gp_samples(test_observations_y[test_data_num], xx, yy, return_figure=True)
             else:
-                f, ax = plot_data(original_observations_x, original_observations_y, return_figure=True, title_add="", display_figure=False)
+                f, ax = plot_data(original_observations_x, test_observations_y[test_data_num], return_figure=True, title_add="", display_figure=False)
             f.savefig(os.path.join(experiment_path, f"Test_data_{test_data_num}.png"))
 
         if MI:
