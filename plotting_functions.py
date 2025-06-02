@@ -492,6 +492,9 @@ def posterior_surface_plot(model, model_evidence_log, xdim=0, ydim=1, filter_typ
     return None, None
 
 
+# =============================================
+# 3D plotting
+# =============================================
 
 def plot_3d_data(samples, xx, yy, return_figure=False, fig=None, ax=None, display_figure=True, title_add = "", shadow=True):
     """
