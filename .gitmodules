@@ -1,0 +1,6 @@
+[submodule "lib/LODEGP"]
+	path = lib/LODEGP
+	url = git@github.com:ABesginow/LODE-GPs.git
+[submodule "lib/helpers"]
+	path = lib/helpers
+	url = git@github.com:ABesginow/GP_helpers.git
