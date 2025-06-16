@@ -209,130 +209,130 @@ def finite_difference_hessian(model, likelihood, num_params, train_x, train_y, u
 
 
 
-def Eigenvalue_correction(neg_mll_hessian, param_punish_term):
-    # Appendix E.2
-    vals, vecs = torch.linalg.eigh(neg_mll_hessian)
-    constructed_eigvals = torch.diag(torch.tensor(
-        [max(val, (torch.exp(torch.tensor(-2*param_punish_term))*(2*torch.pi))) for val in vals], dtype=vals.dtype))
-    num_replaced = torch.count_nonzero(vals - torch.diag(constructed_eigvals))
-    corrected_hessian = vecs@constructed_eigvals@vecs.t()
-    return corrected_hessian, torch.diag(constructed_eigvals), num_replaced, vecs
-        
-
-def calculate_laplace(model, pos_unscaled_map, variances_list=None, param_punish_term = -1.0, **kwargs):
-    #torch.set_default_tensor_type(torch.DoubleTensor)
-    theta_mu = kwargs["theta_mu"] if "theta_mu" in kwargs else None
-    bool_use_finite_difference_hessian = kwargs["use_finite_difference_hessian"] if "use_finite_difference_hessian" in kwargs else False
-    uninformed = kwargs["uninformed"] if "uninformed" in kwargs else False
-    logables = {}
-    total_start = time.time()
-    # Save a list of model parameters and compute the Hessian of the MLL
-    params_list = [p for p in model.parameters()]
-    # This is now the negative MLL
-    neg_unscaled_map = -pos_unscaled_map
-    start = time.time()
-    try:
-        jacobian_neg_unscaled_map = torch.autograd.grad(neg_unscaled_map, params_list, retain_graph=True, create_graph=True, allow_unused=True)
-    except Exception as E:
-        print(E)
-        import pdb
-        pdb.set_trace()
-        print(f"E:{E}")
-    hessian_neg_unscaled_map_raw = []
-    # Calcuate -\nabla\nabla log(f(\theta)) (i.e. Hessian of negative log posterior)
-    for i in range(len(jacobian_neg_unscaled_map)):
-        hessian_neg_unscaled_map_raw.append(torch.autograd.grad(jacobian_neg_unscaled_map[i], params_list, retain_graph=True, allow_unused=True))
-    # Calculate the Hessian using finite differences
-    hessian_neg_unscaled_finite_differences = torch.tensor(finite_difference_hessian(model, model.likelihood, len(params_list), model.train_inputs[0], model.train_targets, uninformed=uninformed) if bool_use_finite_difference_hessian else None)
-    end = time.time()
-    derivative_calc_time = end - start
-    if theta_mu is None:
-        theta_mu = []
-    if variances_list is None:
-        variances_list = []
-    debug_param_name_list = [l[0] for l in list(model.named_parameters())] 
-    
-    if variances_list == [] and theta_mu == []:
-        theta_mu, variance = prior_distribution(model, uninformed=uninformed)
-
-    params = torch.tensor(params_list).clone().reshape(-1, 1)
-
-    end = time.time()
-    prior_generation_time = end - start
-
-    hessian_neg_unscaled_map_symmetrized = torch.tensor(hessian_neg_unscaled_map_raw).clone()
-    hessian_neg_unscaled_map_symmetrized = (hessian_neg_unscaled_map_symmetrized + hessian_neg_unscaled_map_symmetrized.t()) / 2
-    hessian_neg_unscaled_map_symmetrized = hessian_neg_unscaled_map_symmetrized.to(torch.float64)
-
-    if param_punish_term == "BIC":
-        param_punish_term = -0.5*torch.log(torch.tensor(model.train_targets.numel()))
-
-
-    hessian_to_use = hessian_neg_unscaled_finite_differences if bool_use_finite_difference_hessian else hessian_neg_unscaled_map_symmetrized
-
-    # Appendix E.1
-    # it says mll, but it's actually the MAP here
-    start = time.time()
-    hessian_neg_unscaled_map_symmetrized_corrected, constructed_eigvals_log, num_replaced, hessian_neg_unscaled_map_symmetrized_eigvecs = Eigenvalue_correction(hessian_to_use, param_punish_term)
-    end = time.time()
-    hessian_correction_time = end - start
-    # punish term = + u/2 * ln(2pi) - 1/2 * ln(det(H))
-    # u = number of hyperparameters
-    #punish_term = 0.5*len(theta_mu)*torch.tensor(1.8378) - 0.5*torch.sum(torch.log(constructed_eigvals_log))
-    punish_term = 0.5*len(theta_mu)*torch.log(torch.tensor(2*np.pi)) - 0.5*torch.sum(torch.log(constructed_eigvals_log))
-    # 1.8378 = ln(2pi)
-    laplace = pos_unscaled_map + punish_term
-    #punish_without_replacement = 0.5*len(theta_mu)*torch.tensor(1.8378) - 0.5*torch.logdet(oldHessian)
-    laplace_without_replacement = pos_unscaled_map + 0.5*len(theta_mu)*torch.log(torch.tensor(2*np.pi)) - 0.5*torch.logdet(hessian_to_use)
-    end = time.time()
-    approximation_time = end - start
-    if param_punish_term == -1.0:
-        if (len(theta_mu) + punish_term) > 1e-4:
-            print("Something went horribly wrong with the c(i)s")
-            import pdb
-            pdb.set_trace()
-            print(constructed_eigvals_log)
-    else:
-        if (len(theta_mu) + punish_term) > len(theta_mu)+1e-4:
-            print("Something went horribly wrong with the c(i)s")
-            import pdb
-            pdb.set_trace()
-            print(constructed_eigvals_log)
-    total_time = end - total_start
-    # Everything worth logging
-    logables["MAP"] = neg_unscaled_map 
-    logables["punish term"] = punish_term 
-    logables["laplace without replacement"] = laplace_without_replacement
-    logables["correction term"] = param_punish_term
-
-    logables["num replaced"] = num_replaced
-    logables["parameter list"] = debug_param_name_list
-    logables["parameter values"] = params
-    logables["Jacobian autograd"] = jacobian_neg_unscaled_map
-    logables["diag(constructed eigvals)"] = constructed_eigvals_log
-    logables["use finite differences"] = bool_use_finite_difference_hessian
-    logables["Hessian finite difference"] = hessian_neg_unscaled_finite_differences
-    logables["Hessian autograd symmetrized"] = hessian_neg_unscaled_map_symmetrized
-    logables["Hessian pre correction"] = hessian_to_use
-    logables["eigenvectors Hessian pre correction"] = hessian_neg_unscaled_map_symmetrized_eigvecs
-    logables["Hessian post correction"] = hessian_neg_unscaled_map_symmetrized_corrected
-    logables["prior mean"] = theta_mu
-    logables["diag(prior var)"] = torch.diag(variance)
-    logables["model evidence approx"] = laplace
-
-    # Everything time related
-    logables["Derivative time"]         = derivative_calc_time
-    logables["Approximation time"]      = approximation_time
-    logables["Correction time"]         = hessian_correction_time
-    logables["Prior generation time"]   = prior_generation_time
-    logables["Total time"]              = total_time
-
-    if not torch.isfinite(laplace) and laplace > 0:
-        import pdb
-        pdb.set_trace()
-
-    #torch.set_default_tensor_type(torch.FloatTensor)
-    return laplace, logables
+#def Eigenvalue_correction(neg_mll_hessian, param_punish_term):
+#    # Appendix E.2
+#    vals, vecs = torch.linalg.eigh(neg_mll_hessian)
+#    constructed_eigvals = torch.diag(torch.tensor(
+#        [max(val, (torch.exp(torch.tensor(-2*param_punish_term))*(2*torch.pi))) for val in vals], dtype=vals.dtype))
+#    num_replaced = torch.count_nonzero(vals - torch.diag(constructed_eigvals))
+#    corrected_hessian = vecs@constructed_eigvals@vecs.t()
+#    return corrected_hessian, torch.diag(constructed_eigvals), num_replaced, vecs
+#        
+#
+#def calculate_laplace(model, pos_unscaled_map, variances_list=None, param_punish_term = -1.0, **kwargs):
+#    #torch.set_default_tensor_type(torch.DoubleTensor)
+#    theta_mu = kwargs["theta_mu"] if "theta_mu" in kwargs else None
+#    bool_use_finite_difference_hessian = kwargs["use_finite_difference_hessian"] if "use_finite_difference_hessian" in kwargs else False
+#    uninformed = kwargs["uninformed"] if "uninformed" in kwargs else False
+#    logables = {}
+#    total_start = time.time()
+#    # Save a list of model parameters and compute the Hessian of the MLL
+#    params_list = [p for p in model.parameters()]
+#    # This is now the negative MLL
+#    neg_unscaled_map = -pos_unscaled_map
+#    start = time.time()
+#    try:
+#        jacobian_neg_unscaled_map = torch.autograd.grad(neg_unscaled_map, params_list, retain_graph=True, create_graph=True, allow_unused=True)
+#    except Exception as E:
+#        print(E)
+#        import pdb
+#        pdb.set_trace()
+#        print(f"E:{E}")
+#    hessian_neg_unscaled_map_raw = []
+#    # Calcuate -\nabla\nabla log(f(\theta)) (i.e. Hessian of negative log posterior)
+#    for i in range(len(jacobian_neg_unscaled_map)):
+#        hessian_neg_unscaled_map_raw.append(torch.autograd.grad(jacobian_neg_unscaled_map[i], params_list, retain_graph=True, allow_unused=True))
+#    # Calculate the Hessian using finite differences
+#    hessian_neg_unscaled_finite_differences = torch.tensor(finite_difference_hessian(model, model.likelihood, len(params_list), model.train_inputs[0], model.train_targets, uninformed=uninformed) if bool_use_finite_difference_hessian else None)
+#    end = time.time()
+#    derivative_calc_time = end - start
+#    if theta_mu is None:
+#        theta_mu = []
+#    if variances_list is None:
+#        variances_list = []
+#    debug_param_name_list = [l[0] for l in list(model.named_parameters())] 
+#    
+#    if variances_list == [] and theta_mu == []:
+#        theta_mu, variance = prior_distribution(model, uninformed=uninformed)
+#
+#    params = torch.tensor(params_list).clone().reshape(-1, 1)
+#
+#    end = time.time()
+#    prior_generation_time = end - start
+#
+#    hessian_neg_unscaled_map_symmetrized = torch.tensor(hessian_neg_unscaled_map_raw).clone()
+#    hessian_neg_unscaled_map_symmetrized = (hessian_neg_unscaled_map_symmetrized + hessian_neg_unscaled_map_symmetrized.t()) / 2
+#    hessian_neg_unscaled_map_symmetrized = hessian_neg_unscaled_map_symmetrized.to(torch.float64)
+#
+#    if param_punish_term == "BIC":
+#        param_punish_term = -0.5*torch.log(torch.tensor(model.train_targets.numel()))
+#
+#
+#    hessian_to_use = hessian_neg_unscaled_finite_differences if bool_use_finite_difference_hessian else hessian_neg_unscaled_map_symmetrized
+#
+#    # Appendix E.1
+#    # it says mll, but it's actually the MAP here
+#    start = time.time()
+#    hessian_neg_unscaled_map_symmetrized_corrected, constructed_eigvals_log, num_replaced, hessian_neg_unscaled_map_symmetrized_eigvecs = Eigenvalue_correction(hessian_to_use, param_punish_term)
+#    end = time.time()
+#    hessian_correction_time = end - start
+#    # punish term = + u/2 * ln(2pi) - 1/2 * ln(det(H))
+#    # u = number of hyperparameters
+#    #punish_term = 0.5*len(theta_mu)*torch.tensor(1.8378) - 0.5*torch.sum(torch.log(constructed_eigvals_log))
+#    punish_term = 0.5*len(theta_mu)*torch.log(torch.tensor(2*np.pi)) - 0.5*torch.sum(torch.log(constructed_eigvals_log))
+#    # 1.8378 = ln(2pi)
+#    laplace = pos_unscaled_map + punish_term
+#    #punish_without_replacement = 0.5*len(theta_mu)*torch.tensor(1.8378) - 0.5*torch.logdet(oldHessian)
+#    laplace_without_replacement = pos_unscaled_map + 0.5*len(theta_mu)*torch.log(torch.tensor(2*np.pi)) - 0.5*torch.logdet(hessian_to_use)
+#    end = time.time()
+#    approximation_time = end - start
+#    if param_punish_term == -1.0:
+#        if (len(theta_mu) + punish_term) > 1e-4:
+#            print("Something went horribly wrong with the c(i)s")
+#            import pdb
+#            pdb.set_trace()
+#            print(constructed_eigvals_log)
+#    else:
+#        if (len(theta_mu) + punish_term) > len(theta_mu)+1e-4:
+#            print("Something went horribly wrong with the c(i)s")
+#            import pdb
+#            pdb.set_trace()
+#            print(constructed_eigvals_log)
+#    total_time = end - total_start
+#    # Everything worth logging
+#    logables["MAP"] = neg_unscaled_map 
+#    logables["punish term"] = punish_term 
+#    logables["laplace without replacement"] = laplace_without_replacement
+#    logables["correction term"] = param_punish_term
+#
+#    logables["num replaced"] = num_replaced
+#    logables["parameter list"] = debug_param_name_list
+#    logables["parameter values"] = params
+#    logables["Jacobian autograd"] = jacobian_neg_unscaled_map
+#    logables["diag(constructed eigvals)"] = constructed_eigvals_log
+#    logables["use finite differences"] = bool_use_finite_difference_hessian
+#    logables["Hessian finite difference"] = hessian_neg_unscaled_finite_differences
+#    logables["Hessian autograd symmetrized"] = hessian_neg_unscaled_map_symmetrized
+#    logables["Hessian pre correction"] = hessian_to_use
+#    logables["eigenvectors Hessian pre correction"] = hessian_neg_unscaled_map_symmetrized_eigvecs
+#    logables["Hessian post correction"] = hessian_neg_unscaled_map_symmetrized_corrected
+#    logables["prior mean"] = theta_mu
+#    logables["diag(prior var)"] = torch.diag(variance)
+#    logables["model evidence approx"] = laplace
+#
+#    # Everything time related
+#    logables["Derivative time"]         = derivative_calc_time
+#    logables["Approximation time"]      = approximation_time
+#    logables["Correction time"]         = hessian_correction_time
+#    logables["Prior generation time"]   = prior_generation_time
+#    logables["Total time"]              = total_time
+#
+#    if not torch.isfinite(laplace) and laplace > 0:
+#        import pdb
+#        pdb.set_trace()
+#
+#    #torch.set_default_tensor_type(torch.FloatTensor)
+#    return laplace, logables
 
 
 
@@ -446,7 +446,7 @@ def NestedSampling(model, **kwargs):
 
 
 class Lap():
-    def __init__(self, threshold, prior):
+    def __init__(self, threshold, prior=None):
         self.threshold = threshold
         self.prior = prior
 
@@ -459,6 +459,10 @@ class Lap():
             hessian = self.calc_hessian(neg_unscaled_optimum, model_parameters, **kwargs)
             constructed_eigvals_log = self.eigenvalue_correction(hessian, self.threshold, **kwargs)
         punish_term = 0.5*(len(model_parameters)*torch.log(2*torch.pi) - torch.sum(torch.log(constructed_eigvals_log)))
+        laplace = -neg_unscaled_optimum + punish_term
+        if not torch.isfinite(laplace) and laplace > 0:
+            import pdb
+            pdb.set_trace()
         if logging:
             total_logs = {}
             total_logs.update(hessian_logs)
@@ -470,12 +474,12 @@ class Lap():
                 "constructed eigvals log": constructed_eigvals_log,
                 "correction term": self.threshold,
                 "use finite differences": kwargs.get("use_finite_difference_hessian", False),
-                "model evidence approx": -neg_unscaled_optimum + punish_term,
+                "model evidence approx": laplace,
                 
             })
-            return -neg_unscaled_optimum + punish_term, total_logs
+            return laplace, total_logs
         else:
-            return -neg_unscaled_optimum + punish_term
+            return laplace
 
 
     def calc_hessian(self, neg_unscaled_optimum, model_parameters, **kwargs):
@@ -484,6 +488,8 @@ class Lap():
             model = kwargs.get("model", None)
             if model is None:
                 raise ValueError("Model must be provided when using finite difference Hessian.")
+            if self.prior is None:
+                raise ValueError("Prior must be provided when using finite difference Hessian.")
         logging = kwargs.get("logging", False)
         # Calculate the Hessian using autograd
         if not bool_use_finite_difference_hessian and not logging:
@@ -542,19 +548,19 @@ class Lap():
     
 
 class Lap0(Lap):
-    def __init__(self, prior):
+    def __init__(self, prior=None):
         super().__init__(threshold=0.0, prior=prior)
         pass
 
 
 class LapAIC(Lap):
-    def __init__(self, prior):
+    def __init__(self, prior=None):
         super().__init__(threshold=-1.0, prior=prior)
         pass
 
 
 class LapBIC(Lap):
-    def __init__(self, num_data, prior):
+    def __init__(self, num_data, prior=None):
         self.num_data = num_data
         # threshold is -0.5*log(n) where n is the number of data points
         super().__init__(threshold=-0.5*np.log(num_data), prior=prior)
