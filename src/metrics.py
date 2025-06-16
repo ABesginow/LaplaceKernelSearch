@@ -579,15 +579,40 @@ class AIC():
     def __init__(self):
         pass
 
-    def __call__(self):
-        pass
+    def __call__(self, neg_unscaled_mll, num_params, **kwargs):
+        logging = kwargs.get("logging", False)
+        start = time.time()
+        aic = 2*num_params - 2*(-neg_unscaled_mll)
+        end = time.time()
+        if logging:
+            logables = {"punish term" : 2*num_params,
+                        "Total time": end - start,
+                        "loss term": 2*(-neg_unscaled_mll)}
+            return aic, logables
+        else:
+            return aic
+
 
 class BIC():
-    def __init__(self):
-        pass
+    def __init__(self, num_data):
+        self.num_data = num_data
 
-    def __call__(self):
-        pass
+    def __call__(self, neg_unscaled_mll, num_params, **kwargs):
+        logging = kwargs.get("logging", False)
+        start = time.time()
+        bic = num_params*torch.log(self.num_data) - 2*(-neg_unscaled_mll)
+        end = time.time()
+        if logging:
+            logables = {"punish term" : num_params*torch.log(self.num_data),
+                        "Total time": end - start,
+                        "loss term": 2*(-neg_unscaled_mll)}
+            return bic, logables
+        else:
+            return bic
+
+
+
+
 
 class MAP():
     def __init__(self):
