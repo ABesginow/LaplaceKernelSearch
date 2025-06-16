@@ -128,24 +128,24 @@ def log_normalized_prior(model, theta_mu=None, sigma=None, uninformed=False):
     return log_prob.squeeze(0)
 
 
-def calculate_BIC(pos_unscaled_mll, num_params, num_data):
-    start = time.time()
-    BIC = num_params*torch.log(num_data) - 2*pos_unscaled_mll
-    end = time.time()
-    logables = {"punish term" : num_params*torch.log(num_data),
-                "Total time": end - start,
-                "loss term": 2*pos_unscaled_mll}
-    return BIC, logables
-
-
-def calculate_AIC(pos_unscaled_mll, num_params):
-    start = time.time()
-    AIC = 2*num_params - 2*pos_unscaled_mll
-    end = time.time()
-    logables = {"punish term" : 2*num_params,
-                "Total time": end - start,
-                "loss term": 2*pos_unscaled_mll}
-    return AIC, logables
+#def calculate_BIC(pos_unscaled_mll, num_params, num_data):
+#    start = time.time()
+#    BIC = num_params*torch.log(num_data) - 2*pos_unscaled_mll
+#    end = time.time()
+#    logables = {"punish term" : num_params*torch.log(num_data),
+#                "Total time": end - start,
+#                "loss term": 2*pos_unscaled_mll}
+#    return BIC, logables
+#
+#
+#def calculate_AIC(pos_unscaled_mll, num_params):
+#    start = time.time()
+#    AIC = 2*num_params - 2*pos_unscaled_mll
+#    end = time.time()
+#    logables = {"punish term" : 2*num_params,
+#                "Total time": end - start,
+#                "loss term": 2*pos_unscaled_mll}
+#    return AIC, logables
 
 
 def fixed_reinit(model, parameters: torch.tensor) -> None:
