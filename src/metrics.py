@@ -106,6 +106,7 @@ def prior_distribution(model, uninformed=False):
     variance = sigma@sigma
     return theta_mu, variance
  
+
 def log_normalized_prior(model, theta_mu=None, sigma=None, uninformed=False):
     theta_mu, sigma = prior_distribution(model, uninformed=uninformed) if theta_mu is None or sigma is None else (theta_mu, sigma)
     prior = torch.distributions.MultivariateNormal(theta_mu.t(), sigma)
@@ -125,6 +126,7 @@ def log_normalized_prior(model, theta_mu=None, sigma=None, uninformed=False):
     # for convention reasons I'm diving by the number of datapoints
     log_prob = prior.log_prob(params) / len(*model.train_inputs)
     return log_prob.squeeze(0)
+
 
 def calculate_BIC(pos_unscaled_mll, num_params, num_data):
     start = time.time()
@@ -305,8 +307,8 @@ def calculate_laplace(model, pos_unscaled_map, variances_list=None, param_punish
 
     logables["num replaced"] = num_replaced
     logables["parameter list"] = debug_param_name_list
-    logables["Jacobian autograd"] = jacobian_neg_unscaled_map
     logables["parameter values"] = params
+    logables["Jacobian autograd"] = jacobian_neg_unscaled_map
     logables["diag(constructed eigvals)"] = constructed_eigvals_log
     logables["use finite differences"] = bool_use_finite_difference_hessian
     logables["Hessian finite difference"] = hessian_neg_unscaled_finite_differences
@@ -441,3 +443,156 @@ def NestedSampling(model, **kwargs):
         pickle.dump(res, open(full_pickle_path, "wb"))
         logables["res file"] = full_pickle_path
     return res.logz[-1], logables
+
+
+class Lap():
+    def __init__(self, threshold, prior):
+        self.threshold = threshold
+        self.prior = prior
+
+    def __call__(self, neg_unscaled_optimum, model_parameters, **kwargs):
+        logging = kwargs.get("logging", False)
+        if logging:
+            hessian, hessian_logs = self.calc_hessian(neg_unscaled_optimum, model_parameters, **kwargs)
+            constructed_eigvals_log, eigval_correction_logs = self.eigenvalue_correction(hessian, self.threshold, **kwargs)
+        else:
+            hessian = self.calc_hessian(neg_unscaled_optimum, model_parameters, **kwargs)
+            constructed_eigvals_log = self.eigenvalue_correction(hessian, self.threshold, **kwargs)
+        punish_term = 0.5*(len(model_parameters)*torch.log(2*torch.pi) - torch.sum(torch.log(constructed_eigvals_log)))
+        if logging:
+            total_logs = {}
+            total_logs.update(hessian_logs)
+            total_logs.update(eigval_correction_logs)
+            total_logs.update({
+                "MAP": neg_unscaled_optimum,
+                "punish term": punish_term,
+                "laplace without replacement": -neg_unscaled_optimum + 0.5*(len(model_parameters)*torch.log(2*torch.pi) - torch.logdet(hessian)),
+                "constructed eigvals log": constructed_eigvals_log,
+                "correction term": self.threshold,
+                "use finite differences": kwargs.get("use_finite_difference_hessian", False),
+                "model evidence approx": -neg_unscaled_optimum + punish_term,
+                
+            })
+            return -neg_unscaled_optimum + punish_term, total_logs
+        else:
+            return -neg_unscaled_optimum + punish_term
+
+
+    def calc_hessian(self, neg_unscaled_optimum, model_parameters, **kwargs):
+        bool_use_finite_difference_hessian = kwargs.get("use_finite_difference_hessian", False)
+        if bool_use_finite_difference_hessian:
+            model = kwargs.get("model", None)
+            if model is None:
+                raise ValueError("Model must be provided when using finite difference Hessian.")
+        logging = kwargs.get("logging", False)
+        # Calculate the Hessian using autograd
+        if not bool_use_finite_difference_hessian and not logging:
+            try:
+                jacobian_neg_unscaled_map = torch.autograd.grad(neg_unscaled_optimum, model_parameters, retain_graph=True, create_graph=True, allow_unused=True)
+            except Exception as E:
+                print(E)
+                import pdb
+                pdb.set_trace()
+                print(f"E:{E}")
+            hessian_neg_unscaled_map_raw = []
+            # Calcuate -\nabla\nabla log(f(\theta)) (i.e. Hessian of negative log posterior)
+            for i in range(len(jacobian_neg_unscaled_map)):
+                hessian_neg_unscaled_map_raw.append(torch.autograd.grad(jacobian_neg_unscaled_map[i], model_parameters, retain_graph=True, allow_unused=True))
+
+            hessian_neg_unscaled_map_raw = hessian_neg_unscaled_map_raw.to(torch.float64)
+            hessian_neg_unscaled_map_raw = hessian_neg_unscaled_map_raw + hessian_neg_unscaled_map_raw.t()
+            hessian_neg_unscaled_map_raw = hessian_neg_unscaled_map_raw / 2.0
+        # Calculate the Hessian using finite differences
+        elif (bool_use_finite_difference_hessian or not logging) and model is not None:
+            hessian_neg_unscaled_finite_differences = torch.tensor(finite_difference_hessian(model, model.likelihood, len(model_parameters), model.train_inputs[0], model.train_targets, prior=self.prior) if bool_use_finite_difference_hessian else None)
+
+            hessian_neg_unscaled_finite_differences = hessian_neg_unscaled_finite_differences.to(torch.float64)
+            hessian_neg_unscaled_finite_differences = hessian_neg_unscaled_finite_differences + hessian_neg_unscaled_finite_differences.t()
+            hessian_neg_unscaled_finite_differences = hessian_neg_unscaled_finite_differences / 2.0
+
+        hessian_to_use = hessian_neg_unscaled_finite_differences if bool_use_finite_difference_hessian else hessian_neg_unscaled_map_raw
+
+        if logging:
+            return hessian_to_use, {
+                    "Jacobian autograd": jacobian_neg_unscaled_map,
+                    "Hessian autograd symmetrized": hessian_neg_unscaled_map_raw,
+                    "Hessian finite difference symmetrized": hessian_neg_unscaled_finite_differences,
+                    "Hessian pre correction": hessian_to_use,
+                }
+        else:
+            return hessian_to_use
+
+    def eigenvalue_correction(self, neg_map_hessian, param_punish_term, **kwargs):
+        logging = kwargs.get("logging", False)
+        # Appendix 
+        vals, vecs = torch.linalg.eigh(neg_map_hessian)
+        constructed_eigvals = torch.diag(torch.tensor(
+            [max(val, (torch.exp(torch.tensor(-2*param_punish_term))*(2*torch.pi))) for val in vals], dtype=vals.dtype))
+        if logging:
+            num_replaced = torch.count_nonzero(vals - torch.diag(constructed_eigvals))
+            corrected_hessian = vecs@constructed_eigvals@vecs.t()
+            return torch.diag(constructed_eigvals),{
+                "num replaced": num_replaced,
+                "eigenvectors Hessian pre correction": vecs,
+                "Hessian post correction": corrected_hessian,
+                "constructed eigvals log": constructed_eigvals,
+            }
+        else:
+            return torch.diag(constructed_eigvals)
+    
+
+class Lap0(Lap):
+    def __init__(self, prior):
+        super().__init__(threshold=0.0, prior=prior)
+        pass
+
+
+class LapAIC(Lap):
+    def __init__(self, prior):
+        super().__init__(threshold=-1.0, prior=prior)
+        pass
+
+
+class LapBIC(Lap):
+    def __init__(self, num_data, prior):
+        self.num_data = num_data
+        # threshold is -0.5*log(n) where n is the number of data points
+        super().__init__(threshold=-0.5*np.log(num_data), prior=prior)
+        pass
+
+
+class NestedSampling():
+    def __init__(self):
+        pass
+
+    def __call__(self):
+        pass
+
+
+class AIC():
+    def __init__(self):
+        pass
+
+    def __call__(self):
+        pass
+
+class BIC():
+    def __init__(self):
+        pass
+
+    def __call__(self):
+        pass
+
+class MAP():
+    def __init__(self):
+        pass
+
+    def __call__(self):
+        pass
+
+class MLL():
+    def __init__(self):
+        pass
+
+    def __call__(self):
+        pass
