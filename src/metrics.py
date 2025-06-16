@@ -1,23 +1,15 @@
 import copy
 import dynesty
-from dynesty import plotting as dyplot
-from GaussianProcess import ExactGPModel
-from globalParams import options
 import gpytorch
-from gpytorch.kernels import ScaleKernel
-from helpFunctions import get_string_representation_of_kernel as gsr, clean_kernel_expression, print_formatted_hyperparameters
+from gpr.helpFunctions import get_string_representation_of_kernel as gsr
 import itertools
-import matplotlib.pyplot as plt
 import numpy as np
 import pickle
 import random
-import re
-from scipy.special import lambertw
 import scipy
 import sys
 import time
 import torch
-import threading
 import os
 
 
