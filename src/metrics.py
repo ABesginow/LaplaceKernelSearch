@@ -2,6 +2,7 @@ import copy
 import dynesty
 import gpytorch
 from gpr.helpFunctions import get_string_representation_of_kernel as gsr
+from helpers import reparameterize_model
 import itertools
 import numpy as np
 import pickle
@@ -337,9 +338,9 @@ def finite_difference_hessian(model, likelihood, num_params, train_x, train_y, u
 
 
 
-def reparameterize_model(model, theta):
-    for model_param, sampled_param in zip(model.parameters(), theta):
-        model_param.data = torch.full_like(model_param.data, float(sampled_param))
+#def reparameterize_model(model, theta):
+#    for model_param, sampled_param in zip(model.parameters(), theta):
+#        model_param.data = torch.full_like(model_param.data, float(sampled_param))
 
 def reparameterize_and_pos_mll(model, likelihood, theta, train_x, train_y):
     reparameterize_model(model, theta)
