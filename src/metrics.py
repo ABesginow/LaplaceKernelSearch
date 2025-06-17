@@ -727,57 +727,42 @@ class BIC():
         return "BIC"
 
 
-class logMAP():
-    def __init__(self):
-        pass
+class MAP():
+    def __init__(self, logarithmic : bool, scaling : bool):
+        self.logarithmic = logarithmic
+        self.scaling = scaling
 
     def __call__(self, model, likelihood, train_x, train_y, prior, mll=None, **kwargs):
         if mll is None:
             mll = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood, model)
         gradient_needed = kwargs.get("gradient_needed", False)
-        scaling = kwargs.get("scaling", False)
-        if gradient_needed:
-            with torch.enable_grad():
-                mll_value = mll(model(train_x), train_y)
-                map = mll_value + prior(model)
-                if not scaling:
-                    map = map * len(*model.train_inputs)
-                return map
-        else:
-            # No gradient needed, so we can use no_grad context
-            with torch.no_grad():
-                mll_value = mll(model(train_x), train_y)
-                map = mll_value + prior(model)
-                if not scaling:
-                    map = map * len(*model.train_inputs)
-                return map
+        with torch.set_grad_enabled(gradient_needed):
+            mll_value = mll(model(train_x), train_y)
+            if not self.logarithmic:
+                mll_value = torch.exp(mll_value)
+            map = mll_value + prior(model, logarithmic=self.logarithmic)
+            if not self.scaling:
+                map = map * len(*model.train_inputs)
+            return map
 
     def __str__(self):
-        return "MAP"
+        return "log MAP"
 
 
 class MLL():
-    def __init__(self):
+    def __init__(self, scaling : bool):
+        self.scaling = scaling
         pass
 
     def __call__(self, model, likelihood, train_x, train_y, mll=None, **kwargs):
         if mll is None:
             mll = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood, model)
         gradient_needed = kwargs.get("gradient_needed", False)
-        scaling = kwargs.get("scaling", False)
-        if gradient_needed:
-            with torch.enable_grad():
-                mll_value = mll(model(train_x), train_y)
-                if not scaling: 
-                    mll_value = mll_value * len(*model.train_inputs)
-                return mll_value
-        else:
-            # No gradient needed, so we can use no_grad context
-            with torch.no_grad():
-                mll_value = mll(model(train_x), train_y)
-                if not scaling:
-                    mll_value = mll_value * len(*model.train_inputs)
-                return mll_value
+        with torch.set_grad_enabled(gradient_needed):
+            mll_value = mll(model(train_x), train_y)
+            if not self.scaling: 
+                mll_value = mll_value * len(*model.train_inputs)
+            return mll_value
 
     def __str__(self):
         return "MLL"
