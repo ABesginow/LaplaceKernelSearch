@@ -1,0 +1,17 @@
+[build-system]
+requires = ["hatchling >= 1.26"]
+build-backend = "hatchling.build"
+
+[project]
+name = "Laplace model selection"
+description = "A python package containing various metrics, including the Laplace approximation of the likelihood."
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "Andreas Besginow", email = "andreas.besginow@th-owl.de"},
+]
+requires-python = ">=3.12.9"
+dynamic=["version"]
+
+[tool.hatch.version]
+source = "vcs"
