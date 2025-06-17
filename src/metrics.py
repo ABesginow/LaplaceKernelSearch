@@ -348,101 +348,101 @@ def reparameterize_and_pos_mll(model, likelihood, theta, train_x, train_y):
         return mll(model(train_x), train_y)
 
 
-def NestedSampling(model, **kwargs):
-    print_progress = kwargs.get("print_progress", False)
-    #dynamic_sampling = kwargs.get("dynamic_sampling", True)
-    store_samples = kwargs.get("store_samples", False)
-    store_likelihoods = kwargs.get("store_likelihoods", False)
-    store_full = kwargs.get("store_full", False)
-    pickle_directory = kwargs.get("pickle_directory", "")
-    checkpoint_file = kwargs.get("checkpoint_file", None)
-    maxcall = kwargs.get("maxcall", sys.maxsize)
-    maxiter = kwargs.get("maxiter", sys.maxsize)
-    checkpoint_every = kwargs.get("checkpoint_every", sys.maxsize)
-    res_file_name = kwargs.get("res_file_name", None)
-    random_seed = kwargs.get("random_seed", None)
-    uninformed = kwargs.get("uninformed", False)
-    if random_seed is None:
-        random_seed = random.randint(0, 1000000)
+#def NestedSampling(model, **kwargs):
+    #print_progress = kwargs.get("print_progress", False)
+    ##dynamic_sampling = kwargs.get("dynamic_sampling", True)
+    #store_samples = kwargs.get("store_samples", False)
+    #store_likelihoods = kwargs.get("store_likelihoods", False)
+    #store_full = kwargs.get("store_full", False)
+    #pickle_directory = kwargs.get("pickle_directory", "")
+    #checkpoint_file = kwargs.get("checkpoint_file", None)
+    #maxcall = kwargs.get("maxcall", sys.maxsize)
+    #maxiter = kwargs.get("maxiter", sys.maxsize)
+    #checkpoint_every = kwargs.get("checkpoint_every", sys.maxsize)
+    #res_file_name = kwargs.get("res_file_name", None)
+    #random_seed = kwargs.get("random_seed", None)
+    #uninformed = kwargs.get("uninformed", False)
+    #if random_seed is None:
+        #random_seed = random.randint(0, 1000000)
 
-    prior_theta_mean, prior_theta_cov = prior_distribution(model, uninformed=uninformed)
+    #prior_theta_mean, prior_theta_cov = prior_distribution(model, uninformed=uninformed)
 
-    # Define the dimensionality of our problem.
-    ndim = len(list(model.parameters()))
+    ## Define the dimensionality of our problem.
+    #ndim = len(list(model.parameters()))
 
-    def loglike(theta_i):
-        try:
-            log_like = (reparameterize_and_pos_mll(model, model.likelihood, theta_i, 
-                                            model.train_inputs[0], 
-                                            model.train_targets)*len(*model.train_inputs)).detach().numpy()
-        except Exception as E:
-            #print(E)
-            log_like = -np.inf
-        return log_like
+    #def loglike(theta_i):
+        #try:
+            #log_like = (reparameterize_and_pos_mll(model, model.likelihood, theta_i, 
+                                            #model.train_inputs[0], 
+                                            #model.train_targets)*len(*model.train_inputs)).detach().numpy()
+        #except Exception as E:
+            ##print(E)
+            #log_like = -np.inf
+        #return log_like
 
-    # Define our prior via the prior transform.
-    def prior_transform(u):
-        """Transforms the uniform random variables `u ~ Unif[0., 1.)`
-        to the parameters of interest."""
+    ## Define our prior via the prior transform.
+    #def prior_transform(u):
+        #"""Transforms the uniform random variables `u ~ Unif[0., 1.)`
+        #to the parameters of interest."""
 
-        x = np.array(u)  # copy u
+        #x = np.array(u)  # copy u
 
-        # Bivariate Normal
-        t = scipy.stats.norm.ppf(u)  # convert to standard normal
-        Csqrt = np.linalg.cholesky(prior_theta_cov.numpy())
-        x = np.dot(Csqrt, t)  # correlate with appropriate covariance
-        mu = prior_theta_mean.flatten().numpy()  # mean
-        x += mu  # add mean
-        return x
+        ## Bivariate Normal
+        #t = scipy.stats.norm.ppf(u)  # convert to standard normal
+        #Csqrt = np.linalg.cholesky(prior_theta_cov.numpy())
+        #x = np.dot(Csqrt, t)  # correlate with appropriate covariance
+        #mu = prior_theta_mean.flatten().numpy()  # mean
+        #x += mu  # add mean
+        #return x
 
-    rng_generator = np.random.default_rng(seed=random_seed)
-    print(f"Random seed: {random_seed}")
-    if dynamic_sampling:
-        # Trying out dynamic sampler
-        dsampler = dynesty.DynamicNestedSampler(loglike, prior_transform, ndim, 
-                                                rstate=rng_generator)
-        start_time = time.time()
-        #dsampler.run_nested(dlogz_init=0.01, maxcall=100000, print_progress=print_progress)# nlive_init=500, nlive_batch=100,
-        dsampler.run_nested(dlogz_init=0.01,# nlive_init=500, nlive_batch=100,
-                            print_progress=print_progress,
-                            maxcall=maxcall,
-                            maxiter=maxiter,)
-                            # checkpoint_every=checkpoint_every, # checkpoint_file=checkpoint_file
-        end_time = time.time()
-        res = dsampler.results
+    #rng_generator = np.random.default_rng(seed=random_seed)
+    #print(f"Random seed: {random_seed}")
+    #if dynamic_sampling:
+        ## Trying out dynamic sampler
+        #dsampler = dynesty.DynamicNestedSampler(loglike, prior_transform, ndim, 
+                                                #rstate=rng_generator)
+        #start_time = time.time()
+        ##dsampler.run_nested(dlogz_init=0.01, maxcall=100000, print_progress=print_progress)# nlive_init=500, nlive_batch=100,
+        #dsampler.run_nested(dlogz_init=0.01,# nlive_init=500, nlive_batch=100,
+                            #print_progress=print_progress,
+                            #maxcall=maxcall,
+                            #maxiter=maxiter,)
+                            ## checkpoint_every=checkpoint_every, # checkpoint_file=checkpoint_file
+        #end_time = time.time()
+        #res = dsampler.results
 
-    else:
-        # Sample from our distribution.
-        sampler = dynesty.NestedSampler(loglike,
-                                        prior_transform,
-                                        ndim,
-                                        bound='multi',
-                                        sample='auto',
-                                        nlive=500)
-        sampler.run_nested(dlogz=0.01, print_progress=print_progress)
-        res = sampler.results
-    logables = dict()
-    logables["Sample time"] = end_time - start_time
-    logables["log Z"] = res["logz"][-1]
-    logables["log Z err"] = res["logzerr"][-1]
-    logables["prior mean"] = prior_theta_mean
-    logables["prior cov"] = prior_theta_cov
-    logables["dynamic"] = dynamic_sampling
-    logables["num sampled"] = res.niter
-    logables["parameter statistics"] = {"mu": np.mean(res.samples, axis=0),
-                                        "std": np.std(res.samples, axis=0)}
-    if store_likelihoods and not store_full:
-        logables["log likelihoods"] = res["logl"]
-    if store_samples and not store_full:
-        logables["samples"] = res["samples"]
-    if store_full:
-        pickle_filename = f"res_{time.time()}.pkl" if res_file_name is None else res_file_name
-        if not os.path.exists(os.path.join(pickle_directory, "Nested_results")):
-            os.makedirs(os.path.join(pickle_directory, "Nested_results"))
-        full_pickle_path = os.path.join(pickle_directory, "Nested_results", pickle_filename)
-        pickle.dump(res, open(full_pickle_path, "wb"))
-        logables["res file"] = full_pickle_path
-    return res.logz[-1], logables
+    #else:
+        ## Sample from our distribution.
+        #sampler = dynesty.NestedSampler(loglike,
+                                        #prior_transform,
+                                        #ndim,
+                                        #bound='multi',
+                                        #sample='auto',
+                                        #nlive=500)
+        #sampler.run_nested(dlogz=0.01, print_progress=print_progress)
+        #res = sampler.results
+    #logables = dict()
+    #logables["Sample time"] = end_time - start_time
+    #logables["log Z"] = res["logz"][-1]
+    #logables["log Z err"] = res["logzerr"][-1]
+    #logables["prior mean"] = prior_theta_mean
+    #logables["prior cov"] = prior_theta_cov
+    #logables["dynamic"] = dynamic_sampling
+    #logables["num sampled"] = res.niter
+    #logables["parameter statistics"] = {"mu": np.mean(res.samples, axis=0),
+                                        #"std": np.std(res.samples, axis=0)}
+    #if store_likelihoods and not store_full:
+        #logables["log likelihoods"] = res["logl"]
+    #if store_samples and not store_full:
+        #logables["samples"] = res["samples"]
+    #if store_full:
+        #pickle_filename = f"res_{time.time()}.pkl" if res_file_name is None else res_file_name
+        #if not os.path.exists(os.path.join(pickle_directory, "Nested_results")):
+            #os.makedirs(os.path.join(pickle_directory, "Nested_results"))
+        #full_pickle_path = os.path.join(pickle_directory, "Nested_results", pickle_filename)
+        #pickle.dump(res, open(full_pickle_path, "wb"))
+        #logables["res file"] = full_pickle_path
+    #return res.logz[-1], logables
 
 
 class Lap():
