@@ -712,11 +712,30 @@ class BIC():
 
 
 
-class MAP():
+class logMAP():
     def __init__(self):
         pass
 
-    def __call__(self):
+    def __call__(self, model, likelihood, train_x, train_y, prior, mll=None, **kwargs):
+        if mll is None:
+            mll = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood, model)
+        gradient_needed = kwargs.get("gradient_needed", False)
+        scaling = kwargs.get("scaling", False)
+        if gradient_needed:
+            with torch.enable_grad():
+                mll_value = mll(model(train_x), train_y)
+                map = mll_value + prior(model)
+                if not scaling:
+                    map = map * len(*model.train_inputs)
+                return map
+        else:
+            # No gradient needed, so we can use no_grad context
+            with torch.no_grad():
+                mll_value = mll(model(train_x), train_y)
+                map = mll_value + prior(model)
+                if not scaling:
+                    map = map * len(*model.train_inputs)
+                return map
         pass
 
 
@@ -724,5 +743,21 @@ class MLL():
     def __init__(self):
         pass
 
-    def __call__(self):
-        pass
+    def __call__(self, model, likelihood, train_x, train_y, mll=None, **kwargs):
+        if mll is None:
+            mll = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood, model)
+        gradient_needed = kwargs.get("gradient_needed", False)
+        scaling = kwargs.get("scaling", False)
+        if gradient_needed:
+            with torch.enable_grad():
+                mll_value = mll(model(train_x), train_y)
+                if not scaling: 
+                    mll_value = mll_value * len(*model.train_inputs)
+                return mll_value
+        else:
+            # No gradient needed, so we can use no_grad context
+            with torch.no_grad():
+                mll_value = mll(model(train_x), train_y)
+                if not scaling:
+                    mll_value = mll_value * len(*model.train_inputs)
+                return mll_value
