@@ -547,17 +547,23 @@ class Lap():
         else:
             return torch.diag(constructed_eigvals)
     
+    def __str__(self):
+        return f"Lap_{self.threshold}"
 
 class Lap0(Lap):
     def __init__(self, prior=None):
         super().__init__(threshold=0.0, prior=prior)
-        pass
+
+    def __str__(self):
+        return "Lap0"
 
 
 class LapAIC(Lap):
     def __init__(self, prior=None):
         super().__init__(threshold=-1.0, prior=prior)
-        pass
+
+    def __str__(self):
+        return "LapAIC"
 
 
 class LapBIC(Lap):
@@ -565,7 +571,9 @@ class LapBIC(Lap):
         self.num_data = num_data
         # threshold is -0.5*log(n) where n is the number of data points
         super().__init__(threshold=-0.5*np.log(num_data), prior=prior)
-        pass
+
+    def __str__(self):
+        return "LapBIC"
 
 
 class NestedSampling():
@@ -672,7 +680,9 @@ class NestedSampling():
             return res.logz[-1], logables
         else:
             return res.logz[-1]
-        pass
+
+    def __str__(self):
+        return "NestedSampling"
 
 
 class AIC():
@@ -692,6 +702,9 @@ class AIC():
         else:
             return aic
 
+    def __str__(self):
+        return "AIC"
+
 
 class BIC():
     def __init__(self, num_data):
@@ -710,6 +723,8 @@ class BIC():
         else:
             return bic
 
+    def __str__(self):
+        return "BIC"
 
 
 class logMAP():
@@ -736,7 +751,9 @@ class logMAP():
                 if not scaling:
                     map = map * len(*model.train_inputs)
                 return map
-        pass
+
+    def __str__(self):
+        return "MAP"
 
 
 class MLL():
@@ -761,3 +778,6 @@ class MLL():
                 if not scaling:
                     mll_value = mll_value * len(*model.train_inputs)
                 return mll_value
+
+    def __str__(self):
+        return "MLL"
