@@ -154,60 +154,6 @@ import os
 #        param.data = torch.full_like(param.data, value)
 
 
-# https://www.sfu.ca/sasdoc/sashtml/iml/chap11/sect8.htm
-# Also https://en.wikipedia.org/wiki/Finite_difference_coefficient
-def finite_difference_second_derivative_GP_neg_unscaled_map(model, likelihood, train_x, train_y, uninformed=False, h_i_step=5e-2, h_j_step=5e-2, h_i_vec=[0.0, 0.0, 0.0], h_j_vec=[0.0, 0.0, 0.0]):
-    curr_params = torch.tensor(list(model.parameters()))
-    mll_fkt = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood, model)
-
-    while h_i_step > 1e-10 and h_j_step > 1e-10:
-        h_i = h_i_step * torch.tensor(h_i_vec)
-        h_j = h_j_step * torch.tensor(h_j_vec)
-
-        try:
-            fixed_reinit(model, curr_params+h_i + h_j)
-            f_plus = (-mll_fkt(model(train_x), train_y) - log_normalized_prior(model, uninformed=uninformed))*len(*model.train_inputs)
-
-            fixed_reinit(model, curr_params+h_i - h_j)
-            f1 = (-mll_fkt(model(train_x), train_y) - log_normalized_prior(model, uninformed=uninformed))*len(*model.train_inputs)
-            fixed_reinit(model, curr_params-h_i + h_j)
-            f2 = (-mll_fkt(model(train_x), train_y) - log_normalized_prior(model, uninformed=uninformed))*len(*model.train_inputs)
-
-            fixed_reinit(model, curr_params - h_i - h_j)
-            f_minus = (-mll_fkt(model(train_x), train_y) - log_normalized_prior(model, uninformed=uninformed))*len(*model.train_inputs)
-
-            # Reverse model reparameterization
-            fixed_reinit(model, curr_params)
-
-            return (f_plus - f1 - f2 + f_minus) / (4*h_i_step*h_j_step)
-
-        except Exception as E:
-            print(f"Precision {h_i_step+h_j_step} too low. Halving precision")
-            h_i_step /= 2
-            h_j_step /= 2
-            pass
-    raise ValueError("Finite difference Hessian calculation failed.")
-
-
-def finite_difference_hessian(model, likelihood, num_params, train_x, train_y, uninformed=False, h_i_step=5e-2, h_j_step=5e-2):
-    hessian_finite_differences_neg_unscaled_map = np.zeros((num_params, num_params))
-    for i, j in itertools.product(range(num_params), range(num_params)):
-        halving_factor = 1.0
-        h_i_vec = np.zeros(num_params)
-        h_j_vec = np.zeros(num_params)
-        h_i_vec[i] = 1.0
-        h_j_vec[j] = 1.0
-        hessian_finite_differences_neg_unscaled_map[i][j] = finite_difference_second_derivative_GP_neg_unscaled_map(model, likelihood, train_x, train_y, uninformed=uninformed, h_i_step=h_i_step, h_j_step=h_j_step, h_i_vec=h_i_vec, h_j_vec=h_j_vec)
-        while i == j and hessian_finite_differences_neg_unscaled_map[i][j] < 0 and h_i_step > 1e-10 and h_j_step > 1e-10:
-            halving_factor *= 2
-            print("Negative diagonal entry in Hessian. Running with smaller step")
-            print(f"New precision: {(h_i_step+h_j_step)/halving_factor}")
-            h_i_step_temp = h_i_step/halving_factor
-            h_j_step_temp = h_j_step/halving_factor
-            hessian_finite_differences_neg_unscaled_map[i][j] = finite_difference_second_derivative_GP_neg_unscaled_map(model, likelihood, train_x, train_y, uninformed=uninformed, h_i_step=h_i_step_temp, h_j_step=h_j_step_temp, h_i_vec=h_i_vec, h_j_vec=h_j_vec)
-    return hessian_finite_differences_neg_unscaled_map
-
-
 
 
 #def Eigenvalue_correction(neg_mll_hessian, param_punish_term):
@@ -342,11 +288,6 @@ def finite_difference_hessian(model, likelihood, num_params, train_x, train_y, u
 #    for model_param, sampled_param in zip(model.parameters(), theta):
 #        model_param.data = torch.full_like(model_param.data, float(sampled_param))
 
-def reparameterize_and_pos_mll(model, likelihood, theta, train_x, train_y):
-    reparameterize_model(model, theta)
-    mll = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood, model)
-    with torch.no_grad():
-        return mll(model(train_x), train_y)
 
 
 #def NestedSampling(model, **kwargs):
@@ -445,6 +386,66 @@ def reparameterize_and_pos_mll(model, likelihood, theta, train_x, train_y):
         #logables["res file"] = full_pickle_path
     #return res.logz[-1], logables
 
+# https://www.sfu.ca/sasdoc/sashtml/iml/chap11/sect8.htm
+# Also https://en.wikipedia.org/wiki/Finite_difference_coefficient
+def finite_difference_second_derivative_GP_neg_unscaled_map(model, likelihood, train_x, train_y, uninformed=False, h_i_step=5e-2, h_j_step=5e-2, h_i_vec=[0.0, 0.0, 0.0], h_j_vec=[0.0, 0.0, 0.0]):
+    curr_params = torch.tensor(list(model.parameters()))
+    mll_fkt = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood, model)
+
+    while h_i_step > 1e-10 and h_j_step > 1e-10:
+        h_i = h_i_step * torch.tensor(h_i_vec)
+        h_j = h_j_step * torch.tensor(h_j_vec)
+
+        try:
+            fixed_reinit(model, curr_params+h_i + h_j)
+            f_plus = (-mll_fkt(model(train_x), train_y) - log_normalized_prior(model, uninformed=uninformed))*len(*model.train_inputs)
+
+            fixed_reinit(model, curr_params+h_i - h_j)
+            f1 = (-mll_fkt(model(train_x), train_y) - log_normalized_prior(model, uninformed=uninformed))*len(*model.train_inputs)
+            fixed_reinit(model, curr_params-h_i + h_j)
+            f2 = (-mll_fkt(model(train_x), train_y) - log_normalized_prior(model, uninformed=uninformed))*len(*model.train_inputs)
+
+            fixed_reinit(model, curr_params - h_i - h_j)
+            f_minus = (-mll_fkt(model(train_x), train_y) - log_normalized_prior(model, uninformed=uninformed))*len(*model.train_inputs)
+
+            # Reverse model reparameterization
+            fixed_reinit(model, curr_params)
+
+            return (f_plus - f1 - f2 + f_minus) / (4*h_i_step*h_j_step)
+
+        except Exception as E:
+            print(f"Precision {h_i_step+h_j_step} too low. Halving precision")
+            h_i_step /= 2
+            h_j_step /= 2
+            pass
+    raise ValueError("Finite difference Hessian calculation failed.")
+
+
+def finite_difference_hessian(model, likelihood, num_params, train_x, train_y, uninformed=False, h_i_step=5e-2, h_j_step=5e-2):
+    hessian_finite_differences_neg_unscaled_map = np.zeros((num_params, num_params))
+    for i, j in itertools.product(range(num_params), range(num_params)):
+        halving_factor = 1.0
+        h_i_vec = np.zeros(num_params)
+        h_j_vec = np.zeros(num_params)
+        h_i_vec[i] = 1.0
+        h_j_vec[j] = 1.0
+        hessian_finite_differences_neg_unscaled_map[i][j] = finite_difference_second_derivative_GP_neg_unscaled_map(model, likelihood, train_x, train_y, uninformed=uninformed, h_i_step=h_i_step, h_j_step=h_j_step, h_i_vec=h_i_vec, h_j_vec=h_j_vec)
+        while i == j and hessian_finite_differences_neg_unscaled_map[i][j] < 0 and h_i_step > 1e-10 and h_j_step > 1e-10:
+            halving_factor *= 2
+            print("Negative diagonal entry in Hessian. Running with smaller step")
+            print(f"New precision: {(h_i_step+h_j_step)/halving_factor}")
+            h_i_step_temp = h_i_step/halving_factor
+            h_j_step_temp = h_j_step/halving_factor
+            hessian_finite_differences_neg_unscaled_map[i][j] = finite_difference_second_derivative_GP_neg_unscaled_map(model, likelihood, train_x, train_y, uninformed=uninformed, h_i_step=h_i_step_temp, h_j_step=h_j_step_temp, h_i_vec=h_i_vec, h_j_vec=h_j_vec)
+    return hessian_finite_differences_neg_unscaled_map
+
+
+
+def reparameterize_and_pos_mll(model, likelihood, theta, train_x, train_y):
+    reparameterize_model(model, theta)
+    mll = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood, model)
+    with torch.no_grad():
+        return mll(model(train_x), train_y)
 
 class Lap():
     def __init__(self, threshold, prior=None):
