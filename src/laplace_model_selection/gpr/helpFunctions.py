@@ -1,4 +1,4 @@
-import defaultOptions
+import laplace_model_selection.gpr.defaultOptions
 
 def get_kernels_in_kernel_expression(kernel_expression):
     """

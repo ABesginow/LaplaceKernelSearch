@@ -1,8 +1,8 @@
 import copy
 import dynesty
 import gpytorch
-from gpr.helpFunctions import get_string_representation_of_kernel as gsr
-from helpers import reparameterize_model, fixed_reinit, prior_distribution, log_normalized_prior
+from laplace_model_selection.gpr.helpFunctions import get_string_representation_of_kernel as gsr
+from helpers.util_functions import reparameterize_model, fixed_reinit, prior_distribution, log_normalized_prior, extract_model_parameters
 import itertools
 import numpy as np
 import pickle
@@ -460,7 +460,7 @@ class Lap():
         else:
             hessian = self.calc_hessian(neg_unscaled_optimum, model_parameters, **kwargs)
             constructed_eigvals_log = self.eigenvalue_correction(hessian, self.threshold, **kwargs)
-        punish_term = 0.5*(len(model_parameters)*torch.log(2*torch.pi) - torch.sum(torch.log(constructed_eigvals_log)))
+        punish_term = 0.5*(len(model_parameters)*torch.log(torch.tensor(2*torch.pi)) - torch.sum(torch.log(torch.tensor(constructed_eigvals_log))))
         laplace = -neg_unscaled_optimum + punish_term
         if not torch.isfinite(laplace) and laplace > 0:
             import pdb
@@ -507,6 +507,7 @@ class Lap():
             for i in range(len(jacobian_neg_unscaled_map)):
                 hessian_neg_unscaled_map_raw.append(torch.autograd.grad(jacobian_neg_unscaled_map[i], model_parameters, retain_graph=True, allow_unused=True))
 
+            hessian_neg_unscaled_map_raw = torch.tensor(hessian_neg_unscaled_map_raw)
             hessian_neg_unscaled_map_raw = hessian_neg_unscaled_map_raw.to(torch.float64)
             hessian_neg_unscaled_map_raw = hessian_neg_unscaled_map_raw + hessian_neg_unscaled_map_raw.t()
             hessian_neg_unscaled_map_raw = hessian_neg_unscaled_map_raw / 2.0
@@ -582,7 +583,7 @@ class NestedSampling():
         self.model = model 
 
         self.dynamic_sampling = kwargs.get("dynamic_sampling", True)
-        self.prior = kwargs.get("prior", False)
+        self.prior = kwargs.get("prior", None)
         self.maxcall = kwargs.get("maxcall", sys.maxsize)
         self.maxiter = kwargs.get("maxiter", sys.maxsize)
         self.checkpoint_every = kwargs.get("checkpoint_every", sys.maxsize)
@@ -618,8 +619,8 @@ class NestedSampling():
 
         x = np.array(u)  # copy u
 
-        prior_theta_mean = self.prior.mean()
-        prior_theta_cov = self.prior.covariance_matrix()
+        prior_theta_mean = self.prior.mean
+        prior_theta_cov = self.prior.covariance_matrix
 
         # Bivariate Normal
         t = scipy.stats.norm.ppf(u)  # convert to standard normal
@@ -709,7 +710,7 @@ class AIC():
 
 class BIC():
     def __init__(self, num_data):
-        self.num_data = num_data
+        self.num_data = torch.tensor(num_data)
 
     def __call__(self, neg_unscaled_mll, num_params, **kwargs):
         logging = kwargs.get("logging", False)
@@ -741,7 +742,10 @@ class MAP():
             mll_value = mll(model(train_x), train_y)
             if not self.logarithmic:
                 mll_value = torch.exp(mll_value)
-            map = mll_value + prior(model, logarithmic=self.logarithmic)
+                prior_value = torch.exp(prior.log_prob(extract_model_parameters(model)))
+                map = mll_value * prior_value
+            else:
+                map = mll_value + prior.log_prob(extract_model_parameters(model))
             if not self.scaling:
                 map = map * len(*model.train_inputs)
             return map
