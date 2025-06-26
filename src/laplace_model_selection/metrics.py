@@ -122,13 +122,17 @@ class Lap():
 
     def calc_hessian(self, neg_unscaled_optimum, model_parameters, **kwargs):
         bool_use_finite_difference_hessian = kwargs.get("use_finite_difference_hessian", False)
+        model = kwargs.get("model", None)
         if bool_use_finite_difference_hessian:
-            model = kwargs.get("model", None)
             if model is None:
                 raise ValueError("Model must be provided when using finite difference Hessian.")
             if self.prior is None:
                 raise ValueError("Prior must be provided when using finite difference Hessian.")
         logging = kwargs.get("logging", False)
+
+        if (logging and not model) or bool_use_finite_difference_hessian and not model:
+            raise ValueError("Model must be provided when logging or finite differences are active.")
+
         # Calculate the Hessian using autograd
         if not bool_use_finite_difference_hessian or logging:
             try:
@@ -149,7 +153,7 @@ class Lap():
             hessian_neg_unscaled_map_raw = hessian_neg_unscaled_map_raw / 2.0
         # Calculate the Hessian using finite differences
         if (bool_use_finite_difference_hessian or logging) and model is not None:
-            hessian_neg_unscaled_finite_differences = torch.tensor(finite_difference_hessian(model, model.likelihood, len(model_parameters), model.train_inputs[0], model.train_targets, prior=self.prior) if bool_use_finite_difference_hessian else None)
+            hessian_neg_unscaled_finite_differences = torch.tensor(finite_difference_hessian(model, model.likelihood, len(model_parameters), model.train_inputs[0], model.train_targets, prior=self.prior))
 
             hessian_neg_unscaled_finite_differences = hessian_neg_unscaled_finite_differences.to(torch.float64)
             hessian_neg_unscaled_finite_differences = hessian_neg_unscaled_finite_differences + hessian_neg_unscaled_finite_differences.t()
@@ -220,7 +224,9 @@ class NestedSampling():
 
         self.dynamic_sampling = kwargs.get("dynamic_sampling", True)
         self.prior = kwargs.get("prior", None)
+        # The number of log likelihood calls
         self.maxcall = kwargs.get("maxcall", sys.maxsize)
+        # The maximum number of iterations
         self.maxiter = kwargs.get("maxiter", sys.maxsize)
         self.checkpoint_every = kwargs.get("checkpoint_every", sys.maxsize)
         self.random_seed = kwargs.get("random_seed", random.randint(0, 1000000))
@@ -233,7 +239,6 @@ class NestedSampling():
         self.res_file_name = kwargs.get("res_file_name", None)
         self.print_progress = kwargs.get("print_progress", False)
 
-        self.logging = kwargs.get("logging", False)
 
         self.ndim = len(list(model.parameters()))
 
@@ -266,7 +271,8 @@ class NestedSampling():
         x += mu  # add mean
         return x
 
-    def __call__(self):
+    def __call__(self, **kwargs):
+        self.logging = kwargs.get("logging", False)
         rng_generator = np.random.default_rng(seed=self.random_seed)
         print(f"Random seed: {self.random_seed}")
         if self.dynamic_sampling:
@@ -371,6 +377,7 @@ class MAP():
         self.scaling = scaling
 
     def __call__(self, model, likelihood, train_x, train_y, prior, mll=None, **kwargs):
+        logging = kwargs.get("logging", False)
         if mll is None:
             mll = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood, model)
         gradient_needed = kwargs.get("gradient_needed", False)
@@ -384,18 +391,22 @@ class MAP():
                 map = mll_value + prior.log_prob(extract_model_parameters(model))
             if not self.scaling:
                 map = map * len(*model.train_inputs)
-            return map
+            if logging:
+                return map, None
+            else:
+                return map
 
     def __str__(self):
         return "log MAP"
 
 
 class MLL():
-    def __init__(self, scaling : bool):
+    def __init__(self, logarithmic : bool, scaling : bool):
+        self.logarithmic = logarithmic
         self.scaling = scaling
-        pass
 
     def __call__(self, model, likelihood, train_x, train_y, mll=None, **kwargs):
+        logging = kwargs.get("logging", False)
         if mll is None:
             mll = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood, model)
         gradient_needed = kwargs.get("gradient_needed", False)
@@ -403,7 +414,12 @@ class MLL():
             mll_value = mll(model(train_x), train_y)
             if not self.scaling: 
                 mll_value = mll_value * len(*model.train_inputs)
-            return mll_value
+            if not self.logarithmic:
+                mll_value = torch.exp(mll_value)
+            if logging:
+                return mll_value, None 
+            else:
+                return mll_value
 
     def __str__(self):
         return "MLL"
