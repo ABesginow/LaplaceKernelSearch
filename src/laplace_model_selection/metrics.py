@@ -388,7 +388,7 @@ class MAP():
                 prior_value = torch.exp(prior.log_prob(extract_model_parameters(model)))
                 map = mll_value * prior_value
             else:
-                map = mll_value + prior.log_prob(extract_model_parameters(model))
+                map = mll_value + (prior.log_prob(extract_model_parameters(model)) / len(*model.train_inputs))
             if not self.scaling:
                 map = map * len(*model.train_inputs)
             if logging:
@@ -412,10 +412,10 @@ class MLL():
         gradient_needed = kwargs.get("gradient_needed", False)
         with torch.set_grad_enabled(gradient_needed):
             mll_value = mll(model(train_x), train_y)
-            if not self.scaling: 
-                mll_value = mll_value * len(*model.train_inputs)
             if not self.logarithmic:
                 mll_value = torch.exp(mll_value)
+            if not self.scaling: 
+                mll_value = mll_value * len(*model.train_inputs)
             if logging:
                 return mll_value, None 
             else:
