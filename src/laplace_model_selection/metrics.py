@@ -106,7 +106,7 @@ class Lap():
             total_logs.update(hessian_logs)
             total_logs.update(eigval_correction_logs)
             total_logs.update({
-                "MAP": neg_unscaled_optimum,
+                "neg MAP": neg_unscaled_optimum,
                 "punish term": punish_term,
                 "laplace without replacement": -neg_unscaled_optimum + 0.5*(len(model_parameters)*torch.log(torch.tensor(2*torch.pi)) - torch.logdet(hessian)),
                 "constructed eigvals log": constructed_eigvals_log,
@@ -176,7 +176,7 @@ class Lap():
         # Appendix 
         vals, vecs = torch.linalg.eigh(neg_map_hessian)
         constructed_eigvals = torch.diag(torch.tensor(
-            [max(val, (torch.exp(torch.tensor(-2*param_punish_term))*(2*torch.pi))) for val in vals], dtype=vals.dtype))
+            [torch.max(val, (torch.exp(torch.tensor(-2*param_punish_term))*(2*torch.pi))) for val in vals], dtype=vals.dtype))
         if logging:
             num_replaced = torch.count_nonzero(vals - torch.diag(constructed_eigvals))
             corrected_hessian = vecs@constructed_eigvals@vecs.t()
@@ -371,33 +371,97 @@ class BIC():
         return "BIC"
 
 
+#def manual_mll(likelihood):
+#    A = lambda pred, train_y:  - 0.5*train_y.T @ pred.covariance_matrix.inverse() @ train_y 
+#    B = lambda pred, train_y:  - 0.5*torch.logdet(pred.covariance_matrix)
+#    C = lambda pred, train_y:  - 0.5*train_y.size(0)*np.log(2*np.pi)
+#
+#    mll = lambda latent_pred, train_y: A(likelihood(latent_pred), train_y) + B(likelihood(latent_pred), train_y) + C(likelihood(latent_pred), train_y)
+#    return A, B, C, mll
+#
+def safe_covariance_matrix(cov_matrix, jitter=1e-4, max_tries=5):
+    for i in range(max_tries):
+        try:
+            # Try Cholesky to ensure positive definiteness
+            _ = torch.linalg.cholesky(cov_matrix)
+            return cov_matrix
+        except RuntimeError:
+            cov_matrix = cov_matrix + jitter * torch.eye(cov_matrix.size(-1), device=cov_matrix.device)
+            jitter *= 10  # Increase jitter if needed
+    raise RuntimeError("Covariance matrix not positive definite even after adding jitter.")
+
+
+def manual_mll(likelihood):
+    def A(pred, train_y):
+        cov = safe_covariance_matrix(pred.covariance_matrix)
+        # instead of torch.linalg.inv(cov) we use torch.linalg.solve for better numerical stability
+        return -0.5 * train_y.T @ torch.linalg.solve(cov, train_y)
+        #return -0.5 * train_y.T @ torch.linalg.inv(cov) @ train_y
+
+    def B(pred, train_y):
+        cov = safe_covariance_matrix(pred.covariance_matrix)
+        return -0.5 * torch.logdet(cov)
+
+    def C(pred, train_y):
+        return -0.5 * train_y.size(0) * np.log(2 * np.pi)
+
+    mll = lambda latent_pred, train_y: A(likelihood(latent_pred), train_y) + \
+                                       B(likelihood(latent_pred), train_y) + \
+                                       C(likelihood(latent_pred), train_y)
+    return A, B, C, mll
+
+
+
+
 class MAP():
     def __init__(self, logarithmic : bool, scaling : bool):
         self.logarithmic = logarithmic
         self.scaling = scaling
 
-    def __call__(self, model, likelihood, train_x, train_y, prior, mll=None, **kwargs):
+    def __call__(self, model, likelihood, train_x, train_y, prior, given_mll=None, **kwargs):
         logging = kwargs.get("logging", False)
-        if mll is None:
-            mll = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood, model)
+        if given_mll is None:
+            A, B, C, mll = manual_mll(likelihood)
+        else:
+            mll = given_mll
         gradient_needed = kwargs.get("gradient_needed", False)
         with torch.set_grad_enabled(gradient_needed):
-            mll_value = mll(model(train_x), train_y)
+            mll_value = mll(model(train_x), train_y) 
+            if given_mll:
+                mll_value = mll_value* len(*model.train_inputs)
             if not self.logarithmic:
                 mll_value = torch.exp(mll_value)
                 prior_value = torch.exp(prior.log_prob(extract_model_parameters(model)))
                 map = mll_value * prior_value
             else:
-                map = mll_value + (prior.log_prob(extract_model_parameters(model)) / len(*model.train_inputs))
-            if not self.scaling:
-                map = map * len(*model.train_inputs)
+                map = mll_value + prior.log_prob(extract_model_parameters(model))
+            if self.scaling:
+                map = map / len(*model.train_inputs)
             if logging:
-                return map, None
+                logables = {"scaling": self.scaling,
+                            "logarithmic": self.logarithmic,
+                            "prior_value": prior.log_prob(extract_model_parameters(model)) if self.logarithmic else torch.exp(prior.log_prob(extract_model_parameters(model))),}
+                if given_mll is None:
+                    latent_pred = model(train_x)
+                    data_fit = A(likelihood(latent_pred), train_y)
+                    complexity_term = B(likelihood(latent_pred), train_y) 
+                    normalization_constant = C(likelihood(latent_pred), train_y)
+                    logables.update({
+                        "data fit": data_fit,
+                        "complexity term": complexity_term,
+                        "normalization constant": normalization_constant,
+                    })
+                return map, logables 
             else:
                 return map
 
     def __str__(self):
-        return "log MAP"
+        output_str = "MAP"
+        if self.scaling:
+            output_str = "scaled " + output_str
+        if self.logarithmic:
+            output_str = "log "+ output_str
+        return output_str
 
 
 class MLL():
@@ -405,21 +469,42 @@ class MLL():
         self.logarithmic = logarithmic
         self.scaling = scaling
 
-    def __call__(self, model, likelihood, train_x, train_y, mll=None, **kwargs):
+    def __call__(self, model, likelihood, train_x, train_y, given_mll=None, **kwargs):
         logging = kwargs.get("logging", False)
-        if mll is None:
-            mll = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood, model)
+        if given_mll is None:
+            A, B, C, mll = manual_mll(likelihood)
+        else:
+            mll = given_mll
         gradient_needed = kwargs.get("gradient_needed", False)
         with torch.set_grad_enabled(gradient_needed):
-            mll_value = mll(model(train_x), train_y)
+            mll_value = mll(model(train_x), train_y) 
+            if given_mll:
+                mll_value = mll_value* len(*model.train_inputs)
             if not self.logarithmic:
                 mll_value = torch.exp(mll_value)
-            if not self.scaling: 
-                mll_value = mll_value * len(*model.train_inputs)
+            if self.scaling: 
+                mll_value = mll_value / len(*model.train_inputs)
             if logging:
-                return mll_value, None 
+                logables = {"scaling": self.scaling,
+                            "logarithmic": self.logarithmic,}
+                if given_mll is None:
+                    latent_pred = model(train_x)
+                    data_fit = A(likelihood(latent_pred), train_y)
+                    complexity_term = B(likelihood(latent_pred), train_y) 
+                    normalization_constant = C(likelihood(latent_pred), train_y)
+                    logables.update({
+                        "data fit": data_fit,
+                        "complexity term": complexity_term,
+                        "normalization constant": normalization_constant,
+                    })
+                return mll_value, logables 
             else:
                 return mll_value
 
     def __str__(self):
-        return "MLL"
+        output_str = "ML"
+        if self.scaling:
+            output_str = "scaled " + output_str
+        if self.logarithmic:
+            output_str = "log "+ output_str
+        return output_str
