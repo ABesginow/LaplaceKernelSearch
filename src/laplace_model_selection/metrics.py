@@ -396,7 +396,6 @@ def manual_mll(likelihood):
         cov = safe_covariance_matrix(pred.covariance_matrix)
         # instead of torch.linalg.inv(cov) we use torch.linalg.solve for better numerical stability
         return -0.5 * train_y.T @ torch.linalg.solve(cov, train_y)
-        #return -0.5 * train_y.T @ torch.linalg.inv(cov) @ train_y
 
     def B(pred, train_y):
         cov = safe_covariance_matrix(pred.covariance_matrix)
