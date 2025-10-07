@@ -3,7 +3,7 @@ import dynesty
 import gpytorch
 from laplace_model_selection.gpr.helpFunctions import get_string_representation_of_kernel as gsr
 from helpers.util_functions import reparameterize_model, fixed_reinit, prior_distribution, log_normalized_prior, extract_model_parameters
-from helpers.training_functions import kernel_parameter_priors, parameter_priors
+from helpers.training_functions import base_kernel_parameter_priors as kernel_parameter_priors, base_parameter_priors as parameter_priors
 import itertools
 import numpy as np
 import pickle
