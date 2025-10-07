@@ -33,7 +33,7 @@ import tqdm
 
 
 
-def sample_data_from_gp(eval_START, eval_END, eval_COUNT, data_kernel, train_dataset_count=5, test_data=True, test_sample_count=10):
+def sample_data_from_gp(train_START, train_END, train_COUNT, data_kernel, eval_START=0, eval_END=1, eval_COUNT=100, train_dataset_count=5, test_data=True, test_sample_count=10, interleaved_eval_data=False):
     # training data for model initialization (e.g. 1 point with x=0, y=0) ; this makes initializing the model easier
     prior_x = torch.linspace(0, 1, 1)
     prior_y = prior_x
@@ -41,22 +41,37 @@ def sample_data_from_gp(eval_START, eval_END, eval_COUNT, data_kernel, train_dat
     # initialize likelihood and model
     data_likelihood = gpytorch.likelihoods.GaussianLikelihood()
     data_model = DataGPModel(prior_x, prior_y, data_likelihood, kernel_name=data_kernel)
-    observations_x = torch.linspace(eval_START, eval_END, eval_COUNT)
 
-    # Get into evaluation (predictive posterior) mode
-    data_model.eval()
-    data_likelihood.eval()
 
-    # Make predictions by feeding model through likelihood
-    with torch.no_grad(), gpytorch.settings.prior_mode(True):
-        f_preds = data_model(observations_x)
 
-    all_observations_y = f_preds.sample_n(train_dataset_count)
-    if test_data:
-        test_observations_y = f_preds.sample_n(test_sample_count)
-        return (observations_x, all_observations_y), test_observations_y
+    # non-interleaved mode
+    if not interleaved_eval_data:
+        train_obs = torch.linspace(train_START, train_END, train_COUNT)
+        eval_obs = torch.linspace(eval_START, eval_END, eval_COUNT)
+        total_obs = torch.cat([train_obs, eval_obs], dim=0)
+
+        # Get into evaluation (predictive posterior) mode
+        data_model.eval()
+        data_likelihood.eval()
+
+        # Make predictions by feeding model through likelihood
+        with torch.no_grad(), gpytorch.settings.prior_mode(True):
+            train_obs_preds = data_model(train_obs)
+
+        all_observations_y = train_obs_preds.sample_n(train_dataset_count)
+        if test_data:
+            all_test_observations_y = []
+            for i in range(train_dataset_count):
+                data_model.set_train_data(train_obs, all_observations_y[i], strict=False)
+                with torch.no_grad():
+                    f_preds = data_likelihood(data_model(eval_obs))
+                test_observations_y = f_preds.sample_n(test_sample_count)
+                all_test_observations_y.append(test_observations_y)
+            return (train_obs, all_observations_y), (eval_obs, all_test_observations_y)
+        else:
+            return (train_obs, all_observations_y)
     else:
-        return (observations_x, all_observations_y)
+        ...
     
 
 
@@ -70,12 +85,16 @@ def run_experiment(config, **kwargs):
     """
     # Load the current settings
     torch.manual_seed(42)
-    eval_START = -1 
-    eval_END = 1 
+    train_START = 0
+    train_END = 1 
+    train_COUNT = config.get("num_data", 0)
+    eval_START = train_START 
+    eval_END = train_END + 1
+    eval_COUNT = 200
+
     noise_level = torch.sqrt(torch.tensor(config.get("noise_level", 0.0)))
     data_origin = config.get("data_origin", "DataGPModel") #DataGPModel, csv, helpers.data_functions, LODE solution, ...
     # No num_data means a premade dataset
-    eval_COUNT = config.get("num_data", 0)
     data_kernel = config.get("data_kernel", None)
     model_kernel = config["model_kernel"]
     
@@ -84,9 +103,12 @@ def run_experiment(config, **kwargs):
     #logables = dict()
     # Make an "attributes" dictionary containing the settings
     attributes = {
-        "dataStart": str(eval_START),
-        "dataEnd": str(eval_END),
-        "dataNum": str(eval_COUNT),
+        "dataStart": str(train_START),
+        "dataEnd": str(train_END),
+        "dataNum": str(train_COUNT),
+        "evalStart": str(eval_START),
+        "evalEnd": str(eval_END),
+        "evalNum": str(eval_COUNT),
         "dataGenKernel": data_kernel,
         "modelKernel": model_kernel,
         "dataOrigin": data_origin,
@@ -96,7 +118,7 @@ def run_experiment(config, **kwargs):
     #logables["results"] = list() 
     # Create the data
     if data_origin == "DataGPModel":
-        (observations_x, all_observations_y), test_observations_y = sample_data_from_gp(eval_START=eval_START, eval_END=eval_END, eval_COUNT=eval_COUNT, data_kernel=data_kernel, train_dataset_count=10, test_data=True)
+        (observations_x, all_observations_y), test_observations_y = sample_data_from_gp(train_START=train_START, train_END=train_END, train_COUNT=train_COUNT, eval_START=eval_START, eval_END=eval_END, eval_COUNT=eval_COUNT, data_kernel=data_kernel, train_dataset_count=10, test_data=True)
         test_data_exists = True
     elif "ucimlrepo" in data_origin:
         # Split the repo name from the dataset name
