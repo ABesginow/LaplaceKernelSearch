@@ -2,6 +2,7 @@ import copy
 import dill
 import gpytorch
 from helpers.example_kernels import available
+from helpers.data_functions import sample_data_from_gp
 from ucimlrepo import fetch_ucirepo 
   
 from datetime import datetime
@@ -27,53 +28,7 @@ import os
 import torch
 import tqdm
 
-
-
-
-
-
-
-def sample_data_from_gp(train_START, train_END, train_COUNT, data_kernel, eval_START=0, eval_END=1, eval_COUNT=100, train_dataset_count=5, test_data=True, test_sample_count=10, interleaved_eval_data=False):
-    # training data for model initialization (e.g. 1 point with x=0, y=0) ; this makes initializing the model easier
-    prior_x = torch.linspace(0, 1, 1)
-    prior_y = prior_x
-
-    # initialize likelihood and model
-    data_likelihood = gpytorch.likelihoods.GaussianLikelihood()
-    data_model = DataGPModel(prior_x, prior_y, data_likelihood, kernel_name=data_kernel)
-
-
-
-    # non-interleaved mode
-    if not interleaved_eval_data:
-        train_obs = torch.linspace(train_START, train_END, train_COUNT)
-        eval_obs = torch.linspace(eval_START, eval_END, eval_COUNT)
-        total_obs = torch.cat([train_obs, eval_obs], dim=0)
-
-        # Get into evaluation (predictive posterior) mode
-        data_model.eval()
-        data_likelihood.eval()
-
-        # Make predictions by feeding model through likelihood
-        with torch.no_grad(), gpytorch.settings.prior_mode(True):
-            train_obs_preds = data_model(train_obs)
-
-        all_observations_y = train_obs_preds.sample_n(train_dataset_count)
-        if test_data:
-            all_test_observations_y = []
-            for i in range(train_dataset_count):
-                data_model.set_train_data(train_obs, all_observations_y[i], strict=False)
-                with torch.no_grad():
-                    f_preds = data_likelihood(data_model(eval_obs))
-                test_observations_y = f_preds.sample_n(test_sample_count)
-                all_test_observations_y.append(test_observations_y)
-            return (train_obs, all_observations_y), (eval_obs, all_test_observations_y)
-        else:
-            return (train_obs, all_observations_y)
-    else:
-        ...
-    
-
+torch.set_default_dtype(torch.float64)
 
 
 def run_experiment(config, **kwargs):
@@ -90,7 +45,7 @@ def run_experiment(config, **kwargs):
     train_COUNT = config.get("num_data", 0)
     eval_START = train_START 
     eval_END = train_END + 1
-    eval_COUNT = 200
+    eval_COUNT = 100
 
     noise_level = torch.sqrt(torch.tensor(config.get("noise_level", 0.0)))
     data_origin = config.get("data_origin", "DataGPModel") #DataGPModel, csv, helpers.data_functions, LODE solution, ...
@@ -99,6 +54,7 @@ def run_experiment(config, **kwargs):
     model_kernel = config["model_kernel"]
     
     only_nested = kwargs.get("only_nested", False)
+    print("Log: Configs loaded")
 
     #logables = dict()
     # Make an "attributes" dictionary containing the settings
@@ -118,8 +74,9 @@ def run_experiment(config, **kwargs):
     #logables["results"] = list() 
     # Create the data
     if data_origin == "DataGPModel":
-        (observations_x, all_observations_y), test_observations_y = sample_data_from_gp(train_START=train_START, train_END=train_END, train_COUNT=train_COUNT, eval_START=eval_START, eval_END=eval_END, eval_COUNT=eval_COUNT, data_kernel=data_kernel, train_dataset_count=10, test_data=True)
+        (observations_x, all_observations_y), (int_eval_pos, int_eval_obs), (app_eval_pos, app_eval_obs) = sample_data_from_gp(train_START=train_START, train_END=train_END, train_COUNT=train_COUNT, eval_START=eval_START, eval_END=eval_END, eval_COUNT=eval_COUNT, data_kernel=data_kernel, train_dataset_count=10, test_data=True, test_dataset_count=10, interleaved_to_appended_ratio=0.5)
         test_data_exists = True
+        print("Log: DataGPModel data generated")
     elif "ucimlrepo" in data_origin:
         # Split the repo name from the dataset name
         dataset_name = data_origin.split("_")[1].split("-")[1]
@@ -155,6 +112,8 @@ def run_experiment(config, **kwargs):
             # X will be only the HoursSinceStart column
             observations_x = torch.tensor(np.array(df.loc[y.index, ["HoursSinceStart"]])).flatten()
             test_data_exists = False
+            print("Log: UCI Airquality dataset loaded")
+            
         
     
     original_observations_x = copy.deepcopy(observations_x)
@@ -179,7 +138,7 @@ def run_experiment(config, **kwargs):
             observations_y = (observations_y - torch.mean(observations_y)) / torch.std(observations_y)
             test_observations_y = (test_observations_y - torch.mean(test_observations_y)) / torch.std(test_observations_y)
 
-        experiment_path = Path.cwd() / Path("results") / Path("results") / Path(f"kernel_variation_{data_origin}", f"{eval_COUNT}_{data_kernel}", f"{model_kernel}")
+        experiment_path = Path.cwd() / Path("results") / Path("results") / Path(f"kernel_variation_{data_origin}", f"{train_COUNT}_{data_kernel}", f"{model_kernel}")
 
         print(f"PATH: {experiment_path}")
 
@@ -204,7 +163,7 @@ def run_experiment(config, **kwargs):
             # store the first, middle and last test samples
             for test_data_num in [0, 5, 9]:
                 # Plot examples of the test data
-                f, ax = plot_training_data(original_observations_x, test_observations_y[test_data_num], return_fig=True, show=False)
+                f, ax = plot_training_data(torch.cat((int_eval_pos, app_eval_pos)), torch.cat((int_eval_obs[exp_num], app_eval_obs[exp_num][test_data_num])), return_fig=True, show=False)
                 f.savefig(os.path.join(experiment_path, f"Test_data_{test_data_num}.png"))
                 #f.savefig(os.path.join(experiment_path, f"Test_data_{test_data_num}.pgf"))
 
@@ -310,24 +269,83 @@ def run_experiment(config, **kwargs):
         # Since the data is sampled from the same distribution, the likelihood for the trained model should be good.
         test_likelihoods = []
         test_likelihoods_map = []
+        (observations_x, all_observations_y), (int_eval_pos, int_eval_obs), (app_eval_pos, app_eval_obs) 
         if test_data_exists:
-            for test_y in test_observations_y:
-                model_MLL.set_train_data(observations_x, test_y)
-                gpytorch_log_likelihood = gpytorch.mlls.ExactMarginalLogLikelihood(model_MLL.likelihood, model_MLL)
-                test_likelihoods.append(gpytorch_log_likelihood(model_MLL(observations_x), test_y))
+            model_MLL.eval()
+            model_MAP.eval()
+            if "int_eval_obs" in locals() and int_eval_obs is not None:
+                # Do interleaved test data
+                # Metrics to test: MLL, MSE
+                for test_y in [int_eval_obs[exp_num]]:
+                    ## MLL
+                    int_test_likelihoods_MAP = list()
+                    int_test_likelihoods_MLL = list()
+                    for test_y in int_eval_obs:
+                        # Do MLL via a predictive distribution at eval_pos and then use dist.log_prob(test_y) to get the likelihood
+                        with torch.no_grad():
+                            int_MLL_preds = model_MLL(int_eval_pos)
+                            int_MAP_preds = model_MAP(int_eval_pos)
+                            int_normalized_log_prob_MLL = int_MLL_preds.log_prob(test_y/test_y.numel())
+                            int_normalized_log_prob_MAP = int_MAP_preds.log_prob(test_y/test_y.numel())
+                        int_test_likelihoods_MAP.append(int_normalized_log_prob_MAP)
+                        int_test_likelihoods_MLL.append(int_normalized_log_prob_MLL)
 
-                model_MAP.set_train_data(observations_x, test_y)
-                gpytorch_log_likelihood_map_model = gpytorch.mlls.ExactMarginalLogLikelihood(model_MAP.likelihood, model_MAP)
-                test_likelihoods_map.append(gpytorch_log_likelihood_map_model(model_MAP(observations_x), test_y))
-            dill.dump(test_likelihoods, open(os.path.join(experiment_path, f"{exp_num}_testLikelihoods.pkl"), "wb")) 
-            dill.dump(test_likelihoods_map, open(os.path.join(experiment_path, f"{exp_num}_testLikelihoods_map.pkl"), "wb")) 
-            dill.dump(test_observations_y, open(os.path.join(experiment_path, f"{exp_num}_testData.pkl"), "wb")) 
 
-        # Other approach for test evaluation:
-        # MAE
-        # 
+                    dill.dump(int_test_likelihoods_MLL, open(os.path.join(experiment_path, f"{exp_num}_intTestLikelihoodsMLL.pkl"), "wb")) 
+                    dill.dump(int_test_likelihoods_MAP, open(os.path.join(experiment_path, f"{exp_num}_intTestLikelihoodsMAP.pkl"), "wb")) 
+                    dill.dump(int_eval_obs, open(os.path.join(experiment_path, f"{exp_num}_intTestData.pkl"), "wb")) 
+
+                    ## MSE
+                    int_test_MSEs_MLL = list()
+                    int_test_MSEs_MAP = list()
+                    for test_y in int_eval_obs:
+                        with torch.no_grad():
+                            int_MLL_preds = model_MLL(int_eval_pos)
+                            int_MAP_preds = model_MAP(int_eval_pos)
+                            int_MLL_MSE = torch.mean((test_y - int_MLL_preds.mean)**2)
+                            int_MAP_MSE = torch.mean((test_y - int_MAP_preds.mean)**2)
+                        int_test_MSEs_MLL.append(int_MLL_MSE)
+                        int_test_MSEs_MAP.append(int_MAP_MSE)
+
+                    dill.dump(int_test_MSEs_MLL, open(os.path.join(experiment_path, f"{exp_num}_intTestMSEsMLL.pkl"), "wb")) 
+                    dill.dump(int_test_MSEs_MAP, open(os.path.join(experiment_path, f"{exp_num}_intTestMSEsMAP.pkl"), "wb")) 
+
+            if "app_eval_obs" in locals() and app_eval_obs is not None:
+                # Do appended test data
+                # Metrics to test: MLL, MSE
+
+                ## MLL
+                app_test_likelihoods_MAP = list()
+                app_test_likelihoods_MLL = list()
+                for test_y in app_eval_obs:
+                    # Do MLL via a predictive distribution at eval_pos and then use dist.log_prob(test_y) to get the likelihood
+                    with torch.no_grad():
+                        app_MLL_preds = model_MLL(app_eval_pos)
+                        app_MAP_preds = model_MAP(app_eval_pos)
+                        app_normalized_log_prob_MLL = app_MLL_preds.log_prob(test_y/test_y.numel())
+                        app_normalized_log_prob_MAP = app_MAP_preds.log_prob(test_y/test_y.numel())
+                    app_test_likelihoods_MAP.append(app_normalized_log_prob_MAP)
+                    app_test_likelihoods_MLL.append(app_normalized_log_prob_MLL)
 
 
+                dill.dump(app_test_likelihoods_MLL, open(os.path.join(experiment_path, f"{exp_num}_appTestLikelihoodsMLL.pkl"), "wb")) 
+                dill.dump(app_test_likelihoods_MAP, open(os.path.join(experiment_path, f"{exp_num}_appTestLikelihoodsMAP.pkl"), "wb")) 
+                dill.dump(app_eval_obs, open(os.path.join(experiment_path, f"{exp_num}_appTestData.pkl"), "wb")) 
+
+                ## MSE
+                app_test_MSEs_MLL = list()
+                app_test_MSEs_MAP = list()
+                for test_y in app_eval_obs:
+                    with torch.no_grad():
+                        app_MLL_preds = model_MLL(app_eval_pos)
+                        app_MAP_preds = model_MAP(app_eval_pos)
+                        app_MLL_MSE = torch.mean((test_y - app_MLL_preds.mean)**2)
+                        app_MAP_MSE = torch.mean((test_y - app_MAP_preds.mean)**2)
+                    app_test_MSEs_MLL.append(app_MLL_MSE)
+                    app_test_MSEs_MAP.append(app_MAP_MSE)
+
+                dill.dump(app_test_MSEs_MLL, open(os.path.join(experiment_path, f"{exp_num}_appTestMSEsMLL.pkl"), "wb")) 
+                dill.dump(app_test_MSEs_MAP, open(os.path.join(experiment_path, f"{exp_num}_appTestMSEsMAP.pkl"), "wb")) 
 
 
 
@@ -336,9 +354,9 @@ def run_experiment(config, **kwargs):
     #dill.dump(logables, open(os.path.join(experiment_path, f"results.pkl"), "wb"))
 
 
-num_data =  [10, 20, 30, 50, 70, 100]
+num_data =  [2, 3, 5, 7, 15]#[10, 25, 40, 50, 75, 100]
 
-data_kernel = ["SE", "MAT52", "LIN", "MAT32", "PER"]
+data_kernel = ["SE", "MAT52", "LIN", "MAT32", "MAT12", "PER"]
 
 #broken_list = ["PER", "C*PER", "MAT32+PER", "PER*(SE+RQ)"]
 #finished_list = ["LIN"]
@@ -357,7 +375,7 @@ print(configs)
 for config in configs:
     print(config)
     try:
-        run_experiment(config, only_nested=True)
+        run_experiment(config, only_nested=False)
     except Exception as e:
         print(f"Error in config {config}: {e}")
         continue
