@@ -15,7 +15,7 @@ import numpy as np
 from helpers.gp_classes import DataGPModel, ExactGPModel
 from helpers.plotting_functions import plot_training_data, plot_single_input_gp_posterior
 from helpers.training_functions import granso_optimization
-from helpers.util_functions import prior_distribution, extract_model_parameters
+from helpers.util_functions import prior_distribution
 
 from itertools import product
 
@@ -212,8 +212,8 @@ def run_experiment(config, **kwargs):
         nested_sampling = NestedSampling(model=model_MAP, prior=model_parameter_prior, store_full=True, logging=True, pickle_directory=experiment_path, pickle_name=f"nested_sampling_{exp_num}.pkl", maxcall=1e+5, maxiter=1e+5)# print_progress=True, 
 
         #target_metrics = [map, mll, lap0, lapA, lapB, aic, bic, nested_sampling]
-        target_metrics = [map, mll, lap0, lapA, lapB, aic, bic]
-        #target_metrics = [nested_sampling]
+        #target_metrics = [map, mll, lap0, lapA, lapB, aic, bic]
+        target_metrics = [nested_sampling]
 
         model_parameters_lap = [p for p in model_MAP.parameters() if p.requires_grad]
 
@@ -228,8 +228,8 @@ def run_experiment(config, **kwargs):
         nested_sampling_call = lambda : nested_sampling(logging=True)
 
         #metric_calls = [map_call, mll_call, lap0_call, lapA_call, lapB_call, aic_call, bic_call, nested_sampling_call]
-        metric_calls = [map_call, mll_call, lap0_call, lapA_call, lapB_call, aic_call, bic_call]
-        #metric_calls = [nested_sampling_call]
+        #metric_calls = [map_call, mll_call, lap0_call, lapA_call, lapB_call, aic_call, bic_call]
+        metric_calls = [nested_sampling_call]
 
         for metric, metric_call in zip(target_metrics, metric_calls):
             # instantiate the metric
@@ -270,7 +270,7 @@ def run_experiment(config, **kwargs):
         test_likelihoods = []
         test_likelihoods_map = []
         (observations_x, all_observations_y), (int_eval_pos, int_eval_obs), (app_eval_pos, app_eval_obs) 
-        if test_data_exists:
+        if test_data_exists and not only_nested:
             model_MLL.eval()
             model_MAP.eval()
             if "int_eval_obs" in locals() and int_eval_obs is not None:
@@ -354,7 +354,7 @@ def run_experiment(config, **kwargs):
     #dill.dump(logables, open(os.path.join(experiment_path, f"results.pkl"), "wb"))
 
 
-num_data =  [2, 3, 5, 7, 15]#[10, 25, 40, 50, 75, 100]
+num_data = [10, 40, 75]#[25, 50, 100] #[2, 3, 5, 7, 15]#[10, 25, 40, 50, 75, 100]
 
 data_kernel = ["SE", "MAT52", "LIN", "MAT32", "MAT12", "PER"]
 
@@ -375,7 +375,7 @@ print(configs)
 for config in configs:
     print(config)
     try:
-        run_experiment(config, only_nested=False)
+        run_experiment(config, only_nested=True)
     except Exception as e:
         print(f"Error in config {config}: {e}")
         continue

@@ -2,7 +2,7 @@ import copy
 import dynesty
 import gpytorch
 from laplace_model_selection.gpr.helpFunctions import get_string_representation_of_kernel as gsr
-from helpers.util_functions import reparameterize_model, fixed_reinit, prior_distribution, log_normalized_prior, extract_model_parameters
+from helpers.util_functions import reparameterize_model_full, reparameterize_model_trainable, prior_distribution, log_normalized_prior, extract_trainable_model_parameters
 from helpers.training_functions import base_kernel_parameter_priors as kernel_parameter_priors, base_parameter_priors as parameter_priors
 import itertools
 import numpy as np
@@ -18,7 +18,8 @@ import os
 # https://www.sfu.ca/sasdoc/sashtml/iml/chap11/sect8.htm
 # Also https://en.wikipedia.org/wiki/Finite_difference_coefficient
 def finite_difference_second_derivative_GP_neg_unscaled_map(model, likelihood, train_x, train_y, h_i_step=5e-2, h_j_step=5e-2, h_i_vec=[0.0, 0.0, 0.0], h_j_vec=[0.0, 0.0, 0.0], prior=None):
-    curr_params = torch.tensor(list(model.parameters()))
+    #curr_params = torch.tensor(list(model.parameters()))
+    curr_params = torch.tensor([p for p in list(model.hyperparameters()) if p.requires_grad])
     mll_fkt = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood, model)
     if prior is not None:
         theta_mu = prior.mean
@@ -32,19 +33,19 @@ def finite_difference_second_derivative_GP_neg_unscaled_map(model, likelihood, t
         h_j = h_j_step * torch.tensor(h_j_vec)
         map_call = lambda : (-mll_fkt(model(train_x), train_y) - log_normalized_prior(model, param_specs=parameter_priors , kernel_param_specs=kernel_parameter_priors, theta_mu=theta_mu, variance=variance))*len(*model.train_inputs)
         try:
-            fixed_reinit(model, curr_params+h_i + h_j)
+            reparameterize_model_trainable(model, curr_params+h_i + h_j)
             f_plus = map_call()
 
-            fixed_reinit(model, curr_params+h_i - h_j)
+            reparameterize_model_trainable(model, curr_params+h_i - h_j)
             f1 = map_call()
-            fixed_reinit(model, curr_params-h_i + h_j)
+            reparameterize_model_trainable(model, curr_params-h_i + h_j)
             f2 = map_call()
 
-            fixed_reinit(model, curr_params - h_i - h_j)
+            reparameterize_model_trainable(model, curr_params - h_i - h_j)
             f_minus = map_call()
 
             # Reverse model reparameterization
-            fixed_reinit(model, curr_params)
+            reparameterize_model_trainable(model, curr_params)
 
             return (f_plus - f1 - f2 + f_minus) / (4*h_i_step*h_j_step)
 
@@ -76,8 +77,11 @@ def finite_difference_hessian(model, likelihood, num_params, train_x, train_y,  
 
 
 
-def reparameterize_and_pos_mll(model, likelihood, theta, train_x, train_y):
-    reparameterize_model(model, theta)
+def reparameterize_and_pos_mll(model, likelihood, theta, train_x, train_y, trainable=True):
+    if trainable:
+        reparameterize_model_trainable(model, theta)
+    else:
+        reparameterize_model_full(model, theta)
     mll = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood, model)
     with torch.no_grad():
         return mll(model(train_x), train_y)
@@ -240,14 +244,13 @@ class NestedSampling():
         self.print_progress = kwargs.get("print_progress", False)
 
 
-        self.ndim = len(list(model.parameters()))
-
+        self.ndim = len(extract_trainable_model_parameters(self.model))
 
     def loglike(self, theta_i):
         try:
             log_like = (reparameterize_and_pos_mll(self.model, self.model.likelihood, theta_i, 
                                             self.model.train_inputs[0], 
-                                            self.model.train_targets)*len(*self.model.train_inputs)).detach().numpy()
+                                            self.model.train_targets, trainable=True)*len(*self.model.train_inputs)).detach().numpy()
         except Exception as E:
             #print(E)
             log_like = -np.inf
@@ -430,16 +433,16 @@ class MAP():
                 mll_value = mll_value* len(*model.train_inputs)
             if not self.logarithmic:
                 mll_value = torch.exp(mll_value)
-                prior_value = torch.exp(prior.log_prob(extract_model_parameters(model)))
+                prior_value = torch.exp(prior.log_prob(extract_trainable_model_parameters(model)))
                 map = mll_value * prior_value
             else:
-                map = mll_value + prior.log_prob(extract_model_parameters(model))
+                map = mll_value + prior.log_prob(extract_trainable_model_parameters(model))
             if self.scaling:
                 map = map / len(*model.train_inputs)
             if logging:
                 logables = {"scaling": self.scaling,
                             "logarithmic": self.logarithmic,
-                            "prior_value": prior.log_prob(extract_model_parameters(model)) if self.logarithmic else torch.exp(prior.log_prob(extract_model_parameters(model))),}
+                            "prior_value": prior.log_prob(extract_trainable_model_parameters(model)) if self.logarithmic else torch.exp(prior.log_prob(extract_trainable_model_parameters(model))),}
                 if given_mll is None:
                     latent_pred = model(train_x)
                     data_fit = A(likelihood(latent_pred), train_y)
