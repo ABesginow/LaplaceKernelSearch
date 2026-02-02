@@ -25,6 +25,7 @@ import matplotlib.pyplot as plt
 
 import os
 
+import time
 import torch
 import tqdm
 
@@ -177,8 +178,12 @@ def run_experiment(config, **kwargs):
         model_MAP = ExactGPModel(observations_x, observations_y, model_likelihood_MAP, kernel_name=model_kernel)
 
         if not only_nested:
+            start_time = time.time()
             # Train the model with MLL
-            neg_scaled_mll, model_MLL, model_likelihood_MLL, training_log_MLL = granso_optimization(model_MLL, model_likelihood_MLL, observations_x, observations_y, random_restarts=5, maxit=1000, MAP=False, double_precision=False, verbose=False)
+            neg_scaled_mll, model_MLL, model_likelihood_MLL, training_log_MLL = granso_optimization(model_MLL, model_likelihood_MLL, observations_x, observations_y, random_restarts=10, maxit=1000, MAP=False, double_precision=False, verbose=False)
+            end_time = time.time()
+            MLL_train_time = end_time - start_time
+            dill.dump(MLL_train_time, open(os.path.join(experiment_path, f"{exp_num}_trainTimeMLL.pkl"), "wb"))
             dill.dump(training_log_MLL, open(os.path.join(experiment_path, f"{exp_num}_trainLogMLL.pkl"), "wb"))
             dill.dump(copy.deepcopy(model_MLL.state_dict()), open(os.path.join(experiment_path, f"{exp_num}_stateDictMLL.pkl"), "wb"))
             #exp_num_result_dict["training log MLL"] = training_log_MLL
@@ -192,7 +197,11 @@ def run_experiment(config, **kwargs):
 
         # Train the model with MAP
         if not only_nested:
-            neg_scaled_map, model_MAP, model_likelihood_MAP, training_log_MAP = granso_optimization(model_MAP, model_likelihood_MAP, observations_x, observations_y, random_restarts=5, maxit=1000, MAP=True, double_precision=False, verbose=False, model_parameter_prior=model_parameter_prior)
+            start_time = time.time()
+            neg_scaled_map, model_MAP, model_likelihood_MAP, training_log_MAP = granso_optimization(model_MAP, model_likelihood_MAP, observations_x, observations_y, random_restarts=10, maxit=1000, MAP=True, double_precision=False, verbose=False, model_parameter_prior=model_parameter_prior)
+            end_time = time.time()
+            MAP_train_time = end_time - start_time
+            dill.dump(MAP_train_time, open(os.path.join(experiment_path, f"{exp_num}_trainTimeMAP.pkl"), "wb"))
             dill.dump(training_log_MAP, open(os.path.join(experiment_path, f"{exp_num}_trainLogMAP.pkl"), "wb"))
             dill.dump(copy.deepcopy(model_MAP.state_dict()), open(os.path.join(experiment_path, f"{exp_num}_stateDictMAP.pkl"), "wb"))
             #exp_num_result_dict["training log MAP"] = training_log_MAP
@@ -211,9 +220,9 @@ def run_experiment(config, **kwargs):
             bic = BIC(len(observations_x))
         nested_sampling = NestedSampling(model=model_MAP, prior=model_parameter_prior, store_full=True, logging=True, pickle_directory=experiment_path, pickle_name=f"nested_sampling_{exp_num}.pkl", maxcall=1e+5, maxiter=1e+5)# print_progress=True, 
 
-        #target_metrics = [map, mll, lap0, lapA, lapB, aic, bic, nested_sampling]
+        target_metrics = [map, mll, lap0, lapA, lapB, aic, bic, nested_sampling]
         #target_metrics = [map, mll, lap0, lapA, lapB, aic, bic]
-        target_metrics = [nested_sampling]
+        #target_metrics = [nested_sampling]
 
         model_parameters_lap = [p for p in model_MAP.parameters() if p.requires_grad]
 
@@ -227,15 +236,26 @@ def run_experiment(config, **kwargs):
             bic_call = lambda : bic(pos_unscaled_mll, len(model_parameters_lap), logging=True)
         nested_sampling_call = lambda : nested_sampling(logging=True)
 
-        #metric_calls = [map_call, mll_call, lap0_call, lapA_call, lapB_call, aic_call, bic_call, nested_sampling_call]
+        metric_calls = [map_call, mll_call, lap0_call, lapA_call, lapB_call, aic_call, bic_call, nested_sampling_call]
         #metric_calls = [map_call, mll_call, lap0_call, lapA_call, lapB_call, aic_call, bic_call]
-        metric_calls = [nested_sampling_call]
+        #metric_calls = [nested_sampling_call]
 
         for metric, metric_call in zip(target_metrics, metric_calls):
             # instantiate the metric
             #exp_num_result_dict[str(metric)] = dict()
             metric_log = {}
+            start_time = time.time()
             result, logs = metric_call()
+            end_time = time.time()
+            total_time = end_time - start_time
+            if not "Total time" in logs.keys():
+                logs.update({"Metric time": end_time - start_time})
+                if str(metric) in ["Lap0", "LapAIC", "LapBIC", "log MAP"]:
+                    logs.update({"Total time": total_time + MAP_train_time})
+                    logs.update({"Train time": MAP_train_time})
+                elif str(metric) in ["AIC", "BIC", "log ML"]:
+                    logs.update({"Total time": total_time + MLL_train_time})
+                    logs.update({"Train time": MLL_train_time})
             #exp_num_result_dict[str(metric)]["logs"] = logs
             #exp_num_result_dict[str(metric)]["model_evidence_approx"] = result
             metric_log["name"] = str(metric)
@@ -280,15 +300,14 @@ def run_experiment(config, **kwargs):
                     ## MLL
                     int_test_likelihoods_MAP = list()
                     int_test_likelihoods_MLL = list()
-                    for test_y in int_eval_obs:
-                        # Do MLL via a predictive distribution at eval_pos and then use dist.log_prob(test_y) to get the likelihood
-                        with torch.no_grad():
-                            int_MLL_preds = model_MLL(int_eval_pos)
-                            int_MAP_preds = model_MAP(int_eval_pos)
-                            int_normalized_log_prob_MLL = int_MLL_preds.log_prob(test_y/test_y.numel())
-                            int_normalized_log_prob_MAP = int_MAP_preds.log_prob(test_y/test_y.numel())
-                        int_test_likelihoods_MAP.append(int_normalized_log_prob_MAP)
-                        int_test_likelihoods_MLL.append(int_normalized_log_prob_MLL)
+                    # Do MLL via a predictive distribution at eval_pos and then use dist.log_prob(test_y) to get the likelihood
+                    with torch.no_grad():
+                        int_MLL_preds = model_MLL(int_eval_pos)
+                        int_MAP_preds = model_MAP(int_eval_pos)
+                        int_normalized_log_prob_MLL = int_MLL_preds.log_prob(test_y)/test_y.numel()
+                        int_normalized_log_prob_MAP = int_MAP_preds.log_prob(test_y)/test_y.numel()
+                    int_test_likelihoods_MAP.append(int_normalized_log_prob_MAP)
+                    int_test_likelihoods_MLL.append(int_normalized_log_prob_MLL)
 
 
                     dill.dump(int_test_likelihoods_MLL, open(os.path.join(experiment_path, f"{exp_num}_intTestLikelihoodsMLL.pkl"), "wb")) 
@@ -298,14 +317,13 @@ def run_experiment(config, **kwargs):
                     ## MSE
                     int_test_MSEs_MLL = list()
                     int_test_MSEs_MAP = list()
-                    for test_y in int_eval_obs:
-                        with torch.no_grad():
-                            int_MLL_preds = model_MLL(int_eval_pos)
-                            int_MAP_preds = model_MAP(int_eval_pos)
-                            int_MLL_MSE = torch.mean((test_y - int_MLL_preds.mean)**2)
-                            int_MAP_MSE = torch.mean((test_y - int_MAP_preds.mean)**2)
-                        int_test_MSEs_MLL.append(int_MLL_MSE)
-                        int_test_MSEs_MAP.append(int_MAP_MSE)
+                    with torch.no_grad():
+                        int_MLL_preds = model_MLL(int_eval_pos)
+                        int_MAP_preds = model_MAP(int_eval_pos)
+                        int_MLL_MSE = torch.mean((test_y - int_MLL_preds.mean)**2)
+                        int_MAP_MSE = torch.mean((test_y - int_MAP_preds.mean)**2)
+                    int_test_MSEs_MLL.append(int_MLL_MSE)
+                    int_test_MSEs_MAP.append(int_MAP_MSE)
 
                     dill.dump(int_test_MSEs_MLL, open(os.path.join(experiment_path, f"{exp_num}_intTestMSEsMLL.pkl"), "wb")) 
                     dill.dump(int_test_MSEs_MAP, open(os.path.join(experiment_path, f"{exp_num}_intTestMSEsMAP.pkl"), "wb")) 
@@ -322,8 +340,8 @@ def run_experiment(config, **kwargs):
                     with torch.no_grad():
                         app_MLL_preds = model_MLL(app_eval_pos)
                         app_MAP_preds = model_MAP(app_eval_pos)
-                        app_normalized_log_prob_MLL = app_MLL_preds.log_prob(test_y/test_y.numel())
-                        app_normalized_log_prob_MAP = app_MAP_preds.log_prob(test_y/test_y.numel())
+                        app_normalized_log_prob_MLL = app_MLL_preds.log_prob(test_y)/test_y.numel()
+                        app_normalized_log_prob_MAP = app_MAP_preds.log_prob(test_y)/test_y.numel()
                     app_test_likelihoods_MAP.append(app_normalized_log_prob_MAP)
                     app_test_likelihoods_MLL.append(app_normalized_log_prob_MLL)
 
@@ -339,8 +357,8 @@ def run_experiment(config, **kwargs):
                     with torch.no_grad():
                         app_MLL_preds = model_MLL(app_eval_pos)
                         app_MAP_preds = model_MAP(app_eval_pos)
-                        app_MLL_MSE = torch.mean((test_y - app_MLL_preds.mean)**2)
-                        app_MAP_MSE = torch.mean((test_y - app_MAP_preds.mean)**2)
+                        app_MLL_MSE = torch.mean((test_y - app_MLL_preds.mean)**2, axis=1)
+                        app_MAP_MSE = torch.mean((test_y - app_MAP_preds.mean)**2, axis=1)
                     app_test_MSEs_MLL.append(app_MLL_MSE)
                     app_test_MSEs_MAP.append(app_MAP_MSE)
 
@@ -354,7 +372,7 @@ def run_experiment(config, **kwargs):
     #dill.dump(logables, open(os.path.join(experiment_path, f"results.pkl"), "wb"))
 
 
-num_data = [10, 40, 75]#[25, 50, 100] #[2, 3, 5, 7, 15]#[10, 25, 40, 50, 75, 100]
+num_data = [200]#[10, 15, 25, 40, 50, 75, 100, 200]# [2, 3, 5, 7, 15, 10, 25, 40, 50, 75, 100]
 
 data_kernel = ["SE", "MAT52", "LIN", "MAT32", "MAT12", "PER"]
 
@@ -375,7 +393,7 @@ print(configs)
 for config in configs:
     print(config)
     try:
-        run_experiment(config, only_nested=True)
+        run_experiment(config, only_nested=False)
     except Exception as e:
         print(f"Error in config {config}: {e}")
         continue

@@ -110,6 +110,7 @@ class Lap():
             total_logs.update(hessian_logs)
             total_logs.update(eigval_correction_logs)
             total_logs.update({
+                "parameter values" : copy.deepcopy(model_parameters),
                 "neg MAP": neg_unscaled_optimum,
                 "punish term": punish_term,
                 "laplace without replacement": -neg_unscaled_optimum + 0.5*(len(model_parameters)*torch.log(torch.tensor(2*torch.pi)) - torch.logdet(hessian)),
@@ -234,6 +235,7 @@ class NestedSampling():
         self.maxiter = kwargs.get("maxiter", sys.maxsize)
         self.checkpoint_every = kwargs.get("checkpoint_every", sys.maxsize)
         self.random_seed = kwargs.get("random_seed", random.randint(0, 1000000))
+        self.sampler = kwargs.get("sampler", "auto")
 
         self.store_samples = kwargs.get("store_samples", False)
         self.store_likelihoods = kwargs.get("store_likelihoods", False)
@@ -281,13 +283,13 @@ class NestedSampling():
         if self.dynamic_sampling:
             # Trying out dynamic sampler
             dsampler = dynesty.DynamicNestedSampler(self.loglike, self.prior_transform, self.ndim, 
-                                                    rstate=rng_generator)
+                                                    rstate=rng_generator, sample=self.sampler)
             start_time = time.time()
             #dsampler.run_nested(dlogz_init=0.01, maxcall=100000, print_progress=print_progress)# nlive_init=500, nlive_batch=100,
             dsampler.run_nested(dlogz_init=0.01,# nlive_init=500, nlive_batch=100,
                                 print_progress=self.print_progress,
                                 maxcall=self.maxcall,
-                                maxiter=self.maxiter,)
+                                maxiter=self.maxiter)
                                 # checkpoint_every=checkpoint_every, # checkpoint_file=checkpoint_file
             end_time = time.time()
             res = dsampler.results
